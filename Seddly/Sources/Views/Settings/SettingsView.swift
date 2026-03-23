@@ -34,12 +34,17 @@ struct SettingsView: View {
 
                         if !offlineMode {
                             Toggle("Auto-analyze screenshots", isOn: $autoAnalyze)
+                                .disabled(approvedExtractionCount < AppConstants.autoApproveAfterCount && !autoAnalyze)
                             if autoAnalyze {
-                                Text("Screenshots are sent for AI analysis without asking first.")
+                                Text("Screenshots are sent for AI analysis without review. Medium-confidence items are added directly to your ledger.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            } else if approvedExtractionCount >= AppConstants.autoApproveAfterCount {
+                                Text("You've approved \(approvedExtractionCount) extractions — auto-analyze is now available!")
+                                    .font(.caption)
+                                    .foregroundStyle(.accent)
                             } else {
-                                Text("You've approved \(approvedExtractionCount) extraction\(approvedExtractionCount == 1 ? "" : "s"). After \(AppConstants.autoApproveAfterCount), you can enable auto-analyze.")
+                                Text("You've approved \(approvedExtractionCount) of \(AppConstants.autoApproveAfterCount) extractions needed to unlock auto-analyze.")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }

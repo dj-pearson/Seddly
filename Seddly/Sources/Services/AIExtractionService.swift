@@ -13,6 +13,7 @@ actor AIExtractionService {
         let madeBy: String
         let madeTo: String
         let type: String
+        let category: String?
         let deadline: String?
         let dollarAmount: Double?
         let confidence: Int
@@ -23,6 +24,7 @@ actor AIExtractionService {
             case madeBy = "made_by"
             case madeTo = "made_to"
             case type
+            case category
             case deadline
             case dollarAmount = "dollar_amount"
             case confidence

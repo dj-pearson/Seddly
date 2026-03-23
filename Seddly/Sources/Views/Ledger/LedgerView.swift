@@ -11,6 +11,8 @@ struct LedgerView: View {
     @State private var showingFilter = false
     @State private var showingUpgrade = false
     @State private var showingReviewQueue = false
+    @AppStorage("autoAnalyze") private var autoAnalyze = false
+    @AppStorage("offlineMode") private var offlineMode = false
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
     @State private var showingBulkAction = false
@@ -343,7 +345,9 @@ struct LedgerView: View {
                 since: lastProcessed,
                 context: modelContext,
                 aiEndpoint: nil,
-                subscriptionTier: subscriptionService.currentTier
+                subscriptionTier: subscriptionService.currentTier,
+                autoAnalyze: autoAnalyze,
+                offlineMode: offlineMode
             )
 
             withAnimation {

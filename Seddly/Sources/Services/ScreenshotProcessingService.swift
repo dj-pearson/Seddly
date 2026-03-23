@@ -21,7 +21,9 @@ actor ScreenshotProcessingService {
         since date: Date?,
         context: ModelContext,
         aiEndpoint: URL?,
-        subscriptionTier: SubscriptionService.SubscriptionTier
+        subscriptionTier: SubscriptionService.SubscriptionTier,
+        autoAnalyze: Bool = false,
+        offlineMode: Bool = false
     ) async -> ProcessingResult {
         var result = ProcessingResult()
 
@@ -53,7 +55,8 @@ actor ScreenshotProcessingService {
                 continue
             }
 
-            // Layer 3: Rule-based filter
+            // Layer 3: Rule-based filter (use feedback-adjusted threshold)
+            let adjustedThreshold = ClassifierFeedbackService.currentThreshold()
             let ruleScore = RuleFilterService.score(text: ocrText)
 
             let queueItem = ProcessingQueue(screenshotAssetID: assetID)
@@ -64,29 +67,31 @@ actor ScreenshotProcessingService {
 
             result.screenshotsProcessed += 1
 
-            // Layer 4: AI extraction (Pro+ only, requires network + threshold)
+            // Layer 4: AI extraction (Pro+ only, requires network + threshold + not offline)
             if subscriptionTier >= .pro,
-               ruleScore >= AppConstants.defaultConfidenceThreshold,
+               !offlineMode,
+               ruleScore >= adjustedThreshold,
                let endpoint = aiEndpoint {
                 let commitments = await extractWithAI(
                     text: ocrText,
                     endpoint: endpoint,
                     assetID: assetID,
                     screenshotDate: asset.creationDate,
-                    context: context
+                    context: context,
+                    autoAnalyze: autoAnalyze
                 )
                 result.commitmentsDetected += commitments
 
                 queueItem.processingStatus = .completed
-            } else if ruleScore >= AppConstants.defaultConfidenceThreshold {
-                // Free tier: create commitment from rule-based analysis only
+            } else if ruleScore >= adjustedThreshold {
+                // On-device only: create commitment from rule-based analysis
                 let commitment = LocalCommitment(
                     entityName: "Unknown",
                     summary: String(ocrText.prefix(200)),
                     fullText: ocrText,
                     screenshotAssetID: assetID,
                     screenshotDate: asset.creationDate,
-                    needsAIProcessing: true
+                    needsAIProcessing: !autoAnalyze
                 )
                 context.insert(commitment)
                 result.commitmentsDetected += 1
@@ -109,7 +114,8 @@ actor ScreenshotProcessingService {
         endpoint: URL,
         assetID: String,
         screenshotDate: Date?,
-        context: ModelContext
+        context: ModelContext,
+        autoAnalyze: Bool = false
     ) async -> Int {
         let aiService = AIExtractionService(endpointURL: endpoint)
 
@@ -136,6 +142,9 @@ actor ScreenshotProcessingService {
                 nil
             }
 
+            // High confidence (7+): auto-add. Medium (4-6): review queue unless auto-analyze is on.
+            let needsReview = extracted.confidence < 7 && !autoAnalyze
+
             let commitment = LocalCommitment(
                 entityName: extracted.madeBy,
                 summary: extracted.text,
@@ -149,8 +158,14 @@ actor ScreenshotProcessingService {
                 commitmentType: CommitmentType(rawValue: extracted.type),
                 screenshotAssetID: assetID,
                 screenshotDate: screenshotDate,
-                needsAIProcessing: false
+                needsAIProcessing: needsReview
             )
+
+            // Apply AI-detected category
+            if let categoryStr = extracted.category,
+               let detectedCategory = CommitmentCategory(rawValue: categoryStr) {
+                commitment.category = detectedCategory
+            }
 
             // Find or create entity
             let entityName = extracted.madeBy

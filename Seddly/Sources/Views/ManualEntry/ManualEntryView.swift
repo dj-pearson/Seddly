@@ -80,6 +80,14 @@ struct ManualEntryView: View {
                         .keyboardType(.decimalPad)
                 }
 
+                Section("Category") {
+                    Picker("Category", selection: $viewModel.category) {
+                        ForEach(CommitmentCategory.allCases) { category in
+                            Label(category.label, systemImage: category.icon).tag(category)
+                        }
+                    }
+                }
+
                 Section("Screenshot (optional)") {
                     if let attachedImage {
                         Image(uiImage: attachedImage)

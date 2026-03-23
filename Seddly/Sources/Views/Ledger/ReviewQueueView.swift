@@ -4,6 +4,8 @@ import SwiftData
 struct ReviewQueueView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
+    @AppStorage("autoAnalyze") private var autoAnalyze = false
     @Query(
         filter: #Predicate<LocalCommitment> { $0.needsAIProcessing == true },
         sort: \LocalCommitment.createdAt,
@@ -51,6 +53,12 @@ struct ReviewQueueView: View {
                                     Button {
                                         commitment.needsAIProcessing = false
                                         commitment.updatedAt = .now
+                                        approvedExtractionCount += 1
+                                        ClassifierFeedbackService.recordAutoDetection()
+                                        // Auto-enable auto-analyze after threshold
+                                        if approvedExtractionCount >= AppConstants.autoApproveAfterCount && !autoAnalyze {
+                                            autoAnalyze = true
+                                        }
                                     } label: {
                                         Label("Keep", systemImage: "checkmark")
                                     }
@@ -61,6 +69,7 @@ struct ReviewQueueView: View {
                                         commitment.status = .dismissed
                                         commitment.needsAIProcessing = false
                                         commitment.updatedAt = .now
+                                        ClassifierFeedbackService.recordDismissal()
                                     } label: {
                                         Label("Dismiss", systemImage: "xmark")
                                     }

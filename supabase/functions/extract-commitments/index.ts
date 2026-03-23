@@ -8,6 +8,7 @@ interface CommitmentExtraction {
     made_by: string;
     made_to: string;
     type: "firm_promise" | "soft_commitment" | "informational" | "irrelevant";
+    category: "housing" | "freelance" | "purchases" | "personal" | "medical" | "insurance" | "uncategorized";
     deadline: string | null;
     dollar_amount: number | null;
     confidence: number;
@@ -28,9 +29,10 @@ For each commitment found, determine:
 2. Who made the commitment (the person/entity making the promise)
 3. Who the commitment was made to (usually "User")
 4. The type: "firm_promise" (explicit guarantee with deadline), "soft_commitment" (stated intention without firm deadline), "informational" (price quote/estimate, not a promise), or "irrelevant" (no actionable commitment)
-5. The deadline (as ISO 8601 date yyyy-MM-dd if detectable, null otherwise). If the text says "next Friday" or "by end of month", resolve it relative to today's date.
-6. Any dollar amount mentioned (as a number, null if none)
-7. A confidence score from 1-10:
+5. The category — classify the commitment into one of: "housing" (landlord, rent, repairs, maintenance, lease), "freelance" (payments, invoices, client work, contracts), "purchases" (orders, deliveries, refunds, warranties, returns), "medical" (appointments, prescriptions, procedures, billing), "insurance" (claims, coverage, payouts), "personal" (friends, family, personal favors), or "uncategorized" if none fit
+6. The deadline (as ISO 8601 date yyyy-MM-dd if detectable, null otherwise). If the text says "next Friday" or "by end of month", resolve it relative to today's date.
+7. Any dollar amount mentioned (as a number, null if none)
+8. A confidence score from 1-10:
    - 9-10: Explicit, unambiguous commitment with clear deadline
    - 7-8: Clear commitment, deadline may be implicit
    - 4-6: Possible commitment, some hedging or ambiguity
@@ -39,7 +41,7 @@ For each commitment found, determine:
 
 Respond ONLY with valid JSON matching this schema:
 {
-  "commitments": [{ "text", "made_by", "made_to", "type", "deadline", "dollar_amount", "confidence", "reasoning" }],
+  "commitments": [{ "text", "made_by", "made_to", "type", "category", "deadline", "dollar_amount", "confidence", "reasoning" }],
   "rejected": [{ "text", "type", "confidence", "reasoning" }]
 }
 

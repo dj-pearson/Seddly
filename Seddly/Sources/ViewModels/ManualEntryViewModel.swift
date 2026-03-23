@@ -9,6 +9,7 @@ final class ManualEntryViewModel {
     var hasDeadline = false
     var dollarAmount = ""
     var notes = ""
+    var category: CommitmentCategory = .uncategorized
 
     var isValid: Bool {
         !entityName.trimmingCharacters(in: .whitespaces).isEmpty &&
@@ -31,6 +32,7 @@ final class ManualEntryViewModel {
             source: .manual,
             notes: notes.isEmpty ? nil : notes
         )
+        commitment.category = category
 
         // Find or create entity
         let name = commitment.entityName
@@ -44,6 +46,7 @@ final class ManualEntryViewModel {
         }
 
         context.insert(commitment)
+        ClassifierFeedbackService.recordManualAddition()
         return commitment
     }
 
@@ -54,5 +57,6 @@ final class ManualEntryViewModel {
         hasDeadline = false
         dollarAmount = ""
         notes = ""
+        category = .uncategorized
     }
 }

@@ -86,11 +86,19 @@ final class LedgerViewModel {
     func fulfill(_ commitment: LocalCommitment) {
         commitment.status = .fulfilled
         commitment.updatedAt = .now
+        // Record as successful detection if it was auto-detected
+        if commitment.source == .auto {
+            ClassifierFeedbackService.recordAutoDetection()
+        }
     }
 
     func dismiss(_ commitment: LocalCommitment) {
         commitment.status = .dismissed
         commitment.updatedAt = .now
+        // Record as false positive if it was auto-detected
+        if commitment.source == .auto {
+            ClassifierFeedbackService.recordDismissal()
+        }
     }
 
     // MARK: - Bulk Edit
