@@ -28,6 +28,7 @@ final class ProcessingQueue {
     enum ProcessingStatus: String, Codable {
         case pending
         case processing
+        case awaitingReview  // Text extracted, needs user approval before AI send
         case completed
         case skipped
     }

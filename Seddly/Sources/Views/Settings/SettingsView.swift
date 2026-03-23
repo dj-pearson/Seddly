@@ -63,6 +63,12 @@ struct SettingsView: View {
                                 },
                                 set: {
                                     dailyDigestTime = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                                    // Persist for background/foreground digest scheduling
+                                    let components = Calendar.current.dateComponents([.hour, .minute], from: $0)
+                                    UserDefaults.standard.set(
+                                        ["hour": components.hour ?? 20, "minute": components.minute ?? 0],
+                                        forKey: "dailyDigestTime"
+                                    )
                                 }
                             ),
                             displayedComponents: .hourAndMinute

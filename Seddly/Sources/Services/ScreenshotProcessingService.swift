@@ -72,17 +72,22 @@ actor ScreenshotProcessingService {
                !offlineMode,
                ruleScore >= adjustedThreshold,
                let endpoint = aiEndpoint {
-                let commitments = await extractWithAI(
-                    text: ocrText,
-                    endpoint: endpoint,
-                    assetID: assetID,
-                    screenshotDate: asset.creationDate,
-                    context: context,
-                    autoAnalyze: autoAnalyze
-                )
-                result.commitmentsDetected += commitments
-
-                queueItem.processingStatus = .completed
+                if autoAnalyze {
+                    // Auto-analyze: send directly to AI without user review
+                    let commitments = await extractWithAI(
+                        text: ocrText,
+                        endpoint: endpoint,
+                        assetID: assetID,
+                        screenshotDate: asset.creationDate,
+                        context: context,
+                        autoAnalyze: true
+                    )
+                    result.commitmentsDetected += commitments
+                    queueItem.processingStatus = .completed
+                } else {
+                    // Needs user review before AI send (PRD §5.4)
+                    queueItem.processingStatus = .awaitingReview
+                }
             } else if ruleScore >= adjustedThreshold {
                 // On-device only: create commitment from rule-based analysis
                 let commitment = LocalCommitment(
@@ -192,6 +197,26 @@ actor ScreenshotProcessingService {
         }
 
         return count
+    }
+
+    /// Process a single queue item after user approves the text for AI analysis.
+    func processReviewedItem(
+        _ queueItem: ProcessingQueue,
+        approvedText: String,
+        aiEndpoint: URL,
+        context: ModelContext
+    ) async -> Int {
+        let commitments = await extractWithAI(
+            text: approvedText,
+            endpoint: aiEndpoint,
+            assetID: queueItem.screenshotAssetID,
+            screenshotDate: queueItem.createdAt,
+            context: context,
+            autoAnalyze: false
+        )
+        queueItem.processingStatus = .completed
+        try? context.save()
+        return commitments
     }
 
     private func loadImage(from asset: PHAsset) async -> UIImage? {

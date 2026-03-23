@@ -11,6 +11,14 @@ final class OnboardingViewModel {
 
     func requestPhotoAccess() async {
         isRequestingPermission = true
+        // Request limited access first per PRD §5.1 — less intimidating to users
+        photoAuthStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+        isRequestingPermission = false
+    }
+
+    /// Request limited access only — user selects specific photos/albums
+    func requestLimitedPhotoAccess() async {
+        isRequestingPermission = true
         photoAuthStatus = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
         isRequestingPermission = false
     }

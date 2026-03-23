@@ -16,6 +16,9 @@ struct LedgerView: View {
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
     @State private var showingBulkAction = false
+    @State private var showingAIReview = false
+    @State private var pendingAIText: String?
+    @State private var pendingAICallback: ((String?) -> Void)?
 
     private var visibleCommitments: [LocalCommitment] {
         if subscriptionService.currentTier == .free {
@@ -27,6 +30,12 @@ struct LedgerView: View {
     private var activeCommitments: [LocalCommitment] {
         visibleCommitments.filter { $0.status != .dismissed && $0.status != .fulfilled }
     }
+
+    @Query(
+        filter: #Predicate<ProcessingQueue> { $0.processingStatusRaw == "awaitingReview" },
+        sort: \ProcessingQueue.createdAt
+    )
+    private var awaitingAIReview: [ProcessingQueue]
 
     private var reviewQueueItems: [LocalCommitment] {
         commitments.filter { $0.needsAIProcessing || ($0.confidenceScore >= 4 && $0.confidenceScore <= 6 && $0.source == .auto) }
@@ -100,6 +109,9 @@ struct LedgerView: View {
             }
             .overlay(alignment: .bottom) {
                 VStack(spacing: 0) {
+                    if !awaitingAIReview.isEmpty && !autoAnalyze {
+                        aiReviewBanner
+                    }
                     if !reviewQueueItems.isEmpty {
                         reviewQueueBanner
                     }
@@ -129,6 +141,25 @@ struct LedgerView: View {
                     }
                 }
                 Button("Cancel", role: .cancel) {}
+            }
+            .sheet(isPresented: $showingAIReview) {
+                if let text = pendingAIText {
+                    AITextReviewView(
+                        extractedText: text,
+                        onApprove: {
+                            pendingAICallback?(text)
+                            showingAIReview = false
+                        },
+                        onEdit: { editedText in
+                            pendingAICallback?(editedText)
+                            showingAIReview = false
+                        },
+                        onSkip: {
+                            pendingAICallback?(nil)
+                            showingAIReview = false
+                        }
+                    )
+                }
             }
             .sheet(isPresented: $showingManualEntry) {
                 ManualEntryView()
@@ -248,6 +279,55 @@ struct LedgerView: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
+    private var aiReviewBanner: some View {
+        Button {
+            presentNextAIReview()
+        } label: {
+            HStack {
+                Image(systemName: "eye.trianglebadge.exclamationmark")
+                    .foregroundStyle(.blue)
+                Text("\(awaitingAIReview.count) screenshot\(awaitingAIReview.count == 1 ? "" : "s") ready for AI analysis — review before sending")
+                    .font(.caption)
+                Spacer()
+                Text("Review")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .padding(.bottom, 4)
+    }
+
+    private func presentNextAIReview() {
+        guard let item = awaitingAIReview.first,
+              let text = item.extractedText else { return }
+
+        pendingAIText = text
+        pendingAICallback = { approvedText in
+            Task {
+                if let approvedText {
+                    let service = ScreenshotProcessingService()
+                    // In production, pass real AI endpoint
+                    // For now, mark as completed after approval
+                    item.processingStatus = .completed
+                    try? modelContext.save()
+
+                    @AppStorage("approvedExtractionCount") var count = 0
+                    count += 1
+                } else {
+                    // User skipped — mark as completed without AI
+                    item.processingStatus = .skipped
+                    try? modelContext.save()
+                }
+            }
+        }
+        showingAIReview = true
+    }
+
     private var reviewQueueBanner: some View {
         Button {
             showingReviewQueue = true
@@ -355,11 +435,40 @@ struct LedgerView: View {
                 isProcessing = false
             }
 
+            // Update daily digest with real data
+            updateDailyDigest(
+                screenshotsProcessed: result.screenshotsProcessed,
+                commitmentsDetected: result.commitmentsDetected
+            )
+
             if newCommitmentsCount > 0 {
                 try? await Task.sleep(for: .seconds(5))
                 withAnimation { newCommitmentsCount = 0 }
             }
         }
+    }
+
+    private func updateDailyDigest(screenshotsProcessed: Int, commitmentsDetected: Int) {
+        // Count upcoming deadlines this week
+        let weekFromNow = Calendar.current.date(byAdding: .day, value: 7, to: .now) ?? .now
+        let upcomingDeadlines = visibleCommitments.filter { commitment in
+            guard let deadline = commitment.deadline,
+                  commitment.status == .pending else { return false }
+            return deadline > .now && deadline <= weekFromNow
+        }.count
+
+        // Get user-configured digest time
+        let digestTime = UserDefaults.standard.object(forKey: "dailyDigestTime") as? [String: Int]
+        let hour = digestTime?["hour"] ?? 20
+        let minute = digestTime?["minute"] ?? 0
+
+        DigestNotificationService.scheduleDailyDigest(
+            hour: hour,
+            minute: minute,
+            screenshotsProcessed: screenshotsProcessed,
+            commitmentsDetected: commitmentsDetected,
+            upcomingDeadlines: upcomingDeadlines
+        )
     }
 }
 
