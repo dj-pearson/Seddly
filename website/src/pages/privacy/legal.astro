@@ -1,0 +1,139 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Privacy Policy — Seddly">
+  <section class="legal">
+    <h1>Privacy Policy</h1>
+    <p class="effective">Effective Date: March 23, 2026</p>
+
+    <p>Pearson Media LLC ("we," "us," "our") operates the Seddly mobile application ("App"). This Privacy Policy explains how we collect, use, and protect your information.</p>
+
+    <h2>1. Information We Collect</h2>
+
+    <h3>1.1 Information Processed On-Device (Never Transmitted)</h3>
+    <ul>
+      <li><strong>Screenshots:</strong> The App accesses only the Screenshots smart album on your device. Screenshot image files are processed on-device using Apple's Vision framework for text recognition. Screenshot images are never uploaded, transmitted, or stored on our servers.</li>
+      <li><strong>Extracted Text:</strong> Text recognized from screenshots is stored locally on your device.</li>
+      <li><strong>Commitment Data:</strong> Commitments, deadlines, entity names, and notes are stored locally on your device using SwiftData.</li>
+    </ul>
+
+    <h3>1.2 Information Sent for AI Processing (Pro and Pro+ Only)</h3>
+    <ul>
+      <li><strong>Text Snippets:</strong> When AI-powered commitment extraction is used, extracted text from screenshots (not the images themselves) is sent to our servers for analysis. This text is processed by Anthropic's Claude AI API. No personally identifiable information, device identifiers, or image data is included in these requests.</li>
+      <li><strong>Processing is Ephemeral:</strong> Text sent for AI analysis is not stored on our servers or by Anthropic after processing is complete.</li>
+    </ul>
+
+    <h3>1.3 Account Information (Pro+ Only)</h3>
+    <ul>
+      <li>If you create a Pro+ account via Apple Sign-In, we collect your Apple User ID and, optionally, your email address.</li>
+      <li>Subscription status and expiration dates are stored on our servers.</li>
+      <li>Commitment data is synced to our servers for cross-device access.</li>
+    </ul>
+
+    <h3>1.4 Analytics (All Tiers)</h3>
+    <ul>
+      <li>We collect anonymized, aggregate processing statistics (number of screenshots processed, commitments extracted) using an anonymized device identifier. This data cannot be linked to you personally.</li>
+      <li>We use Apple's App Store Connect Analytics for download and usage metrics. We do not use third-party analytics SDKs.</li>
+    </ul>
+
+    <h2>2. How We Use Your Information</h2>
+    <ul>
+      <li>To extract commitments, deadlines, and entities from screenshot text</li>
+      <li>To send deadline notifications</li>
+      <li>To sync data across devices (Pro+ only)</li>
+      <li>To process subscription transactions</li>
+      <li>To improve commitment detection accuracy using anonymized aggregate statistics</li>
+    </ul>
+
+    <h2>3. Third-Party Services</h2>
+    <ul>
+      <li><strong>Anthropic (Claude API):</strong> Text snippets are processed by Anthropic's AI for commitment extraction. Anthropic's privacy policy applies to data processed by their API. Anthropic does not use API inputs to train their models.</li>
+      <li><strong>Apple:</strong> Sign-In with Apple is used for Pro+ account creation. App Store handles subscription billing.</li>
+      <li><strong>Supabase:</strong> Our backend infrastructure for Pro+ data sync and Edge Function hosting.</li>
+    </ul>
+
+    <h2>4. Data Retention</h2>
+    <ul>
+      <li><strong>On-Device Data:</strong> Retained until you delete it or uninstall the App.</li>
+      <li><strong>Server-Side Data (Pro+):</strong> Retained while your account is active. Deleted within 30 days of account deletion.</li>
+      <li><strong>AI Processing Data:</strong> Not retained. Text is processed and discarded.</li>
+      <li><strong>Analytics Data:</strong> Retained for 12 months, then deleted.</li>
+    </ul>
+
+    <h2>5. Your Rights</h2>
+    <p>You have the right to:</p>
+    <ul>
+      <li><strong>Access:</strong> View all data the App has collected (available in Settings &gt; Your Data).</li>
+      <li><strong>Delete:</strong> Delete all local and server-side data with a single tap (Settings &gt; Delete All Data).</li>
+      <li><strong>Export:</strong> Export your commitment data (Pro+ feature).</li>
+      <li><strong>Opt Out:</strong> Use the App in fully offline mode without any cloud processing.</li>
+    </ul>
+
+    <h2>6. Data Security</h2>
+    <p>On-device data is protected by iOS device encryption. Network communications use TLS 1.3. Server-side data is encrypted at rest. We use Row Level Security to ensure users can only access their own data.</p>
+
+    <h2>7. Children's Privacy</h2>
+    <p>The App is not intended for children under 13. We do not knowingly collect personal information from children under 13. If you believe we have collected information from a child under 13, please contact us.</p>
+
+    <h2>8. Changes to This Policy</h2>
+    <p>We may update this Privacy Policy from time to time. We will notify you of any material changes by posting the new policy in the App and on our website.</p>
+
+    <h2>9. Contact</h2>
+    <p>For privacy questions or data requests, contact us at:<br/>
+      <a href="mailto:privacy@seddly.com">privacy@seddly.com</a><br/>
+      Pearson Media LLC</p>
+  </section>
+</BaseLayout>
+
+<style>
+  .legal {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 6rem 2rem 4rem;
+  }
+
+  .legal h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+  }
+
+  .effective {
+    color: var(--color-text-muted);
+    margin-bottom: 2rem;
+    font-size: 0.9rem;
+  }
+
+  .legal h2 {
+    font-size: 1.3rem;
+    margin-top: 2.5rem;
+    margin-bottom: 0.8rem;
+    text-align: left;
+  }
+
+  .legal h3 {
+    font-size: 1.05rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .legal p {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+    line-height: 1.7;
+  }
+
+  .legal ul {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    padding-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .legal li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+  }
+</style>

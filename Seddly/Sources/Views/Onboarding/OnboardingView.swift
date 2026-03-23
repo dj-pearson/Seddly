@@ -1,17 +1,27 @@
 import SwiftUI
+import Photos
 
 struct OnboardingView: View {
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var viewModel = OnboardingViewModel()
+    @State private var showBackfill = false
 
     var body: some View {
-        TabView(selection: $viewModel.currentPage) {
-            welcomePage.tag(0)
-            howItWorksPage.tag(1)
-            privacyPage.tag(2)
-            permissionPage.tag(3)
+        if showBackfill {
+            BackfillView {
+                hasCompletedOnboarding = true
+            }
+        } else {
+            TabView(selection: $viewModel.currentPage) {
+                welcomePage.tag(0)
+                howItWorksPage.tag(1)
+                privacyPage.tag(2)
+                permissionPage.tag(3)
+                notificationPage.tag(4)
+            }
+            .tabViewStyle(.page)
+            .indexViewStyle(.page(backgroundDisplayMode: .always))
         }
-        .tabViewStyle(.page)
-        .indexViewStyle(.page(backgroundDisplayMode: .always))
     }
 
     private var welcomePage: some View {
@@ -85,7 +95,7 @@ struct OnboardingView: View {
             Button {
                 Task {
                     await viewModel.requestPhotoAccess()
-                    viewModel.completeOnboarding()
+                    withAnimation { viewModel.advancePage() }
                 }
             } label: {
                 Text("Allow Screenshot Access")
@@ -96,7 +106,42 @@ struct OnboardingView: View {
             .disabled(viewModel.isRequestingPermission)
 
             Button("Skip for Now") {
-                viewModel.completeOnboarding()
+                withAnimation { viewModel.advancePage() }
+            }
+            .foregroundStyle(.secondary)
+        }
+        .padding()
+    }
+
+    private var notificationPage: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: "bell.badge")
+                .font(.system(size: 60))
+                .foregroundStyle(.accent)
+            Text("Stay on Top of Deadlines")
+                .font(.title2)
+                .fontWeight(.bold)
+            Text("Get notified when deadlines approach and when commitments go overdue.")
+                .multilineTextAlignment(.center)
+                .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button {
+                Task {
+                    await viewModel.requestNotificationAccess()
+                    finishOnboarding()
+                }
+            } label: {
+                Text("Enable Notifications")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+
+            Button("Skip") {
+                finishOnboarding()
             }
             .foregroundStyle(.secondary)
         }
@@ -114,6 +159,14 @@ struct OnboardingView: View {
         }
         .buttonStyle(.borderedProminent)
         .controlSize(.large)
+    }
+
+    private func finishOnboarding() {
+        if viewModel.photoAuthStatus == .authorized || viewModel.photoAuthStatus == .limited {
+            showBackfill = true
+        } else {
+            hasCompletedOnboarding = true
+        }
     }
 }
 

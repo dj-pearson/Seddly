@@ -7,12 +7,22 @@ struct CommitmentDetailView: View {
     var body: some View {
         List {
             Section("Details") {
-                LabeledContent("Who") {
-                    if isEditing {
-                        TextField("Entity", text: $commitment.entityName)
-                            .multilineTextAlignment(.trailing)
-                    } else {
-                        Text(commitment.entityName)
+                if let entity = commitment.entity {
+                    NavigationLink {
+                        EntityProfileView(entity: entity)
+                    } label: {
+                        LabeledContent("Who") {
+                            Text(commitment.entityName)
+                        }
+                    }
+                } else {
+                    LabeledContent("Who") {
+                        if isEditing {
+                            TextField("Entity", text: $commitment.entityName)
+                                .multilineTextAlignment(.trailing)
+                        } else {
+                            Text(commitment.entityName)
+                        }
                     }
                 }
 
@@ -25,7 +35,16 @@ struct CommitmentDetailView: View {
                     }
                 }
 
-                if let deadline = commitment.deadline {
+                if isEditing {
+                    DatePicker(
+                        "Deadline",
+                        selection: Binding(
+                            get: { commitment.deadline ?? .now },
+                            set: { commitment.deadline = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
+                } else if let deadline = commitment.deadline {
                     LabeledContent("Deadline") {
                         Text(deadline, style: .date)
                             .foregroundStyle(deadlineColor)
@@ -62,6 +81,14 @@ struct CommitmentDetailView: View {
                 }
             }
 
+            if !commitment.fullText.isEmpty && commitment.fullText != commitment.summary {
+                Section("Original Text") {
+                    Text(commitment.fullText)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section("Notes") {
                 TextField("Add notes...", text: Binding(
                     get: { commitment.notes ?? "" },
@@ -73,7 +100,11 @@ struct CommitmentDetailView: View {
             if commitment.source != .manual {
                 Section("Source") {
                     LabeledContent("Detected via") {
-                        Text(commitment.source == .auto ? "Auto-scan" : "Share Sheet")
+                        switch commitment.source {
+                        case .auto: Text("Auto-scan")
+                        case .shareSheet: Text("Share Sheet")
+                        case .manual: Text("Manual")
+                        }
                     }
                     if let date = commitment.screenshotDate {
                         LabeledContent("Screenshot taken") {
@@ -90,6 +121,13 @@ struct CommitmentDetailView: View {
                     message: Text(shareText)
                 ) {
                     Label("Share as Text", systemImage: "square.and.arrow.up")
+                }
+
+                Button(role: .destructive) {
+                    commitment.status = .dismissed
+                    commitment.updatedAt = .now
+                } label: {
+                    Label("Dismiss Commitment", systemImage: "trash")
                 }
             }
         }
@@ -125,6 +163,9 @@ struct CommitmentDetailView: View {
             text += "\nAmount: $\(amount)"
         }
         text += "\nStatus: \(commitment.status.label)"
+        if let notes = commitment.notes, !notes.isEmpty {
+            text += "\nNotes: \(notes)"
+        }
         return text
     }
 }

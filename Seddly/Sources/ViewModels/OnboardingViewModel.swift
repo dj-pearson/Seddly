@@ -7,11 +7,7 @@ final class OnboardingViewModel {
     var photoAuthStatus: PHAuthorizationStatus = .notDetermined
     var isRequestingPermission = false
 
-    let totalPages = 4
-
-    var canProceed: Bool {
-        currentPage < totalPages - 1
-    }
+    let totalPages = 5
 
     func requestPhotoAccess() async {
         isRequestingPermission = true
@@ -19,13 +15,14 @@ final class OnboardingViewModel {
         isRequestingPermission = false
     }
 
+    func requestNotificationAccess() async {
+        let service = NotificationService()
+        _ = try? await service.requestAuthorization()
+    }
+
     func advancePage() {
         if currentPage < totalPages - 1 {
             currentPage += 1
         }
-    }
-
-    func completeOnboarding() {
-        UserDefaults.standard.set(true, forKey: "hasCompletedOnboarding")
     }
 }
