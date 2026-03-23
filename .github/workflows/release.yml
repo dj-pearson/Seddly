@@ -1,0 +1,113 @@
+name: Release — Archive & Upload to TestFlight
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_number:
+        description: 'Override build number (optional)'
+        required: false
+        type: string
+
+jobs:
+  archive-and-upload:
+    runs-on: macos-15
+    timeout-minutes: 45
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.3
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.3'
+
+      - name: Show build environment
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Import code-signing certificate
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Install provisioning profile — App
+        run: |
+          PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PP_PATH"
+          echo "${{ secrets.PROVISIONING_PROFILE_APP }}" | base64 --decode > "$PP_PATH/Seddly_AppStore.mobileprovision"
+
+      - name: Install provisioning profile — Share Extension
+        run: |
+          PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "${{ secrets.PROVISIONING_PROFILE_SHARE_EXT }}" | base64 --decode > "$PP_PATH/SeddlyShareExt_AppStore.mobileprovision"
+
+      - name: Determine build number
+        id: build_number
+        run: |
+          if [ -n "${{ github.event.inputs.build_number }}" ]; then
+            echo "number=${{ github.event.inputs.build_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve Team ID in ExportOptions
+        run: |
+          sed -i '' "s/\${APPLE_TEAM_ID}/${{ secrets.APPLE_TEAM_ID }}/" ExportOptions.plist
+
+      - name: Archive
+        run: |
+          set -o pipefail
+          xcodebuild archive \
+            -project Seddly.xcodeproj \
+            -scheme Seddly \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/Seddly.xcarchive" \
+            CURRENT_PROJECT_VERSION=${{ steps.build_number.outputs.number }} \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            | xcbeautify --quiet
+
+      - name: Export IPA
+        run: |
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/Seddly.xcarchive" \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" \
+            | xcbeautify --quiet
+
+      - name: Upload to TestFlight
+        uses: apple-actions/upload-testflight-build@v3
+        with:
+          app-path: ${{ runner.temp }}/export/Seddly.ipa
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_API_PRIVATE_KEY }}
+
+      - name: Upload archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Seddly-${{ github.ref_name }}-archive
+          path: ${{ runner.temp }}/Seddly.xcarchive
+          retention-days: 30
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Seddly-${{ github.ref_name }}-ipa
+          path: ${{ runner.temp }}/export/Seddly.ipa
+          retention-days: 90

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "WebSearch",
+      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/.github/workflows\")",
+      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/App\")",
+      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Models\")",
+      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/Ledger\")",
+      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/Detail\")"
+    ]
+  }
+}
