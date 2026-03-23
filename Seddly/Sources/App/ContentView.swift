@@ -3,21 +3,38 @@ import SwiftUI
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var clipboardMonitor = ClipboardMonitorService()
 
     var body: some View {
         Group {
             if hasCompletedOnboarding {
-                TabView {
-                    LedgerView()
-                        .tabItem {
-                            Label("Ledger", systemImage: "list.bullet.clipboard")
-                        }
+                if horizontalSizeClass == .regular {
+                    // iPad: three-column split view
+                    TabView {
+                        IPadLedgerView()
+                            .tabItem {
+                                Label("Ledger", systemImage: "list.bullet.clipboard")
+                            }
 
-                    SettingsView()
-                        .tabItem {
-                            Label("Settings", systemImage: "gear")
-                        }
+                        SettingsView()
+                            .tabItem {
+                                Label("Settings", systemImage: "gear")
+                            }
+                    }
+                } else {
+                    // iPhone: standard tab layout
+                    TabView {
+                        LedgerView()
+                            .tabItem {
+                                Label("Ledger", systemImage: "list.bullet.clipboard")
+                            }
+
+                        SettingsView()
+                            .tabItem {
+                                Label("Settings", systemImage: "gear")
+                            }
+                    }
                 }
             } else {
                 OnboardingView()

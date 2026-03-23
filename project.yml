@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.pearsonmedia
   deploymentTarget:
     iOS: "17.0"
+    watchOS: "10.0"
   xcodeVersion: "26.3"
   createIntermediateGroups: true
   generateEmptyDirectories: true
@@ -13,7 +14,7 @@ settings:
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     SWIFT_VERSION: "6.0"
-    TARGETED_DEVICE_FAMILY: "1"
+    TARGETED_DEVICE_FAMILY: "1,2"
     ENABLE_USER_SCRIPT_SANDBOXING: "YES"
     SWIFT_EMIT_LOC_STRINGS: "YES"
     SWIFT_STRICT_CONCURRENCY: complete
@@ -48,6 +49,7 @@ targets:
     dependencies:
       - target: SeddlyShareExtension
       - target: SeddlyWidget
+      - target: SeddlyWatch
     scheme:
       testTargets:
         - SeddlyTests
@@ -89,6 +91,27 @@ targets:
         INFOPLIST_FILE: SeddlyWidget/Info.plist
         CODE_SIGN_ENTITLEMENTS: SeddlyWidget/SeddlyWidget.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.Widget
+      configs:
+        Debug:
+          CODE_SIGN_STYLE: Automatic
+        Release:
+          CODE_SIGN_STYLE: Manual
+
+  SeddlyWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: SeddlyWatch
+        excludes:
+          - "**/.gitkeep"
+      - path: Seddly/Sources/Shared
+      - path: Seddly/Sources/Models
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.watchkitapp
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.pearsonmedia.Seddly
+        INFOPLIST_KEY_CFBundleDisplayName: Seddly
+        TARGETED_DEVICE_FAMILY: "4"
       configs:
         Debug:
           CODE_SIGN_STYLE: Automatic

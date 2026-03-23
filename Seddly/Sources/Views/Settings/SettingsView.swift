@@ -84,6 +84,9 @@ struct SettingsView: View {
                     NavigationLink("Custom Workflows") {
                         WorkflowManagementView()
                     }
+                    NavigationLink("API Access") {
+                        APIAccessView()
+                    }
                 }
 
                 Section("Privacy") {

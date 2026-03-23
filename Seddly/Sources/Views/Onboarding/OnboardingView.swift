@@ -5,9 +5,19 @@ struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var viewModel = OnboardingViewModel()
     @State private var showBackfill = false
+    @State private var showAICoach = false
 
     var body: some View {
-        if showBackfill {
+        if showAICoach {
+            AICoachView {
+                if viewModel.photoAuthStatus == .authorized || viewModel.photoAuthStatus == .limited {
+                    showAICoach = false
+                    showBackfill = true
+                } else {
+                    hasCompletedOnboarding = true
+                }
+            }
+        } else if showBackfill {
             BackfillView {
                 hasCompletedOnboarding = true
             }
@@ -163,7 +173,7 @@ struct OnboardingView: View {
 
     private func finishOnboarding() {
         if viewModel.photoAuthStatus == .authorized || viewModel.photoAuthStatus == .limited {
-            showBackfill = true
+            showAICoach = true
         } else {
             hasCompletedOnboarding = true
         }
