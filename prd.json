@@ -1,0 +1,360 @@
+{
+    "project": "Seddly",
+    "branchName": "ralph/remaining-gaps-completion",
+    "description": "Complete all remaining gaps across the Seddly PRD — entitlements, auto-status updates, calendar permissions, CI/CD updates, tests, UX polish, and deployment config",
+    "userStories": [
+      {
+        "id": "US-001",
+        "title": "Add missing entitlements to Seddly.entitlements",
+        "description": "As a developer, I need the entitlements file to declare all capabilities the app uses so that code signing and App Review succeed.",
+        "acceptanceCriteria": [
+          "Seddly/Resources/Seddly.entitlements includes com.apple.developer.applesignin with default scope",
+          "Seddly/Resources/Seddly.entitlements includes com.apple.security.application-groups with group.com.pearsonmedia.Seddly",
+          "Seddly/Resources/Seddly.entitlements includes aps-environment set to development",
+          "Typecheck passes"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "AuthService uses Sign in with Apple but entitlements don't declare it. CalendarService uses EventKit which doesn't need an entitlement but does need Info.plist usage description."
+      },
+      {
+        "id": "US-002",
+        "title": "Add NSCalendarsUsageDescription to Info.plist",
+        "description": "As a user, I need to see a clear permission dialog when Seddly requests calendar access so I understand why it's needed.",
+        "acceptanceCriteria": [
+          "Seddly/Resources/Info.plist includes NSCalendarsUsageDescription with text explaining Seddly creates calendar events for commitment deadlines",
+          "Seddly/Resources/Info.plist includes NSCalendarsFullAccessUsageDescription with similar text",
+          "Typecheck passes"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "CalendarService calls requestFullAccessToEvents() but Info.plist has no calendar usage description. App will crash on first calendar access without this."
+      },
+      {
+        "id": "US-003",
+        "title": "Build auto-status update service for overdue commitments",
+        "description": "As a user, I want commitments to automatically show as overdue when their deadline passes so I don't have to manually update them.",
+        "acceptanceCriteria": [
+          "Create Seddly/Sources/Services/StatusUpdateService.swift",
+          "Service scans all pending commitments and updates status to .overdue if deadline < now",
+          "Service is called on app foreground in LedgerView processOnForeground()",
+          "Service is called during background task processing in BackgroundTaskService",
+          "Typecheck passes"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Currently isOverdue is a computed property but statusRaw never actually changes to overdue. Entity overdueCount relies on both the stored status and the computed property, creating inconsistency."
+      },
+      {
+        "id": "US-004",
+        "title": "Add New badge to recently detected commitments",
+        "description": "As a user, I want to see which commitments were just detected so I know what's new since my last visit.",
+        "acceptanceCriteria": [
+          "Add lastViewedDate tracking via UserDefaults (updated when user opens the app)",
+          "CommitmentCardView shows a small 'New' badge for commitments created after lastViewedDate",
+          "Badge disappears after the commitment has been on screen for one session",
+          "Typecheck passes"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "PRD §10.2 specifies new commitments should be highlighted with a New badge."
+      },
+      {
+        "id": "US-005",
+        "title": "Add review banner after first backfill",
+        "description": "As a new user, I want a subtle banner telling me to review my commitments after the initial backfill scan.",
+        "acceptanceCriteria": [
+          "After BackfillView completes with commitments found, set a flag in UserDefaults",
+          "LedgerView shows a dismissible banner: 'Review your commitments — tap any to edit or dismiss'",
+          "Banner is only shown once (dismissed on tap or after first commitment interaction)",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "PRD §10.1 step 7 specifies this banner."
+      },
+      {
+        "id": "US-006",
+        "title": "Add app badge count for overdue commitments",
+        "description": "As a user, I want to see the number of overdue commitments on the app icon so I know at a glance if I have unresolved issues.",
+        "acceptanceCriteria": [
+          "App badge number is set to the count of overdue commitments after each foreground processing run",
+          "Badge updates during background task processing",
+          "Badge is cleared when there are no overdue commitments",
+          "Uses UNUserNotificationCenter.current().setBadgeCount()",
+          "Typecheck passes"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-007",
+        "title": "Update CI workflow to include Watch target",
+        "description": "As a developer, I need CI to build the Watch target so regressions are caught before merge.",
+        "acceptanceCriteria": [
+          ".github/workflows/ci.yml builds SeddlyWatch target alongside main targets",
+          ".github/workflows/release.yml includes SeddlyWatch in archive and export",
+          "Typecheck passes"
+        ],
+        "priority": 7,
+        "passes": false,
+        "notes": "SeddlyWatch target was added in Phase 4 but CI/CD doesn't reference it."
+      },
+      {
+        "id": "US-008",
+        "title": "Add api-commitments to Supabase deploy workflow",
+        "description": "As a developer, I need the new api-commitments Edge Function deployed alongside the other functions.",
+        "acceptanceCriteria": [
+          ".github/workflows/deploy-supabase.yml deploys api-commitments function",
+          "Function is listed alongside extract-commitments, generate-dispute-summary, subscription-webhook, send-silent-push",
+          "Typecheck passes"
+        ],
+        "priority": 8,
+        "passes": false,
+        "notes": "api-commitments Edge Function was added in Phase 4 but deploy workflow only deploys the original 4 functions."
+      },
+      {
+        "id": "US-009",
+        "title": "Add unit tests for CommitmentSharingService",
+        "description": "As a developer, I need tests for the sharing service to prevent regressions in reminder message and evidence summary generation.",
+        "acceptanceCriteria": [
+          "Test generateReminderMessage produces correct format with entity name, summary, deadline",
+          "Test generateReminderMessage shows days overdue for past deadlines",
+          "Test generateEvidenceSummary includes all commitment fields",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 9,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-010",
+        "title": "Add unit tests for EscalationTemplateService",
+        "description": "As a developer, I need tests for escalation letter generation to ensure templates produce correctly formatted letters.",
+        "acceptanceCriteria": [
+          "Test generateLetter for housing category includes landlord-specific language",
+          "Test generateLetter for freelance category includes payment-specific language",
+          "Test generateLetter populates commitment timeline with real data",
+          "Test availableTemplates returns all non-personal categories",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 10,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-011",
+        "title": "Add unit tests for CommitmentTemplate model",
+        "description": "As a developer, I need tests for commitment templates to verify all presets have valid data.",
+        "acceptanceCriteria": [
+          "Test allTemplates has 9 entries",
+          "Test each template has non-empty name, icon, defaultSummary",
+          "Test templates cover housing, freelance, purchases, medical, insurance categories",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 11,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-012",
+        "title": "Add unit tests for PrivacyAuditService",
+        "description": "As a developer, I need tests for the privacy audit service to verify audit entries are recorded correctly and reports generate properly.",
+        "acceptanceCriteria": [
+          "Test recordAIExtraction creates a PrivacyAuditEntry with correct eventType and textLength",
+          "Test recordDisputeSummary creates entry with commitment count in summary",
+          "Test generateReport returns correct counts and totals",
+          "Test exportReport produces formatted text with all sections",
+          "Tests use Swift Testing framework (@Test, #expect) with in-memory ModelContainer",
+          "Tests pass"
+        ],
+        "priority": 12,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-013",
+        "title": "Add unit tests for LocalEntity accountability score",
+        "description": "As a developer, I need tests for the accountability score and grade calculations on LocalEntity.",
+        "acceptanceCriteria": [
+          "Test accountabilityScore returns 0 for entity with no commitments",
+          "Test accountabilityScore returns 100 for entity with all fulfilled",
+          "Test accountabilityScore penalizes overdue commitments",
+          "Test accountabilityGrade returns A for 90+, B for 80+, etc.",
+          "Test shareableScoreCard contains entity name and score",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 13,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-014",
+        "title": "Add unit tests for LedgerViewModel history limits",
+        "description": "As a developer, I need tests for the tier-based history limit logic to verify free/pro/pro+ limits work correctly.",
+        "acceptanceCriteria": [
+          "Test applyHistoryLimit with .free tier filters out commitments older than 30 days",
+          "Test applyHistoryLimit with .pro tier filters out commitments older than 1 year",
+          "Test applyHistoryLimit with .proPlus tier returns all commitments",
+          "Test bulk edit operations (bulkUpdateStatus, bulkUpdateCategory) update selected commitments",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 14,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-015",
+        "title": "Add unit tests for ClipboardMonitorService",
+        "description": "As a developer, I need tests for clipboard monitoring to verify commitment detection thresholds.",
+        "acceptanceCriteria": [
+          "Test that text under 30 characters is ignored",
+          "Test that text below confidence threshold does not trigger prompt",
+          "Test that text above confidence threshold sets showClipboardPrompt to true",
+          "Test dismiss() resets all state",
+          "Tests use Swift Testing framework (@Test, #expect)",
+          "Tests pass"
+        ],
+        "priority": 15,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-016",
+        "title": "Wire Share Sheet Edit option for detected commitments",
+        "description": "As a user sharing a screenshot to Seddly, I want an Edit option to modify the detected commitment before adding it to my ledger.",
+        "acceptanceCriteria": [
+          "ShareViewController showConfirmUI adds an Edit button alongside Add to Ledger and Skip",
+          "Edit button navigates to a simple form with entity name and summary fields pre-filled from detected text",
+          "User can modify fields before confirming",
+          "Typecheck passes"
+        ],
+        "priority": 16,
+        "passes": false,
+        "notes": "PRD §10.4 step 5 says share sheet should have Confirm/Edit/Skip options. Currently only has Add to Ledger and Skip."
+      },
+      {
+        "id": "US-017",
+        "title": "Add deep link handling for commitment share URLs",
+        "description": "As a user, I want to open seddly.com/c/ links in the app to view shared commitment reminders.",
+        "acceptanceCriteria": [
+          "SeddlyApp handles universal links for seddly.com/c/{id} pattern",
+          "When opened, navigates to the commitment detail view if the commitment exists locally",
+          "If commitment not found, shows a message that the commitment is not on this device",
+          "Add associated domains entitlement for applinks:seddly.com",
+          "Typecheck passes"
+        ],
+        "priority": 17,
+        "passes": false,
+        "notes": "CommitmentSharingService.generateShareableLink creates seddly.com/c/ URLs but the app doesn't handle them."
+      },
+      {
+        "id": "US-018",
+        "title": "Add Watch entitlements and Info.plist",
+        "description": "As a developer, I need proper entitlements and Info.plist for the Watch target so it builds and runs correctly.",
+        "acceptanceCriteria": [
+          "SeddlyWatch/Info.plist exists with WKCompanionAppBundleIdentifier set to com.pearsonmedia.Seddly",
+          "SeddlyWatch/SeddlyWatch.entitlements exists with App Groups entitlement matching main app",
+          "project.yml references the Watch entitlements file",
+          "Typecheck passes"
+        ],
+        "priority": 18,
+        "passes": false,
+        "notes": "Watch target was added in Phase 4 but has no entitlements or Info.plist files."
+      },
+      {
+        "id": "US-019",
+        "title": "Add Supabase migration for custom workflow and privacy audit tables",
+        "description": "As a developer, I need database tables for Phase 4 models that sync to Supabase for Pro+ users.",
+        "acceptanceCriteria": [
+          "New migration file adds privacy_audit_log table with columns: id, user_id, timestamp, event_type, destination, data_summary, text_length_sent, commitment_id",
+          "New migration file adds custom_workflows table with columns: id, user_id, name, steps (jsonb), is_default, created_at",
+          "Both tables have RLS policies restricting access to own data",
+          "Typecheck passes"
+        ],
+        "priority": 19,
+        "passes": false,
+        "notes": "PrivacyAuditEntry and CustomWorkflow are in SwiftData but have no Supabase counterpart for Pro+ sync."
+      },
+      {
+        "id": "US-020",
+        "title": "Add commitments category_raw and custom workflow fields to Supabase",
+        "description": "As a developer, I need the Supabase commitments table to include the new Phase 4 fields for full sync support.",
+        "acceptanceCriteria": [
+          "New migration adds calendar_event_id (text, nullable) column to commitments table",
+          "New migration adds custom_status_label (text, nullable) column to commitments table",
+          "New migration adds workflow_id (uuid, nullable) column to commitments table",
+          "SyncService push and pull handle the new fields",
+          "Typecheck passes"
+        ],
+        "priority": 20,
+        "passes": false,
+        "notes": "LocalCommitment has calendarEventID, customStatusLabel, workflowID fields that don't sync to Supabase."
+      },
+      {
+        "id": "US-021",
+        "title": "Add PersistenceService implementation",
+        "description": "As a developer, I need the PersistenceService stub to be implemented or removed to avoid confusion.",
+        "acceptanceCriteria": [
+          "If PersistenceService is used, implement it with methods for common SwiftData operations",
+          "If PersistenceService is not used, delete the file and remove any references",
+          "Typecheck passes"
+        ],
+        "priority": 21,
+        "passes": false,
+        "notes": "PersistenceService.swift exists in Services but was not examined. Need to check if it's a stub or fully implemented."
+      },
+      {
+        "id": "US-022",
+        "title": "Add Apple Sign-In UI to Settings for Pro+ account creation",
+        "description": "As a Pro+ user, I need a Sign in with Apple button in Settings to create an account for cloud sync.",
+        "acceptanceCriteria": [
+          "SettingsView shows a Sign in with Apple button in the Subscription section when user is on Pro+ tier and not authenticated",
+          "Button triggers ASAuthorizationAppleIDProvider flow",
+          "On success, calls AuthService.signInWithApple() and shows confirmation",
+          "Shows current account status if already signed in",
+          "Typecheck passes"
+        ],
+        "priority": 22,
+        "passes": false,
+        "notes": "AuthService exists with signInWithApple() but no UI presents the Sign in with Apple button anywhere."
+      },
+      {
+        "id": "US-023",
+        "title": "Wire SyncService into app lifecycle for Pro+ users",
+        "description": "As a Pro+ user, I want my commitments to sync automatically when I open the app.",
+        "acceptanceCriteria": [
+          "SyncService.syncCommitments() is called on app foreground when user is Pro+ and authenticated",
+          "SyncService.pullCommitments() is called on app foreground to fetch remote changes",
+          "Sync only runs if user has an active Pro+ subscription and valid auth token",
+          "Privacy audit records cloud sync events",
+          "Typecheck passes"
+        ],
+        "priority": 23,
+        "passes": false,
+        "notes": "SyncService exists with push/pull methods but is never called from the app lifecycle."
+      },
+      {
+        "id": "US-024",
+        "title": "Add website apple-app-site-association file for universal links",
+        "description": "As a developer, I need the AASA file on seddly.com so universal links work for commitment sharing.",
+        "acceptanceCriteria": [
+          "website/public/.well-known/apple-app-site-association file exists",
+          "AASA file declares applinks for com.pearsonmedia.Seddly",
+          "Paths include /c/* for commitment share links",
+          "File is valid JSON with correct structure",
+          "Typecheck passes"
+        ],
+        "priority": 24,
+        "passes": false,
+        "notes": "Needed for US-017 deep link handling to work."
+      }
+    ]
+  }
+  
