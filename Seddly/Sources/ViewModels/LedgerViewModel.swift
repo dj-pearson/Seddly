@@ -9,10 +9,13 @@ final class LedgerViewModel {
     var filterHasDeadlineOnly = false
     var filterDateStart: Date?
     var filterDateEnd: Date?
+    var filterCategory: CommitmentCategory?
+    var filterAmountMin: Double?
+    var filterAmountMax: Double?
     var searchText = ""
 
     var hasActiveFilters: Bool {
-        filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil
+        filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil || filterCategory != nil || filterAmountMin != nil
     }
 
     enum SortOrder: String, CaseIterable {
@@ -38,6 +41,25 @@ final class LedgerViewModel {
         // Deadline filter
         if filterHasDeadlineOnly {
             filtered = filtered.filter { $0.deadline != nil }
+        }
+
+        // Category filter
+        if let filterCategory {
+            filtered = filtered.filter { $0.category == filterCategory }
+        }
+
+        // Amount filter
+        if let min = filterAmountMin {
+            filtered = filtered.filter {
+                guard let amount = $0.dollarAmount else { return false }
+                return NSDecimalNumber(decimal: amount).doubleValue >= min
+            }
+        }
+        if let max = filterAmountMax {
+            filtered = filtered.filter {
+                guard let amount = $0.dollarAmount else { return false }
+                return NSDecimalNumber(decimal: amount).doubleValue <= max
+            }
         }
 
         // Date range filter

@@ -47,6 +47,16 @@ final class ManualEntryViewModel {
 
         context.insert(commitment)
         ClassifierFeedbackService.recordManualAddition()
+
+        // Schedule notifications for commitments with deadlines
+        if commitment.deadline != nil {
+            let notificationService = NotificationService()
+            Task {
+                await notificationService.scheduleDeadlineApproaching(for: commitment)
+                await notificationService.scheduleDeadlinePassed(for: commitment)
+            }
+        }
+
         return commitment
     }
 

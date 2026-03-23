@@ -3,6 +3,7 @@ import Photos
 
 struct EmptyLedgerView: View {
     var onAddManually: (() -> Void)?
+    var onScanScreenshots: (() -> Void)?
 
     private var photoAccessDenied: Bool {
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -17,15 +18,31 @@ struct EmptyLedgerView: View {
         }
     }
 
+    private var hasPhotoAccess: Bool {
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        return status == .authorized || status == .limited
+    }
+
     private var normalEmptyView: some View {
         ContentUnavailableView {
             Label("No Commitments Yet", systemImage: "doc.text.magnifyingglass")
         } description: {
             Text("Take a screenshot of a promise someone made, or add one manually.")
         } actions: {
-            if let onAddManually {
-                Button("Add Manually", action: onAddManually)
+            VStack(spacing: 12) {
+                if hasPhotoAccess, let onScan = onScanScreenshots {
+                    Button {
+                        onScan()
+                    } label: {
+                        Label("Scan Existing Screenshots", systemImage: "photo.stack")
+                    }
                     .buttonStyle(.borderedProminent)
+                }
+
+                if let onAddManually {
+                    Button("Add Manually", action: onAddManually)
+                        .buttonStyle(hasPhotoAccess ? .bordered : .borderedProminent)
+                }
             }
         }
     }

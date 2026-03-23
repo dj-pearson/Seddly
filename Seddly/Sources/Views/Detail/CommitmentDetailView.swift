@@ -7,8 +7,11 @@ struct CommitmentDetailView: View {
     @Environment(SubscriptionService.self) private var subscriptionService
     @Environment(CalendarService.self) private var calendarService
     @Query(sort: \CustomWorkflow.createdAt) private var workflows: [CustomWorkflow]
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.dismiss) private var dismiss
     @State private var isEditing = false
     @State private var showingCustomReminder = false
+    @State private var showDeleteConfirmation = false
     @State private var customReminderDate = Date()
     @State private var screenshotImage: UIImage?
 
@@ -80,9 +83,20 @@ struct CommitmentDetailView: View {
                     }
                 } else {
                     if let deadline = commitment.deadline {
-                        LabeledContent("Deadline") {
-                            Text(deadline, style: .date)
-                                .foregroundStyle(deadlineColor)
+                        VStack(alignment: .leading, spacing: 2) {
+                            LabeledContent("Deadline") {
+                                Text(deadline, style: .date)
+                                    .foregroundStyle(deadlineColor)
+                            }
+                            // Show interpretation note if AI resolved an implicit deadline
+                            if commitment.source == .auto,
+                               let reasoning = commitment.aiReasoning,
+                               containsDateInterpretation(reasoning) {
+                                Text(extractDeadlineNote(from: commitment.fullText))
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                                    .italic()
+                            }
                         }
                     }
 
@@ -187,6 +201,34 @@ struct CommitmentDetailView: View {
                 .lineLimit(3...6)
             }
 
+            // Related screenshots from same entity
+            if let entity = commitment.entity {
+                let related = entity.commitments
+                    .filter { $0.id != commitment.id && $0.screenshotAssetID != nil }
+                    .sorted { $0.createdAt > $1.createdAt }
+                if !related.isEmpty {
+                    Section("Related from \(entity.name)") {
+                        ForEach(related.prefix(5)) { relatedCommitment in
+                            NavigationLink(value: relatedCommitment) {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(relatedCommitment.summary)
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                    HStack {
+                                        Text(relatedCommitment.createdAt, style: .date)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text(relatedCommitment.status.label)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if commitment.source != .manual {
                 Section("Source") {
                     LabeledContent("Detected via") {
@@ -258,12 +300,26 @@ struct CommitmentDetailView: View {
                     commitment.status = .dismissed
                     commitment.updatedAt = .now
                 } label: {
-                    Label("Dismiss Commitment", systemImage: "trash")
+                    Label("Dismiss Commitment", systemImage: "eye.slash")
+                }
+
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Delete Permanently", systemImage: "trash")
                 }
             }
         }
         .navigationTitle("Commitment")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Delete Commitment?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                deleteCommitment()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete this commitment and cannot be undone.")
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(isEditing ? "Done" : "Edit") {
@@ -302,6 +358,20 @@ struct CommitmentDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private func deleteCommitment() {
+        // Remove calendar event if linked
+        if let eventID = commitment.calendarEventID {
+            calendarService.removeEvent(identifier: eventID)
+        }
+        // Remove notifications
+        let notificationService = NotificationService()
+        notificationService.removeNotifications(for: commitment.id)
+        // Delete from SwiftData
+        modelContext.delete(commitment)
+        try? modelContext.save()
+        dismiss()
     }
 
     private func addToCalendar() {
@@ -357,6 +427,23 @@ struct CommitmentDetailView: View {
                 continuation.resume(returning: image)
             }
         }
+    }
+
+    private func containsDateInterpretation(_ reasoning: String) -> Bool {
+        let keywords = ["interpreted", "resolved", "next friday", "next week", "end of", "by tomorrow", "next monday", "next tuesday", "next wednesday", "next thursday", "next saturday", "next sunday", "this week", "this month"]
+        let lower = reasoning.lowercased()
+        return keywords.contains { lower.contains($0) }
+    }
+
+    private func extractDeadlineNote(from fullText: String) -> String {
+        let datePatterns = ["next friday", "next week", "next monday", "next tuesday", "next wednesday", "next thursday", "next saturday", "next sunday", "end of week", "end of month", "end of day", "by tomorrow", "this friday", "this week"]
+        let lower = fullText.lowercased()
+        for pattern in datePatterns {
+            if lower.contains(pattern) {
+                return "Interpreted from \"\(pattern)\" in original text"
+            }
+        }
+        return "Deadline resolved from original text"
     }
 
     private var deadlineColor: Color {

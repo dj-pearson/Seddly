@@ -41,13 +41,16 @@ struct LedgerView: View {
         commitments.filter { $0.needsAIProcessing || ($0.confidenceScore >= 4 && $0.confidenceScore <= 6 && $0.source == .auto) }
     }
 
+    @State private var showingBackfill = false
+
     var body: some View {
         NavigationStack {
             Group {
                 if visibleCommitments.isEmpty {
-                    EmptyLedgerView {
-                        showingManualEntry = true
-                    }
+                    EmptyLedgerView(
+                        onAddManually: { showingManualEntry = true },
+                        onScanScreenshots: { showingBackfill = true }
+                    )
                 } else {
                     commitmentList
                 }
@@ -170,7 +173,10 @@ struct LedgerView: View {
                     selectedEntityName: $viewModel.filterEntityName,
                     hasDeadlineOnly: $viewModel.filterHasDeadlineOnly,
                     dateRangeStart: $viewModel.filterDateStart,
-                    dateRangeEnd: $viewModel.filterDateEnd
+                    dateRangeEnd: $viewModel.filterDateEnd,
+                    selectedCategory: $viewModel.filterCategory,
+                    amountMin: $viewModel.filterAmountMin,
+                    amountMax: $viewModel.filterAmountMax
                 )
                 .presentationDetents([.large])
             }
@@ -186,6 +192,18 @@ struct LedgerView: View {
             }
             .sheet(isPresented: $showingReviewQueue) {
                 ReviewQueueView()
+            }
+            .sheet(isPresented: $showingBackfill) {
+                NavigationStack {
+                    BackfillView {
+                        showingBackfill = false
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { showingBackfill = false }
+                        }
+                    }
+                }
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {

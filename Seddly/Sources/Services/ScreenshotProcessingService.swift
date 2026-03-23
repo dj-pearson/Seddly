@@ -99,6 +99,13 @@ actor ScreenshotProcessingService {
                     needsAIProcessing: !autoAnalyze
                 )
                 context.insert(commitment)
+
+                // Schedule notifications for any commitment with a deadline
+                if commitment.deadline != nil {
+                    await notificationService.scheduleDeadlineApproaching(for: commitment)
+                    await notificationService.scheduleDeadlinePassed(for: commitment)
+                }
+
                 result.commitmentsDetected += 1
                 queueItem.processingStatus = .completed
             } else {
@@ -187,8 +194,8 @@ actor ScreenshotProcessingService {
 
             context.insert(commitment)
 
-            // Schedule notifications for high-confidence commitments
-            if extracted.confidence >= 7 {
+            // Schedule notifications for all commitments with deadlines
+            if commitment.deadline != nil {
                 await notificationService.scheduleDeadlineApproaching(for: commitment)
                 await notificationService.scheduleDeadlinePassed(for: commitment)
             }

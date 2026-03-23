@@ -7,6 +7,9 @@ struct FilterView: View {
     @Binding var hasDeadlineOnly: Bool
     @Binding var dateRangeStart: Date?
     @Binding var dateRangeEnd: Date?
+    @Binding var selectedCategory: CommitmentCategory?
+    @Binding var amountMin: Double?
+    @Binding var amountMax: Double?
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \LocalEntity.name) private var entities: [LocalEntity]
 
@@ -57,8 +60,59 @@ struct FilterView: View {
                     }
                 }
 
+                Section("Category") {
+                    Button {
+                        selectedCategory = nil
+                    } label: {
+                        filterRow(label: "All", isSelected: selectedCategory == nil)
+                    }
+                    .foregroundStyle(.primary)
+
+                    ForEach(CommitmentCategory.allCases) { category in
+                        Button {
+                            selectedCategory = category
+                        } label: {
+                            HStack {
+                                Image(systemName: category.icon)
+                                    .frame(width: 20)
+                                filterRow(label: category.label, isSelected: selectedCategory == category)
+                            }
+                        }
+                        .foregroundStyle(.primary)
+                    }
+                }
+
                 Section("Deadline") {
                     Toggle("Has deadline only", isOn: $hasDeadlineOnly)
+                }
+
+                Section("Dollar Amount") {
+                    Toggle("Filter by amount", isOn: Binding(
+                        get: { amountMin != nil || amountMax != nil },
+                        set: {
+                            if $0 {
+                                amountMin = 0
+                                amountMax = nil
+                            } else {
+                                amountMin = nil
+                                amountMax = nil
+                            }
+                        }
+                    ))
+
+                    if amountMin != nil {
+                        HStack {
+                            Text("Min $")
+                            TextField("0", value: $amountMin, format: .number)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(.roundedBorder)
+                            Text("Max $")
+                            TextField("Any", value: $amountMax, format: .number)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        .font(.subheadline)
+                    }
                 }
 
                 Section("Date Range") {
@@ -92,9 +146,12 @@ struct FilterView: View {
                     Button("Clear All Filters") {
                         selectedStatus = nil
                         selectedEntityName = nil
+                        selectedCategory = nil
                         hasDeadlineOnly = false
                         dateRangeStart = nil
                         dateRangeEnd = nil
+                        amountMin = nil
+                        amountMax = nil
                     }
                     .foregroundStyle(.red)
                 }
