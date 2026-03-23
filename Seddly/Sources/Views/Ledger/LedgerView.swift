@@ -21,10 +21,7 @@ struct LedgerView: View {
     @State private var pendingAICallback: ((String?) -> Void)?
 
     private var visibleCommitments: [LocalCommitment] {
-        if subscriptionService.currentTier == .free {
-            return viewModel.applyFreeTierHistoryLimit(commitments)
-        }
-        return Array(commitments)
+        viewModel.applyHistoryLimit(Array(commitments), tier: subscriptionService.currentTier)
     }
 
     private var activeCommitments: [LocalCommitment] {
@@ -407,17 +404,45 @@ struct LedgerView: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
+    private var totalActiveCount: Int {
+        commitments.filter { $0.status != .dismissed && $0.status != .fulfilled }.count
+    }
+
+    private var hiddenCount: Int {
+        max(0, totalActiveCount - AppConstants.maxFreeCommitments)
+    }
+
     private var upgradeBanner: some View {
         Button {
             showingUpgrade = true
         } label: {
-            HStack {
-                Image(systemName: "arrow.up.circle.fill")
-                Text("Free limit reached (\(AppConstants.maxFreeCommitments)). Upgrade to Pro for unlimited.")
-                    .font(.caption)
-                Spacer()
-                Image(systemName: "chevron.right")
-                    .font(.caption2)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .foregroundStyle(.accent)
+                    if hiddenCount > 0 {
+                        Text("You have \(totalActiveCount) commitments but your free plan allows \(AppConstants.maxFreeCommitments).")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("Free limit reached (\(AppConstants.maxFreeCommitments)).")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                if hiddenCount > 0 {
+                    Text("Upgrade to Pro to track all \(totalActiveCount) — \(hiddenCount) commitment\(hiddenCount == 1 ? " is" : "s are") hidden.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Upgrade to Pro for unlimited commitments.")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
             }
             .padding()
             .background(.ultraThinMaterial)

@@ -13,10 +13,7 @@ struct IPadLedgerView: View {
     @State private var columnVisibility = NavigationSplitViewVisibility.all
 
     private var visibleCommitments: [LocalCommitment] {
-        if subscriptionService.currentTier == .free {
-            return viewModel.applyFreeTierHistoryLimit(commitments)
-        }
-        return Array(commitments)
+        viewModel.applyHistoryLimit(Array(commitments), tier: subscriptionService.currentTier)
     }
 
     var body: some View {

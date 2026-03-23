@@ -156,10 +156,30 @@ class ShareViewController: UIViewController {
             let container = try SharedModelContainer.create()
             let context = ModelContext(container)
 
-            let queueItem = ProcessingQueue(screenshotAssetID: "share-\(UUID().uuidString)")
+            let shareID = "share-\(UUID().uuidString)"
+
+            // Save to processing queue for tracking
+            let queueItem = ProcessingQueue(screenshotAssetID: shareID)
             queueItem.extractedText = text
-            queueItem.processingStatus = .pending
+            queueItem.ruleBasedScore = RuleFilterService.score(text: text)
+            queueItem.processingStatus = .completed
             context.insert(queueItem)
+
+            // If rule filter passes threshold, create a commitment directly
+            let score = RuleFilterService.score(text: text)
+            if score >= AppConstants.defaultConfidenceThreshold {
+                let commitment = LocalCommitment(
+                    entityName: "Unknown",
+                    summary: detectedSummary ?? String(text.prefix(200)),
+                    fullText: text,
+                    source: .shareSheet,
+                    screenshotAssetID: shareID,
+                    screenshotDate: .now,
+                    needsAIProcessing: true
+                )
+                context.insert(commitment)
+            }
+
             try context.save()
         } catch {
             // Silently fail — the screenshot will be picked up on next app launch

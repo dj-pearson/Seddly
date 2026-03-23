@@ -99,10 +99,24 @@ final class LedgerViewModel {
         }
     }
 
-    /// Filters commitments for free tier: only show last 30 days
+    /// Applies history limits based on subscription tier.
+    /// Free: 30 days. Pro: 1 year. Pro+: unlimited.
+    func applyHistoryLimit(_ commitments: [LocalCommitment], tier: SubscriptionService.SubscriptionTier) -> [LocalCommitment] {
+        switch tier {
+        case .free:
+            let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+            return commitments.filter { $0.createdAt >= cutoff }
+        case .pro:
+            let cutoff = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .distantPast
+            return commitments.filter { $0.createdAt >= cutoff }
+        case .proPlus:
+            return commitments
+        }
+    }
+
+    /// Legacy convenience for free tier
     func applyFreeTierHistoryLimit(_ commitments: [LocalCommitment]) -> [LocalCommitment] {
-        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
-        return commitments.filter { $0.createdAt >= cutoff }
+        applyHistoryLimit(commitments, tier: .free)
     }
 
     func fulfill(_ commitment: LocalCommitment) {

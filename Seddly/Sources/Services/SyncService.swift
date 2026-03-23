@@ -42,6 +42,7 @@ actor SyncService {
                 "confidence": commitment.confidenceScore,
                 "ai_reasoning": commitment.aiReasoning,
                 "source": commitment.sourceRaw,
+                "category": commitment.categoryRaw ?? "uncategorized",
                 "screenshot_date": commitment.screenshotDate?.ISO8601Format(),
                 "notes": commitment.notes,
             ]
@@ -81,6 +82,7 @@ actor SyncService {
             let confidence: Int
             let ai_reasoning: String?
             let source: String
+            let category: String?
             let screenshot_date: String?
             let notes: String?
         }
@@ -113,6 +115,9 @@ actor SyncService {
                 screenshotDate: remote.screenshot_date.flatMap { isoFormatter.date(from: $0) },
                 notes: remote.notes
             )
+            if let cat = remote.category, let category = CommitmentCategory(rawValue: cat) {
+                commitment.category = category
+            }
             commitment.syncStatus = .synced
             context.insert(commitment)
         }
