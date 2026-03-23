@@ -1,0 +1,122 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+// Blog posts - add new posts here
+const posts = [
+  {
+    slug: 'how-to-document-landlord-promises',
+    title: 'How to Document Landlord Promises (So They Can\'t Deny Them Later)',
+    date: '2026-03-23',
+    excerpt: 'Your landlord says they\'ll fix the AC "by next Friday." You screenshot it. But then what? Here\'s how to turn that screenshot into accountability.',
+    category: 'Renters',
+  },
+  {
+    slug: 'freelance-client-payment-tracking',
+    title: 'Stop Chasing Invoices: How Freelancers Can Track Client Payment Promises',
+    date: '2026-03-23',
+    excerpt: 'When a client says "we\'ll pay Net 30" in a text and it\'s now Net 60, you need more than a screenshot buried in your camera roll.',
+    category: 'Freelancers',
+  },
+  {
+    slug: 'screenshots-as-evidence',
+    title: 'Can Screenshots Be Used as Evidence? What You Need to Know',
+    date: '2026-03-23',
+    excerpt: 'Screenshots are increasingly accepted in disputes, but only if you can find them, organize them, and present them clearly. Here\'s how.',
+    category: 'Legal',
+  },
+  {
+    slug: 'accountability-gap',
+    title: 'The Accountability Gap: Why People Break Promises and How to Close It',
+    date: '2026-03-23',
+    excerpt: 'Most broken promises aren\'t malicious — they\'re forgotten. The person who promised genuinely intended to follow through. The problem is friction.',
+    category: 'Product',
+  },
+];
+---
+
+<BaseLayout title="Blog — Seddly" description="Practical guides on documenting promises, tracking commitments, and holding people accountable.">
+  <section class="page-header">
+    <h1>Blog</h1>
+    <p>Practical guides on accountability, documentation, and holding people to their word.</p>
+  </section>
+
+  <section class="blog-list">
+    {posts.map(post => (
+      <article class="blog-card">
+        <span class="category">{post.category}</span>
+        <h2><a href={`/blog/${post.slug}`}>{post.title}</a></h2>
+        <p>{post.excerpt}</p>
+        <time datetime={post.date}>{new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</time>
+      </article>
+    ))}
+  </section>
+</BaseLayout>
+
+<style>
+  .page-header {
+    text-align: center;
+    padding: 6rem 2rem 3rem;
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+  }
+
+  .blog-list {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .blog-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 2rem;
+  }
+
+  .category {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-accent);
+  }
+
+  .blog-card h2 {
+    font-size: 1.3rem;
+    margin: 0.5rem 0;
+    text-align: left;
+  }
+
+  .blog-card h2 a {
+    color: var(--color-text);
+  }
+
+  .blog-card h2 a:hover {
+    color: var(--color-accent);
+  }
+
+  .blog-card p {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+  }
+
+  .blog-card time {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+</style>

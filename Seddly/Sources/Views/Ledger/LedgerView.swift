@@ -10,17 +10,29 @@ struct LedgerView: View {
     @State private var showingManualEntry = false
     @State private var showingFilter = false
     @State private var showingUpgrade = false
+    @State private var showingReviewQueue = false
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
 
+    private var visibleCommitments: [LocalCommitment] {
+        if subscriptionService.currentTier == .free {
+            return viewModel.applyFreeTierHistoryLimit(commitments)
+        }
+        return Array(commitments)
+    }
+
     private var activeCommitments: [LocalCommitment] {
-        commitments.filter { $0.status != .dismissed && $0.status != .fulfilled }
+        visibleCommitments.filter { $0.status != .dismissed && $0.status != .fulfilled }
+    }
+
+    private var reviewQueueItems: [LocalCommitment] {
+        commitments.filter { $0.needsAIProcessing || ($0.confidenceScore >= 4 && $0.confidenceScore <= 6 && $0.source == .auto) }
     }
 
     var body: some View {
         NavigationStack {
             Group {
-                if commitments.isEmpty {
+                if visibleCommitments.isEmpty {
                     EmptyLedgerView {
                         showingManualEntry = true
                     }
@@ -56,7 +68,7 @@ struct LedgerView: View {
                     Button {
                         showingFilter.toggle()
                     } label: {
-                        Image(systemName: viewModel.filterStatus != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                     }
                 }
             }
@@ -67,16 +79,27 @@ struct LedgerView: View {
                 }
             }
             .overlay(alignment: .bottom) {
-                if subscriptionService.currentTier == .free && activeCommitments.count >= AppConstants.maxFreeCommitments {
-                    upgradeBanner
+                VStack(spacing: 0) {
+                    if !reviewQueueItems.isEmpty {
+                        reviewQueueBanner
+                    }
+                    if subscriptionService.currentTier == .free && activeCommitments.count >= AppConstants.maxFreeCommitments {
+                        upgradeBanner
+                    }
                 }
             }
             .sheet(isPresented: $showingManualEntry) {
                 ManualEntryView()
             }
             .sheet(isPresented: $showingFilter) {
-                FilterView(selectedStatus: $viewModel.filterStatus)
-                    .presentationDetents([.medium])
+                FilterView(
+                    selectedStatus: $viewModel.filterStatus,
+                    selectedEntityName: $viewModel.filterEntityName,
+                    hasDeadlineOnly: $viewModel.filterHasDeadlineOnly,
+                    dateRangeStart: $viewModel.filterDateStart,
+                    dateRangeEnd: $viewModel.filterDateEnd
+                )
+                .presentationDetents([.large])
             }
             .sheet(isPresented: $showingUpgrade) {
                 NavigationStack {
@@ -87,6 +110,9 @@ struct LedgerView: View {
                             }
                         }
                 }
+            }
+            .sheet(isPresented: $showingReviewQueue) {
+                ReviewQueueView()
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
@@ -110,7 +136,7 @@ struct LedgerView: View {
                 }
             }
 
-            ForEach(viewModel.sortedCommitments(commitments)) { commitment in
+            ForEach(viewModel.sortedCommitments(visibleCommitments)) { commitment in
                 NavigationLink(value: commitment) {
                     CommitmentCardView(commitment: commitment)
                 }
@@ -152,13 +178,36 @@ struct LedgerView: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
+    private var reviewQueueBanner: some View {
+        Button {
+            showingReviewQueue = true
+        } label: {
+            HStack {
+                Image(systemName: "eye.circle.fill")
+                    .foregroundStyle(.yellow)
+                Text("\(reviewQueueItems.count) item\(reviewQueueItems.count == 1 ? "" : "s") to review")
+                    .font(.caption)
+                Spacer()
+                Text("Review")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .padding(.bottom, 4)
+    }
+
     private var upgradeBanner: some View {
         Button {
             showingUpgrade = true
         } label: {
             HStack {
                 Image(systemName: "arrow.up.circle.fill")
-                Text("You've reached the free limit (\(AppConstants.maxFreeCommitments) commitments). Upgrade to Pro for unlimited.")
+                Text("Free limit reached (\(AppConstants.maxFreeCommitments)). Upgrade to Pro for unlimited.")
                     .font(.caption)
                 Spacer()
                 Image(systemName: "chevron.right")
@@ -169,10 +218,13 @@ struct LedgerView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .buttonStyle(.plain)
-        .padding()
+        .padding(.horizontal)
+        .padding(.bottom)
     }
 
     private func processOnForeground() {
+        // Free tier: no auto-scan
+        guard subscriptionService.currentTier >= .pro else { return }
         guard !isProcessing else { return }
         isProcessing = true
 
@@ -184,7 +236,7 @@ struct LedgerView: View {
             let result = await processingService.processNewScreenshots(
                 since: lastProcessed,
                 context: modelContext,
-                aiEndpoint: nil, // Will be configured with real endpoint
+                aiEndpoint: nil,
                 subscriptionTier: subscriptionService.currentTier
             )
 
@@ -193,7 +245,6 @@ struct LedgerView: View {
                 isProcessing = false
             }
 
-            // Clear the "new" badge after 5 seconds
             if newCommitmentsCount > 0 {
                 try? await Task.sleep(for: .seconds(5))
                 withAnimation { newCommitmentsCount = 0 }

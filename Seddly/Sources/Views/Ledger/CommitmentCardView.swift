@@ -11,6 +11,8 @@ struct CommitmentCardView: View {
                     .fontWeight(.semibold)
                     .foregroundStyle(.secondary)
 
+                sourceIcon
+
                 Spacer()
 
                 ConfidenceBadgeView(score: commitment.confidenceScore)
@@ -47,6 +49,24 @@ struct CommitmentCardView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private var sourceIcon: some View {
+        switch commitment.source {
+        case .auto:
+            Image(systemName: "camera.viewfinder")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        case .shareSheet:
+            Image(systemName: "square.and.arrow.up")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        case .manual:
+            Image(systemName: "pencil")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private var statusColor: Color {

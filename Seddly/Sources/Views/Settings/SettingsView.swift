@@ -3,6 +3,10 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(SubscriptionService.self) private var subscriptionService
+    @AppStorage("offlineMode") private var offlineMode = false
+    @AppStorage("autoAnalyze") private var autoAnalyze = false
+    @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
     @State private var showDeleteConfirmation = false
     @State private var notificationsEnabled = true
     @State private var dailyDigestTime = DateComponents(hour: 20, minute: 0)
@@ -17,6 +21,28 @@ struct SettingsView: View {
                     Button("Manage in Settings") {
                         if let url = URL(string: UIApplication.openSettingsURLString) {
                             UIApplication.shared.open(url)
+                        }
+                    }
+                }
+
+                if subscriptionService.currentTier >= .pro {
+                    Section("AI Processing") {
+                        Toggle("Offline Mode", isOn: $offlineMode)
+                        Text("All processing stays on your device. Commitment detection may be less accurate.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if !offlineMode {
+                            Toggle("Auto-analyze screenshots", isOn: $autoAnalyze)
+                            if autoAnalyze {
+                                Text("Screenshots are sent for AI analysis without asking first.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else {
+                                Text("You've approved \(approvedExtractionCount) extraction\(approvedExtractionCount == 1 ? "" : "s"). After \(AppConstants.autoApproveAfterCount), you can enable auto-analyze.")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -82,10 +108,13 @@ struct SettingsView: View {
         }
 
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+        approvedExtractionCount = 0
+        autoAnalyze = false
     }
 }
 
 #Preview {
     SettingsView()
         .modelContainer(for: [LocalCommitment.self, LocalEntity.self, ProcessingQueue.self], inMemory: true)
+        .environment(SubscriptionService())
 }

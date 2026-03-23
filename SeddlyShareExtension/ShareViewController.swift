@@ -4,8 +4,14 @@ import UniformTypeIdentifiers
 import Vision
 
 class ShareViewController: UIViewController {
-    private let processingLabel = UILabel()
-    private let statusLabel = UILabel()
+    private var extractedText: String?
+    private var detectedSummary: String?
+
+    private let containerStack = UIStackView()
+    private let spinner = UIActivityIndicatorView(style: .large)
+    private let titleLabel = UILabel()
+    private let summaryLabel = UILabel()
+    private let buttonStack = UIStackView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -16,34 +22,33 @@ class ShareViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .systemBackground
 
-        let stack = UIStackView()
-        stack.axis = .vertical
-        stack.spacing = 12
-        stack.alignment = .center
-        stack.translatesAutoresizingMaskIntoConstraints = false
+        containerStack.axis = .vertical
+        containerStack.spacing = 16
+        containerStack.alignment = .center
+        containerStack.translatesAutoresizingMaskIntoConstraints = false
 
-        let spinner = UIActivityIndicatorView(style: .large)
         spinner.startAnimating()
 
-        processingLabel.text = "Processing screenshot..."
-        processingLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.text = "Processing screenshot..."
+        titleLabel.font = .preferredFont(forTextStyle: .headline)
+        titleLabel.textAlignment = .center
 
-        statusLabel.text = ""
-        statusLabel.font = .preferredFont(forTextStyle: .subheadline)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.numberOfLines = 0
-        statusLabel.textAlignment = .center
+        summaryLabel.text = ""
+        summaryLabel.font = .preferredFont(forTextStyle: .subheadline)
+        summaryLabel.textColor = .secondaryLabel
+        summaryLabel.numberOfLines = 0
+        summaryLabel.textAlignment = .center
 
-        stack.addArrangedSubview(spinner)
-        stack.addArrangedSubview(processingLabel)
-        stack.addArrangedSubview(statusLabel)
+        containerStack.addArrangedSubview(spinner)
+        containerStack.addArrangedSubview(titleLabel)
+        containerStack.addArrangedSubview(summaryLabel)
 
-        view.addSubview(stack)
+        view.addSubview(containerStack)
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+            containerStack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            containerStack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            containerStack.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            containerStack.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
         ])
     }
 
@@ -54,27 +59,26 @@ class ShareViewController: UIViewController {
         }
 
         Task {
-            var processed = 0
-
             for item in extensionItems {
                 guard let attachments = item.attachments else { continue }
 
                 for attachment in attachments {
                     if attachment.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                        let success = await processImageAttachment(attachment)
-                        if success { processed += 1 }
+                        let (text, summary) = await processImageAttachment(attachment)
+                        if let text {
+                            extractedText = text
+                            detectedSummary = summary
+                            await MainActor.run { showConfirmUI(text: text, summary: summary) }
+                            return // Wait for user action
+                        }
                     }
                 }
             }
 
             await MainActor.run {
-                if processed > 0 {
-                    processingLabel.text = "Added to Seddly"
-                    statusLabel.text = "\(processed) screenshot\(processed == 1 ? "" : "s") queued for analysis."
-                } else {
-                    processingLabel.text = "No commitments found"
-                    statusLabel.text = "This screenshot didn't contain detectable text."
-                }
+                titleLabel.text = "No commitments found"
+                summaryLabel.text = "This screenshot didn't contain detectable text."
+                spinner.stopAnimating()
             }
 
             try? await Task.sleep(for: .seconds(1.5))
@@ -82,11 +86,91 @@ class ShareViewController: UIViewController {
         }
     }
 
-    private func processImageAttachment(_ attachment: NSItemProvider) async -> Bool {
+    private func showConfirmUI(text: String, summary: String?) {
+        spinner.stopAnimating()
+        spinner.isHidden = true
+
+        if let summary {
+            titleLabel.text = "Commitment found:"
+            summaryLabel.text = summary
+        } else {
+            titleLabel.text = "Text extracted"
+            summaryLabel.text = String(text.prefix(200))
+        }
+
+        // Create buttons
+        buttonStack.axis = .horizontal
+        buttonStack.spacing = 12
+        buttonStack.distribution = .fillEqually
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+
+        let confirmButton = UIButton(type: .system)
+        confirmButton.setTitle("Add to Ledger", for: .normal)
+        confirmButton.backgroundColor = .systemBlue
+        confirmButton.setTitleColor(.white, for: .normal)
+        confirmButton.titleLabel?.font = .boldSystemFont(ofSize: 15)
+        confirmButton.layer.cornerRadius = 10
+        confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
+
+        let skipButton = UIButton(type: .system)
+        skipButton.setTitle("Skip", for: .normal)
+        skipButton.backgroundColor = .secondarySystemBackground
+        skipButton.setTitleColor(.label, for: .normal)
+        skipButton.titleLabel?.font = .systemFont(ofSize: 15)
+        skipButton.layer.cornerRadius = 10
+        skipButton.addTarget(self, action: #selector(skipTapped), for: .touchUpInside)
+
+        buttonStack.addArrangedSubview(skipButton)
+        buttonStack.addArrangedSubview(confirmButton)
+
+        containerStack.addArrangedSubview(buttonStack)
+
+        NSLayoutConstraint.activate([
+            buttonStack.widthAnchor.constraint(equalTo: containerStack.widthAnchor),
+            confirmButton.heightAnchor.constraint(equalToConstant: 44),
+            skipButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
+    }
+
+    @objc private func confirmTapped() {
+        saveToQueue()
+
+        titleLabel.text = "Added to Seddly"
+        summaryLabel.text = "Open Seddly to review."
+        buttonStack.isHidden = true
+
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            completeRequest()
+        }
+    }
+
+    @objc private func skipTapped() {
+        completeRequest()
+    }
+
+    private func saveToQueue() {
+        guard let text = extractedText else { return }
+
+        do {
+            let container = try SharedModelContainer.create()
+            let context = ModelContext(container)
+
+            let queueItem = ProcessingQueue(screenshotAssetID: "share-\(UUID().uuidString)")
+            queueItem.extractedText = text
+            queueItem.processingStatus = .pending
+            context.insert(queueItem)
+            try context.save()
+        } catch {
+            // Silently fail — the screenshot will be picked up on next app launch
+        }
+    }
+
+    private func processImageAttachment(_ attachment: NSItemProvider) async -> (String?, String?) {
         guard let item = try? await attachment.loadItem(
             forTypeIdentifier: UTType.image.identifier,
             options: nil
-        ) else { return false }
+        ) else { return (nil, nil) }
 
         let image: UIImage?
 
@@ -97,29 +181,22 @@ class ShareViewController: UIViewController {
         } else if let img = item as? UIImage {
             image = img
         } else {
-            return false
+            return (nil, nil)
         }
 
-        guard let image, let cgImage = image.cgImage else { return false }
+        guard let image, let cgImage = image.cgImage else { return (nil, nil) }
 
-        // Run OCR on-device
-        let ocrText = await performOCR(on: cgImage)
-        guard let ocrText, !ocrText.isEmpty else { return false }
-
-        // Save to shared SwiftData container
-        do {
-            let container = try SharedModelContainer.create()
-            let context = ModelContext(container)
-
-            let queueItem = ProcessingQueue(screenshotAssetID: "share-\(UUID().uuidString)")
-            queueItem.extractedText = ocrText
-            queueItem.processingStatus = .pending
-            context.insert(queueItem)
-            try context.save()
-            return true
-        } catch {
-            return false
+        guard let ocrText = await performOCR(on: cgImage), !ocrText.isEmpty else {
+            return (nil, nil)
         }
+
+        // Quick rule-based check for a summary
+        let score = RuleFilterService.score(text: ocrText)
+        let summary = score >= AppConstants.defaultConfidenceThreshold
+            ? String(ocrText.prefix(200))
+            : nil
+
+        return (ocrText, summary)
     }
 
     private func performOCR(on cgImage: CGImage) async -> String? {

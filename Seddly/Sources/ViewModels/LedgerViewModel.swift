@@ -5,7 +5,15 @@ import SwiftData
 final class LedgerViewModel {
     var sortOrder: SortOrder = .deadline
     var filterStatus: CommitmentStatus?
+    var filterEntityName: String?
+    var filterHasDeadlineOnly = false
+    var filterDateStart: Date?
+    var filterDateEnd: Date?
     var searchText = ""
+
+    var hasActiveFilters: Bool {
+        filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil
+    }
 
     enum SortOrder: String, CaseIterable {
         case deadline = "Deadline"
@@ -17,10 +25,30 @@ final class LedgerViewModel {
     func sortedCommitments(_ commitments: [LocalCommitment]) -> [LocalCommitment] {
         var filtered = commitments
 
+        // Status filter
         if let filterStatus {
             filtered = filtered.filter { $0.status == filterStatus }
         }
 
+        // Entity filter
+        if let filterEntityName {
+            filtered = filtered.filter { $0.entityName == filterEntityName }
+        }
+
+        // Deadline filter
+        if filterHasDeadlineOnly {
+            filtered = filtered.filter { $0.deadline != nil }
+        }
+
+        // Date range filter
+        if let start = filterDateStart {
+            filtered = filtered.filter { $0.createdAt >= start }
+        }
+        if let end = filterDateEnd {
+            filtered = filtered.filter { $0.createdAt <= end }
+        }
+
+        // Search
         if !searchText.isEmpty {
             let query = searchText.lowercased()
             filtered = filtered.filter {
@@ -47,6 +75,12 @@ final class LedgerViewModel {
                 (statusPriority[$0.status] ?? 5) < (statusPriority[$1.status] ?? 5)
             }
         }
+    }
+
+    /// Filters commitments for free tier: only show last 30 days
+    func applyFreeTierHistoryLimit(_ commitments: [LocalCommitment]) -> [LocalCommitment] {
+        let cutoff = Calendar.current.date(byAdding: .day, value: -30, to: .now) ?? .distantPast
+        return commitments.filter { $0.createdAt >= cutoff }
     }
 
     func fulfill(_ commitment: LocalCommitment) {
