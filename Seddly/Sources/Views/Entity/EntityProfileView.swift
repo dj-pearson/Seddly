@@ -2,10 +2,12 @@ import SwiftUI
 
 struct EntityProfileView: View {
     let entity: LocalEntity
+    @Environment(\.modelContext) private var modelContext
     @Environment(SubscriptionService.self) private var subscriptionService
     @State private var disputeSummary: String?
     @State private var isGeneratingSummary = false
     @State private var showingSummary = false
+    @State private var summaryError: String?
 
     var body: some View {
         List {
@@ -180,31 +182,30 @@ struct EntityProfileView: View {
 
     private func generateDisputeSummary() {
         isGeneratingSummary = true
+        summaryError = nil
 
         Task {
-            // In production, this calls the generate-dispute-summary Edge Function
-            // For now, generate a local summary
-            var summary = "Timeline of commitments from \(entity.name):\n\n"
+            let service = DisputeSummaryService(
+                endpointURL: URL(string: "https://your-project.supabase.co/functions/v1/generate-dispute-summary")!
+            )
 
-            for commitment in entity.commitments.sorted(by: { $0.createdAt < $1.createdAt }) {
-                let dateStr = commitment.createdAt.formatted(date: .long, time: .omitted)
-                summary += "\(dateStr) — \(commitment.summary)"
-
-                if let deadline = commitment.deadline {
-                    summary += " (Due: \(deadline.formatted(date: .long, time: .omitted)))"
-                }
-
-                if let amount = commitment.dollarAmount {
-                    summary += " — $\(amount)"
-                }
-
-                summary += "\nSource: \(commitment.source == .auto ? "screenshot" : commitment.source == .shareSheet ? "share sheet" : "manual entry")"
-                summary += "\nStatus: \(commitment.status.label)\n\n"
+            do {
+                // Try AI-powered summary via Edge Function
+                let summary = try await service.generateSummary(
+                    entityName: entity.name,
+                    commitments: entity.commitments,
+                    context: modelContext
+                )
+                disputeSummary = summary
+            } catch {
+                // Fallback to local generation
+                summaryError = error.localizedDescription
+                disputeSummary = service.generateLocalSummary(
+                    entityName: entity.name,
+                    commitments: entity.commitments
+                )
             }
 
-            summary += "Summary: \(entity.fulfilledCount) of \(entity.totalCommitments) commitments fulfilled. \(entity.overdueCount) overdue."
-
-            disputeSummary = summary
             isGeneratingSummary = false
             showingSummary = true
         }

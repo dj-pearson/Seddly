@@ -3,6 +3,12 @@ import StoreKit
 
 struct SubscriptionView: View {
     @Environment(SubscriptionService.self) private var subscriptionService
+    @State private var billingPeriod: BillingPeriod = .monthly
+
+    enum BillingPeriod: String, CaseIterable {
+        case monthly = "Monthly"
+        case yearly = "Yearly"
+    }
 
     var body: some View {
         List {
@@ -10,30 +16,78 @@ struct SubscriptionView: View {
                 currentTierRow
             }
 
+            Section {
+                Picker("Billing", selection: $billingPeriod) {
+                    ForEach(BillingPeriod.allCases, id: \.self) { period in
+                        Text(period.rawValue).tag(period)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets())
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+
             Section("Plans") {
                 SubscriptionTierRow(
                     name: "Free",
                     price: "$0",
-                    features: ["Manual screenshot import", "5 active commitments", "On-device processing only", "Basic deadline alerts"],
+                    period: "",
+                    savings: nil,
+                    features: [
+                        "Manual screenshot import via Share Sheet",
+                        "5 active commitments",
+                        "On-device processing only",
+                        "Basic deadline alerts",
+                        "30-day history"
+                    ],
                     isCurrent: subscriptionService.currentTier == .free
                 )
 
                 SubscriptionTierRow(
                     name: "Pro",
-                    price: "$4.99/mo",
-                    features: ["Auto-scan Screenshots album", "Unlimited commitments", "AI-powered extraction", "Full notification suite", "Search & filter", "Entity profiles"],
+                    price: billingPeriod == .monthly ? "$4.99" : "$39.99",
+                    period: billingPeriod == .monthly ? "/mo" : "/yr",
+                    savings: billingPeriod == .yearly ? "Save 33%" : nil,
+                    features: [
+                        "Auto-scan Screenshots album",
+                        "Unlimited active commitments",
+                        "AI-powered commitment extraction",
+                        "Full notification suite",
+                        "Search & filter",
+                        "Entity profiles with fulfillment rates",
+                        "1-year history"
+                    ],
                     isCurrent: subscriptionService.currentTier == .pro
                 ) {
-                    await purchase(AppConstants.SubscriptionProductID.proMonthly)
+                    let productID = billingPeriod == .monthly
+                        ? AppConstants.SubscriptionProductID.proMonthly
+                        : AppConstants.SubscriptionProductID.proYearly
+                    await purchase(productID)
                 }
 
                 SubscriptionTierRow(
                     name: "Pro+",
-                    price: "$9.99/mo",
-                    features: ["Everything in Pro", "AI dispute summaries", "PDF export", "iCloud sync", "Unlimited history", "Priority processing"],
+                    price: billingPeriod == .monthly ? "$9.99" : "$79.99",
+                    period: billingPeriod == .monthly ? "/mo" : "/yr",
+                    savings: billingPeriod == .yearly ? "Save 33%" : nil,
+                    features: [
+                        "Everything in Pro",
+                        "AI-generated dispute summaries",
+                        "PDF export",
+                        "iCloud sync across devices",
+                        "Unlimited history",
+                        "Custom reminder scheduling",
+                        "Priority AI processing",
+                        "API access"
+                    ],
                     isCurrent: subscriptionService.currentTier == .proPlus
                 ) {
-                    await purchase(AppConstants.SubscriptionProductID.proPlusMonthly)
+                    let productID = billingPeriod == .monthly
+                        ? AppConstants.SubscriptionProductID.proPlusMonthly
+                        : AppConstants.SubscriptionProductID.proPlusYearly
+                    await purchase(productID)
                 }
             }
 
@@ -90,6 +144,8 @@ struct SubscriptionView: View {
 private struct SubscriptionTierRow: View {
     let name: String
     let price: String
+    let period: String
+    let savings: String?
     let features: [String]
     let isCurrent: Bool
     var onSubscribe: (() async -> Void)?
@@ -99,11 +155,26 @@ private struct SubscriptionTierRow: View {
             HStack {
                 Text(name)
                     .font(.headline)
+                if let savings {
+                    Text(savings)
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.green.opacity(0.15))
+                        .foregroundStyle(.green)
+                        .clipShape(Capsule())
+                }
                 Spacer()
-                Text(price)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.accent)
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text(price)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.accent)
+                    Text(period)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             ForEach(features, id: \.self) { feature in
