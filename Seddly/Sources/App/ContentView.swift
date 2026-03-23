@@ -5,7 +5,17 @@ struct ContentView: View {
 
     var body: some View {
         if hasCompletedOnboarding {
-            LedgerView()
+            TabView {
+                LedgerView()
+                    .tabItem {
+                        Label("Ledger", systemImage: "list.bullet.clipboard")
+                    }
+
+                SettingsView()
+                    .tabItem {
+                        Label("Settings", systemImage: "gear")
+                    }
+            }
         } else {
             OnboardingView()
         }

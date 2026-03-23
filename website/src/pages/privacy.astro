@@ -1,0 +1,212 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Privacy — Seddly" description="Seddly is built privacy-first. Screenshots never leave your device. Here's exactly how your data works.">
+  <section class="page-header">
+    <h1>How Your Data Works</h1>
+    <p>Seddly is built privacy-first. Here's exactly what happens with your data — in plain English.</p>
+  </section>
+
+  <section class="privacy-flow">
+    <div class="flow-section">
+      <h2>What stays on your device</h2>
+      <div class="flow-items on-device">
+        <div class="flow-item">
+          <span class="icon">&#x1F4F1;</span>
+          <div>
+            <h3>Your screenshot images</h3>
+            <p>Screenshot files never leave your iPhone. We read pixels, extract text, and that's it. The image stays in your Photos app.</p>
+          </div>
+        </div>
+        <div class="flow-item">
+          <span class="icon">&#x1F50D;</span>
+          <div>
+            <h3>Text extraction (OCR)</h3>
+            <p>All text recognition runs on-device using Apple's Vision framework. No network call needed.</p>
+          </div>
+        </div>
+        <div class="flow-item">
+          <span class="icon">&#x1F4CB;</span>
+          <div>
+            <h3>Your commitment ledger</h3>
+            <p>All commitments, entities, deadlines, and notes are stored locally on your device using SwiftData.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-section">
+      <h2>What is processed in the cloud (Pro only)</h2>
+      <div class="flow-items cloud">
+        <div class="flow-item">
+          <span class="icon">&#x1F4AC;</span>
+          <div>
+            <h3>Text snippets for AI analysis</h3>
+            <p>When the AI analyzes a screenshot, only the extracted text is sent — not the image. No name, email, or device ID is attached. You can review exactly what's sent before it goes.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-section">
+      <h2>What Seddly never does</h2>
+      <div class="flow-items never">
+        <div class="flow-item"><p>Never uploads your screenshots or images</p></div>
+        <div class="flow-item"><p>Never accesses your personal photos or videos</p></div>
+        <div class="flow-item"><p>Never reads screenshots in the background without showing you</p></div>
+        <div class="flow-item"><p>Never shares data with third parties</p></div>
+        <div class="flow-item"><p>Never requires an account for free or Pro tiers</p></div>
+        <div class="flow-item"><p>Never tracks you across apps or websites</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="privacy-label">
+    <h2>App Store Privacy Label</h2>
+    <div class="label-grid">
+      <div class="label-card">
+        <h3>Data Linked to You</h3>
+        <p>None (Free &amp; Pro)<br/>Identifiers + Usage Data (Pro+ with account)</p>
+      </div>
+      <div class="label-card">
+        <h3>Data Used to Track You</h3>
+        <p>None</p>
+      </div>
+      <div class="label-card">
+        <h3>Data Not Linked to You</h3>
+        <p>Diagnostics</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="legal-link">
+    <p>For the full legal privacy policy, see <a href="/privacy/legal">Privacy Policy</a>.</p>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-header {
+    text-align: center;
+    padding: 6rem 2rem 3rem;
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+  }
+
+  .privacy-flow {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 0 2rem;
+  }
+
+  .flow-section {
+    margin-bottom: 3rem;
+  }
+
+  .flow-section h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+    text-align: left;
+  }
+
+  .flow-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .flow-item {
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1.2rem;
+  }
+
+  .on-device .flow-item {
+    border-left: 3px solid var(--color-success);
+  }
+
+  .cloud .flow-item {
+    border-left: 3px solid var(--color-warning);
+  }
+
+  .never .flow-item {
+    border-left: 3px solid var(--color-danger);
+  }
+
+  .icon {
+    font-size: 1.5rem;
+    flex-shrink: 0;
+  }
+
+  .flow-item h3 {
+    font-size: 1rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .flow-item p {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .privacy-label {
+    max-width: 750px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .privacy-label h2 {
+    font-size: 1.4rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .label-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+  }
+
+  .label-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+  }
+
+  .label-card h3 {
+    font-size: 0.85rem;
+    color: var(--color-text-muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .label-card p {
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+
+  .legal-link {
+    text-align: center;
+    padding: 2rem;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .label-grid { grid-template-columns: 1fr; }
+  }
+</style>

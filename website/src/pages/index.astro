@@ -1,0 +1,361 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Seddly — Promise Tracker for iOS">
+  <section class="hero">
+    <div class="hero-inner">
+      <h1>Every promise.<br />Every deadline.<br />Every receipt.</h1>
+      <p class="hero-sub">
+        People make promises over text, email, and DMs every day.
+        Seddly makes sure they keep them.
+      </p>
+      <a href="#download" class="cta">Download for iOS</a>
+    </div>
+  </section>
+
+  <section class="how-it-works" id="how">
+    <div class="section-inner">
+      <h2>How it works</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-icon">1</div>
+          <h3>Screenshot</h3>
+          <p>Take a screenshot of any promise — a text, email, DM, or document. You already do this.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">2</div>
+          <h3>AI Extracts</h3>
+          <p>Seddly detects who promised what, by when, and for how much. No typing required.</p>
+        </div>
+        <div class="step">
+          <div class="step-icon">3</div>
+          <h3>You Get Reminded</h3>
+          <p>When deadlines approach or pass, Seddly alerts you. When things go wrong, it builds your case.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features">
+    <div class="section-inner">
+      <h2>Built for accountability</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <h3>Live Ledger</h3>
+          <p>A chronological list of every active commitment — who promised, what they promised, and when it's due.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Entity Profiles</h3>
+          <p>See every commitment from the same person or company. Track their fulfillment rate over time.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Dispute Timelines</h3>
+          <p>Generate professional, evidence-backed timelines you can forward to a lawyer, landlord, or escalation team.</p>
+        </div>
+        <div class="feature-card">
+          <h3>Privacy First</h3>
+          <p>Screenshots never leave your device. All text extraction happens on-phone. No account required.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="pricing" id="pricing">
+    <div class="section-inner">
+      <h2>Simple pricing</h2>
+      <div class="pricing-grid">
+        <div class="price-card">
+          <h3>Free</h3>
+          <div class="price">$0</div>
+          <ul>
+            <li>Manual screenshot import</li>
+            <li>5 active commitments</li>
+            <li>On-device processing</li>
+            <li>Basic deadline alerts</li>
+          </ul>
+        </div>
+        <div class="price-card featured">
+          <div class="badge">Most Popular</div>
+          <h3>Pro</h3>
+          <div class="price">$4.99<span>/mo</span></div>
+          <ul>
+            <li>Auto-scan screenshots</li>
+            <li>Unlimited commitments</li>
+            <li>AI-powered extraction</li>
+            <li>Full notification suite</li>
+            <li>Search &amp; filter</li>
+            <li>Entity profiles</li>
+          </ul>
+        </div>
+        <div class="price-card">
+          <h3>Pro+</h3>
+          <div class="price">$9.99<span>/mo</span></div>
+          <ul>
+            <li>Everything in Pro</li>
+            <li>AI dispute summaries</li>
+            <li>PDF export</li>
+            <li>iCloud sync</li>
+            <li>Unlimited history</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="faq">
+    <div class="section-inner">
+      <h2>FAQ</h2>
+      <div class="faq-list">
+        <details>
+          <summary>Can Seddly see my personal photos?</summary>
+          <p>No. Seddly only accesses the Screenshots smart album on your iPhone. Personal photos, videos, and camera roll are never touched.</p>
+        </details>
+        <details>
+          <summary>Are my screenshots uploaded anywhere?</summary>
+          <p>No. Screenshot images never leave your device. Only extracted text (after you approve it) is sent for AI analysis. No images, metadata, or personal identifiers are transmitted.</p>
+        </details>
+        <details>
+          <summary>Do I need an account?</summary>
+          <p>Not for Free or Pro. Only Pro+ requires an account (Apple Sign-In) for cross-device sync. Free and Pro work entirely on-device with no sign-up.</p>
+        </details>
+        <details>
+          <summary>What happens if I delete the app?</summary>
+          <p>All local data is deleted. If you're on Pro+ with cloud sync, your data can be restored when you reinstall. Otherwise, deletion is permanent.</p>
+        </details>
+        <details>
+          <summary>Is this a legal tool?</summary>
+          <p>Seddly is a personal accountability tracker, not legal software. Dispute timelines are informational and may support your case, but they are not legal advice or certified evidence.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section" id="download">
+    <div class="section-inner">
+      <h2>Hold everyone to their word</h2>
+      <p>Download Seddly for iOS and start tracking the promises that matter.</p>
+      <a href="#" class="cta">Download on the App Store</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .hero {
+    padding: 8rem 2rem 6rem;
+    text-align: center;
+  }
+
+  .hero-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 1.5rem;
+  }
+
+  .hero-sub {
+    font-size: 1.2rem;
+    color: var(--color-text-muted);
+    max-width: 500px;
+    margin: 0 auto 2.5rem;
+  }
+
+  .cta {
+    display: inline-block;
+    background: var(--color-accent);
+    color: white;
+    padding: 0.9rem 2.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    transition: background 0.2s;
+  }
+
+  .cta:hover {
+    background: var(--color-accent-hover);
+    color: white;
+  }
+
+  .section-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 4rem 2rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 2.5rem;
+    text-align: center;
+    letter-spacing: -0.02em;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+  }
+
+  .step {
+    text-align: center;
+    padding: 2rem;
+  }
+
+  .step-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: white;
+    font-weight: 800;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+  }
+
+  .step h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .step p {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+  }
+
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+
+  .feature-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 2rem;
+  }
+
+  .feature-card h3 {
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .feature-card p {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+
+  .price-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 2rem;
+    position: relative;
+  }
+
+  .price-card.featured {
+    border-color: var(--color-accent);
+    transform: scale(1.03);
+  }
+
+  .badge {
+    position: absolute;
+    top: -12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--color-accent);
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.25rem 1rem;
+    border-radius: 20px;
+  }
+
+  .price-card h3 {
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .price {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+  }
+
+  .price span {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+
+  .price-card ul {
+    list-style: none;
+  }
+
+  .price-card li {
+    padding: 0.4rem 0;
+    font-size: 0.9rem;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .price-card li:last-child {
+    border-bottom: none;
+  }
+
+  .faq-list {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  details {
+    border-bottom: 1px solid var(--color-border);
+    padding: 1.2rem 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  details p {
+    margin-top: 0.8rem;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .cta-section {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .cta-section p {
+    color: var(--color-text-muted);
+    margin-bottom: 2rem;
+    font-size: 1.1rem;
+  }
+
+  @media (max-width: 768px) {
+    .steps { grid-template-columns: 1fr; }
+    .feature-grid { grid-template-columns: 1fr; }
+    .pricing-grid { grid-template-columns: 1fr; }
+    .price-card.featured { transform: none; }
+  }
+</style>

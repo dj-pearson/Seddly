@@ -1,0 +1,204 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "Every promise. Every deadline. Every receipt. Seddly turns your screenshots into an accountability system." } = Astro.props;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://seddly.com" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Seddly",
+      "applicationCategory": "ProductivityApplication",
+      "operatingSystem": "iOS",
+      "description": description,
+      "url": "https://seddly.com",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    })} />
+  </head>
+  <body>
+    <nav>
+      <div class="nav-inner">
+        <a href="/" class="logo">Seddly</a>
+        <div class="nav-links">
+          <a href="/how-it-works">How It Works</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/support">Support</a>
+          <a href="#download" class="cta-small">Download</a>
+        </div>
+      </div>
+    </nav>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer>
+      <div class="footer-inner">
+        <div class="footer-col">
+          <h4>Seddly</h4>
+          <p>Hold everyone to their word.</p>
+          <p class="copyright">&copy; {new Date().getFullYear()} Pearson Media LLC</p>
+        </div>
+        <div class="footer-col">
+          <h4>Product</h4>
+          <a href="/how-it-works">How It Works</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/support">Support</a>
+        </div>
+        <div class="footer-col">
+          <h4>Legal</h4>
+          <a href="/privacy/legal">Privacy Policy</a>
+          <a href="/terms">Terms of Use</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --color-bg: #0a0a0b;
+    --color-surface: #141416;
+    --color-border: #2a2a2e;
+    --color-text: #e8e8ec;
+    --color-text-muted: #8b8b94;
+    --color-accent: #5b7ff5;
+    --color-accent-hover: #7b99f7;
+    --color-success: #34c759;
+    --color-warning: #ff9f0a;
+    --color-danger: #ff453a;
+    --max-width: 1100px;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    line-height: 1.6;
+  }
+
+  a {
+    color: var(--color-accent);
+    text-decoration: none;
+  }
+
+  a:hover {
+    color: var(--color-accent-hover);
+  }
+
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10, 10, 11, 0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border);
+    padding: 1rem 2rem;
+  }
+
+  .nav-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .logo {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    align-items: center;
+  }
+
+  .nav-links a {
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+  }
+
+  .cta-small {
+    background: var(--color-accent);
+    color: white !important;
+    padding: 0.5rem 1.2rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+
+  .cta-small:hover {
+    background: var(--color-accent-hover);
+  }
+
+  footer {
+    border-top: 1px solid var(--color-border);
+    padding: 3rem 2rem;
+    margin-top: 4rem;
+  }
+
+  .footer-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 2rem;
+  }
+
+  .footer-col h4 {
+    margin-bottom: 0.8rem;
+    font-size: 0.9rem;
+    color: var(--color-text);
+  }
+
+  .footer-col a,
+  .footer-col p {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    margin-bottom: 0.4rem;
+  }
+
+  .copyright {
+    margin-top: 1rem;
+    font-size: 0.8rem;
+  }
+
+  @media (max-width: 768px) {
+    .nav-links { gap: 1rem; }
+    .footer-inner { grid-template-columns: 1fr; }
+  }
+</style>

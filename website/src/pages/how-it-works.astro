@@ -1,0 +1,148 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="How Seddly Works — Screenshot to Accountability">
+  <section class="page-header">
+    <h1>How Seddly Works</h1>
+    <p>From screenshot to accountability in seconds. Here's the full pipeline.</p>
+  </section>
+
+  <section class="pipeline">
+    <div class="pipeline-step">
+      <div class="step-number">1</div>
+      <div class="step-content">
+        <h2>You take a screenshot</h2>
+        <p>A text message from your landlord. An email from a client. A DM from a seller. You already screenshot these — it's instinct.</p>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">2</div>
+      <div class="step-content">
+        <h2>On-device text extraction</h2>
+        <p>When you open Seddly, it scans your Screenshots album using Apple's Vision framework — the same technology behind Live Text. All text extraction happens on your iPhone. No images are uploaded.</p>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">3</div>
+      <div class="step-content">
+        <h2>Smart classification</h2>
+        <p>Not every screenshot contains a promise. Seddly's classifier separates conversations, receipts, and agreements from memes, UI screenshots, and irrelevant images — before any AI is involved.</p>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">4</div>
+      <div class="step-content">
+        <h2>AI commitment extraction</h2>
+        <p>For screenshots that likely contain promises, the extracted text (not the image) is analyzed by AI. It identifies who promised what, by when, and for how much. Every commitment gets a confidence score.</p>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">5</div>
+      <div class="step-content">
+        <h2>Your ledger updates</h2>
+        <p>Commitments appear in your ledger automatically. High-confidence items are added directly. Medium-confidence items go to a review queue. You always have final say.</p>
+      </div>
+    </div>
+
+    <div class="pipeline-step">
+      <div class="step-number">6</div>
+      <div class="step-content">
+        <h2>Deadlines are tracked</h2>
+        <p>Seddly sends you alerts when deadlines approach and notifications when they pass. No more forgotten promises. No more scrolling through your camera roll looking for proof.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <h2>Ready to hold everyone accountable?</h2>
+    <a href="#download" class="cta">Download for iOS</a>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-header {
+    text-align: center;
+    padding: 6rem 2rem 3rem;
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+  }
+
+  .pipeline {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+
+  .pipeline-step {
+    display: flex;
+    gap: 2rem;
+    padding: 2rem 0;
+    border-left: 2px solid var(--color-border);
+    margin-left: 24px;
+    padding-left: 2rem;
+    position: relative;
+  }
+
+  .step-number {
+    position: absolute;
+    left: -18px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: white;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+
+  .step-content h2 {
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    text-align: left;
+  }
+
+  .step-content p {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+  }
+
+  .cta-section {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .cta {
+    display: inline-block;
+    background: var(--color-accent);
+    color: white;
+    padding: 0.9rem 2.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-top: 1.5rem;
+  }
+
+  .cta:hover {
+    background: var(--color-accent-hover);
+    color: white;
+  }
+</style>

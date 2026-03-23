@@ -1,0 +1,121 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Support — Seddly">
+  <section class="page-header">
+    <h1>Support</h1>
+    <p>Common questions and troubleshooting for Seddly.</p>
+  </section>
+
+  <section class="faq-section">
+    <h2>Frequently Asked Questions</h2>
+
+    <details>
+      <summary>Why didn't Seddly detect my screenshot?</summary>
+      <p>Seddly processes screenshots when you open the app. If a screenshot was taken while the app was closed, open Seddly and it will scan for new screenshots automatically. Make sure you've granted photo library access in Settings &gt; Seddly.</p>
+    </details>
+
+    <details>
+      <summary>How do I grant photo access after denying it?</summary>
+      <p>Go to your iPhone Settings &gt; Seddly &gt; Photos, and select "All Photos" or "Selected Photos" (choose your Screenshots album). You can also use the Share Sheet to send individual screenshots to Seddly without granting full photo access.</p>
+    </details>
+
+    <details>
+      <summary>How do I export my commitment history?</summary>
+      <p>On Pro+, tap any entity name to see their profile, then tap "Generate Summary" to create a formatted timeline. You can share this as text or export as PDF.</p>
+    </details>
+
+    <details>
+      <summary>Can I use Seddly without an internet connection?</summary>
+      <p>Yes. On-device OCR and rule-based commitment detection work fully offline. AI-powered extraction requires an internet connection but screenshots are queued for processing when you're back online.</p>
+    </details>
+
+    <details>
+      <summary>How do I cancel my subscription?</summary>
+      <p>Go to iPhone Settings &gt; [Your Name] &gt; Subscriptions &gt; Seddly, then tap "Cancel Subscription." Your Pro/Pro+ features will remain active until the end of your billing period.</p>
+    </details>
+
+    <details>
+      <summary>What happens to my data if I downgrade?</summary>
+      <p>Your commitments stay on your device. You won't lose any data. On the free tier, you'll be limited to 5 active commitments and won't have AI extraction, but existing commitments remain accessible.</p>
+    </details>
+
+    <details>
+      <summary>Is Seddly available on Android?</summary>
+      <p>Not yet. Seddly is currently iOS-only. An Android version is planned if the iOS app proves the model.</p>
+    </details>
+  </section>
+
+  <section class="contact">
+    <h2>Still need help?</h2>
+    <p>Email us at <a href="mailto:support@seddly.com">support@seddly.com</a> and we'll get back to you within 24 hours.</p>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-header {
+    text-align: center;
+    padding: 6rem 2rem 3rem;
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .page-header h1 {
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+  }
+
+  .faq-section {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 0 2rem 3rem;
+  }
+
+  .faq-section h2 {
+    font-size: 1.5rem;
+    margin-bottom: 2rem;
+    text-align: left;
+  }
+
+  details {
+    border-bottom: 1px solid var(--color-border);
+    padding: 1.2rem 0;
+  }
+
+  summary {
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  details p {
+    margin-top: 0.8rem;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+
+  .contact {
+    text-align: center;
+    padding: 3rem 2rem;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .contact h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .contact p {
+    color: var(--color-text-muted);
+    font-size: 1rem;
+  }
+</style>
