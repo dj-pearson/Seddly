@@ -101,6 +101,18 @@ struct CommitmentDetailView: View {
                         Text(status.label).tag(status)
                     }
                 }
+
+                Picker("Category", selection: Binding(
+                    get: { commitment.category },
+                    set: {
+                        commitment.category = $0
+                        commitment.updatedAt = .now
+                    }
+                )) {
+                    ForEach(CommitmentCategory.allCases) { category in
+                        Label(category.label, systemImage: category.icon).tag(category)
+                    }
+                }
             }
 
             if let reasoning = commitment.aiReasoning {

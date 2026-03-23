@@ -54,6 +54,11 @@ jobs:
           PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
           echo "${{ secrets.PROVISIONING_PROFILE_SHARE_EXT }}" | base64 --decode > "$PP_PATH/SeddlyShareExt_AppStore.mobileprovision"
 
+      - name: Install provisioning profile — Widget
+        run: |
+          PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "${{ secrets.PROVISIONING_PROFILE_WIDGET }}" | base64 --decode > "$PP_PATH/SeddlyWidget_AppStore.mobileprovision"
+
       - name: Determine build number
         id: build_number
         run: |

@@ -69,6 +69,18 @@ struct SettingsView: View {
                     NavigationLink("Manage Subscription") {
                         SubscriptionView()
                     }
+                    NavigationLink("Refer a Friend") {
+                        ReferralView()
+                    }
+                }
+
+                Section("Data") {
+                    NavigationLink("Export Data") {
+                        DataExportView()
+                    }
+                    NavigationLink("Merge Duplicate Entities") {
+                        EntityMergeView()
+                    }
                 }
 
                 Section("Privacy") {

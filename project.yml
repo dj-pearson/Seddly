@@ -47,6 +47,7 @@ targets:
       path: Seddly/Resources/Seddly.entitlements
     dependencies:
       - target: SeddlyShareExtension
+      - target: SeddlyWidget
     scheme:
       testTargets:
         - SeddlyTests
@@ -62,11 +63,32 @@ targets:
           - "**/.gitkeep"
       - path: Seddly/Sources/Shared
       - path: Seddly/Sources/Models
+      - path: Seddly/Sources/Services/RuleFilterService.swift
     settings:
       base:
         INFOPLIST_FILE: SeddlyShareExtension/Info.plist
         CODE_SIGN_ENTITLEMENTS: SeddlyShareExtension/SeddlyShareExtension.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.ShareExtension
+      configs:
+        Debug:
+          CODE_SIGN_STYLE: Automatic
+        Release:
+          CODE_SIGN_STYLE: Manual
+
+  SeddlyWidget:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SeddlyWidget
+        excludes:
+          - "**/.gitkeep"
+      - path: Seddly/Sources/Shared
+      - path: Seddly/Sources/Models
+    settings:
+      base:
+        INFOPLIST_FILE: SeddlyWidget/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SeddlyWidget/SeddlyWidget.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.Widget
       configs:
         Debug:
           CODE_SIGN_STYLE: Automatic

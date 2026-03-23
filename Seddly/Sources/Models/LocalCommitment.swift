@@ -21,6 +21,7 @@ final class LocalCommitment {
     var notes: String?
     var needsAIProcessing: Bool
     var syncStatusRaw: String
+    var categoryRaw: String?
     var createdAt: Date
     var updatedAt: Date
 
@@ -45,6 +46,11 @@ final class LocalCommitment {
     var syncStatus: SyncStatus {
         get { SyncStatus(rawValue: syncStatusRaw) ?? .local }
         set { syncStatusRaw = newValue.rawValue }
+    }
+
+    var category: CommitmentCategory {
+        get { CommitmentCategory(rawValue: categoryRaw ?? "") ?? .uncategorized }
+        set { categoryRaw = newValue.rawValue }
     }
 
     var isOverdue: Bool {

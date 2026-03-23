@@ -17,6 +17,8 @@
         <string>Seddly_AppStore</string>
         <key>com.pearsonmedia.Seddly.ShareExtension</key>
         <string>SeddlyShareExt_AppStore</string>
+        <key>com.pearsonmedia.Seddly.Widget</key>
+        <string>SeddlyWidget_AppStore</string>
     </dict>
 </dict>
 </plist>

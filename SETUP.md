@@ -68,6 +68,13 @@ Register two App IDs:
 - Capabilities to enable:
   - ✅ App Groups
 
+**App ID 3 — Widget Extension**
+- Platform: iOS
+- Description: `Seddly Widget`
+- Bundle ID: `com.pearsonmedia.Seddly.Widget` (Explicit)
+- Capabilities to enable:
+  - ✅ App Groups
+
 ### 2.2 Register App Group
 
 Go to **Identifiers → App Groups → +**
@@ -184,6 +191,13 @@ Go to **Certificates, Identifiers & Profiles → Profiles → +**
 - App ID: `Seddly Share Extension (com.pearsonmedia.Seddly.ShareExtension)`
 - Certificate: Select your Apple Distribution certificate
 - Profile Name: `SeddlyShareExt_AppStore`
+- Download the `.mobileprovision` file
+
+**Profile 3 — Widget Extension**
+- Type: App Store Connect
+- App ID: `Seddly Widget (com.pearsonmedia.Seddly.Widget)`
+- Certificate: Select your Apple Distribution certificate
+- Profile Name: `SeddlyWidget_AppStore`
 - Download the `.mobileprovision` file
 
 ### 4.5 Encode the Profiles
