@@ -30,6 +30,35 @@ final class LocalEntity {
         return Double(fulfilledCount) / Double(totalCommitments)
     }
 
+    var accountabilityScore: Int {
+        guard totalCommitments > 0 else { return 0 }
+        let fulfilled = Double(fulfilledCount)
+        let overdue = Double(overdueCount)
+        let total = Double(totalCommitments)
+
+        // Score from 0-100: rewards fulfilled, penalizes overdue
+        let baseScore = (fulfilled / total) * 100
+        let penalty = (overdue / total) * 30
+        return max(0, min(100, Int(baseScore - penalty)))
+    }
+
+    var accountabilityGrade: String {
+        switch accountabilityScore {
+        case 90...100: "A"
+        case 80..<90: "B"
+        case 70..<80: "C"
+        case 60..<70: "D"
+        default: "F"
+        }
+    }
+
+    var shareableScoreCard: String {
+        "\(name) — Accountability Score: \(accountabilityScore)/100 (Grade: \(accountabilityGrade))\n"
+        + "Fulfilled \(fulfilledCount) of \(totalCommitments) tracked commitment\(totalCommitments == 1 ? "" : "s").\n"
+        + "\(overdueCount) overdue.\n"
+        + "— Tracked by Seddly (seddly.com)"
+    }
+
     var pendingCommitments: [LocalCommitment] {
         commitments
             .filter { $0.status == .pending }

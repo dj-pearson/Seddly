@@ -10,7 +10,10 @@
       "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/Detail\")",
       "Bash(find C:/Users/dpearson/Documents/Seddly -name *.swift -not -path */.git/* -exec wc -l {} +)",
       "Bash(find /c/Users/dpearson/Documents/Seddly -type f -name *Auth* -o -name *Supabase*)",
-      "Bash(find /c/Users/dpearson/Documents/Seddly/website -type f -name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js)"
+      "Bash(find /c/Users/dpearson/Documents/Seddly/website -type f -name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js)",
+      "Bash(grep -n \"\\\\.present\\\\|\\\\.sheet\\\\|\\\\.navigation\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/**/*.swift)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r \"Progressive\\\\|progressive\\\\|auto.*analyze\\\\|autoApprove\\\\|Trust\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources --include=*.swift)"
     ]
   }
 }

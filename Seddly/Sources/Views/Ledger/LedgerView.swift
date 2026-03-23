@@ -13,6 +13,7 @@ struct LedgerView: View {
     @State private var showingReviewQueue = false
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
+    @State private var showingBulkAction = false
 
     private var visibleCommitments: [LocalCommitment] {
         if subscriptionService.currentTier == .free {
@@ -43,15 +44,32 @@ struct LedgerView: View {
             .navigationTitle("Seddly")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        if subscriptionService.currentTier == .free &&
-                            activeCommitments.count >= AppConstants.maxFreeCommitments {
-                            showingUpgrade = true
-                        } else {
-                            showingManualEntry = true
+                    if viewModel.isSelecting {
+                        Button("Done") {
+                            viewModel.clearSelection()
                         }
-                    } label: {
-                        Image(systemName: "plus")
+                    } else {
+                        Button {
+                            if subscriptionService.currentTier == .free &&
+                                activeCommitments.count >= AppConstants.maxFreeCommitments {
+                                showingUpgrade = true
+                            } else {
+                                showingManualEntry = true
+                            }
+                        } label: {
+                            Image(systemName: "plus")
+                        }
+                    }
+                }
+                ToolbarItem(placement: .secondaryAction) {
+                    if !visibleCommitments.isEmpty {
+                        Button(viewModel.isSelecting ? "Cancel" : "Select") {
+                            if viewModel.isSelecting {
+                                viewModel.clearSelection()
+                            } else {
+                                viewModel.isSelecting = true
+                            }
+                        }
                     }
                 }
                 ToolbarItemGroup(placement: .topBarLeading) {
@@ -87,6 +105,28 @@ struct LedgerView: View {
                         upgradeBanner
                     }
                 }
+            }
+            .overlay(alignment: .bottom) {
+                if viewModel.isSelecting && !viewModel.selectedCommitments.isEmpty {
+                    bulkActionBar
+                }
+            }
+            .confirmationDialog("Bulk Action", isPresented: $showingBulkAction) {
+                Menu("Set Status") {
+                    ForEach(CommitmentStatus.allCases) { status in
+                        Button(status.label) {
+                            viewModel.bulkUpdateStatus(status, in: visibleCommitments)
+                        }
+                    }
+                }
+                Menu("Set Category") {
+                    ForEach(CommitmentCategory.allCases) { category in
+                        Button(category.label) {
+                            viewModel.bulkUpdateCategory(category, in: visibleCommitments)
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
             }
             .sheet(isPresented: $showingManualEntry) {
                 ManualEntryView()
@@ -137,23 +177,51 @@ struct LedgerView: View {
             }
 
             ForEach(viewModel.sortedCommitments(visibleCommitments)) { commitment in
-                NavigationLink(value: commitment) {
-                    CommitmentCardView(commitment: commitment)
-                }
-                .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) {
-                        viewModel.dismiss(commitment)
-                    } label: {
-                        Label("Dismiss", systemImage: "xmark")
-                    }
-                }
-                .swipeActions(edge: .leading) {
+                if viewModel.isSelecting {
                     Button {
-                        viewModel.fulfill(commitment)
+                        viewModel.toggleSelection(for: commitment)
                     } label: {
-                        Label("Fulfilled", systemImage: "checkmark")
+                        HStack(spacing: 12) {
+                            Image(systemName: viewModel.isSelected(commitment) ? "checkmark.circle.fill" : "circle")
+                                .foregroundStyle(viewModel.isSelected(commitment) ? .accent : .secondary)
+                            CommitmentCardView(commitment: commitment)
+                        }
                     }
-                    .tint(.green)
+                    .foregroundStyle(.primary)
+                } else {
+                    NavigationLink(value: commitment) {
+                        CommitmentCardView(commitment: commitment)
+                    }
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            viewModel.dismiss(commitment)
+                        } label: {
+                            Label("Dismiss", systemImage: "xmark")
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            viewModel.fulfill(commitment)
+                        } label: {
+                            Label("Fulfilled", systemImage: "checkmark")
+                        }
+                        .tint(.green)
+                    }
+                }
+            }
+
+            if viewModel.isSelecting {
+                Section {
+                    HStack {
+                        Button("Select All") {
+                            viewModel.selectAll(viewModel.sortedCommitments(visibleCommitments))
+                        }
+                        .font(.caption)
+                        Spacer()
+                        Text("\(viewModel.selectedCommitments.count) selected")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
@@ -199,6 +267,44 @@ struct LedgerView: View {
         .buttonStyle(.plain)
         .padding(.horizontal)
         .padding(.bottom, 4)
+    }
+
+    private var bulkActionBar: some View {
+        HStack(spacing: 16) {
+            Button {
+                viewModel.bulkUpdateStatus(.fulfilled, in: visibleCommitments)
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "checkmark.circle")
+                    Text("Fulfill").font(.caption2)
+                }
+            }
+
+            Button {
+                viewModel.bulkUpdateStatus(.dismissed, in: visibleCommitments)
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "xmark.circle")
+                    Text("Dismiss").font(.caption2)
+                }
+            }
+
+            Button {
+                showingBulkAction = true
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "ellipsis.circle")
+                    Text("More").font(.caption2)
+                }
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .padding(.horizontal)
+        .padding(.bottom)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 
     private var upgradeBanner: some View {

@@ -5,6 +5,7 @@ import SwiftData
 struct SeddlyApp: App {
     let modelContainer: ModelContainer
     @State private var subscriptionService = SubscriptionService()
+    @State private var calendarService = CalendarService()
 
     init() {
         do {
@@ -23,6 +24,7 @@ struct SeddlyApp: App {
         WindowGroup {
             ContentView()
                 .environment(subscriptionService)
+                .environment(calendarService)
         }
         .modelContainer(modelContainer)
     }

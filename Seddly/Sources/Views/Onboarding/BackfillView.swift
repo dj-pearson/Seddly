@@ -31,6 +31,7 @@ struct BackfillView: View {
         var screenshotsFound = 0
         var screenshotsProcessed = 0
         var commitmentsDetected = 0
+        var conversationGroups = 0
     }
 
     var body: some View {
@@ -113,6 +114,10 @@ struct BackfillView: View {
             VStack(spacing: 8) {
                 Text("\(progress.screenshotsFound) screenshots found")
                     .foregroundStyle(.secondary)
+                if progress.conversationGroups > 0 {
+                    Text("\(progress.conversationGroups) conversation thread\(progress.conversationGroups == 1 ? "" : "s") detected")
+                        .foregroundStyle(.secondary)
+                }
                 Text("\(progress.screenshotsProcessed) processed")
                     .foregroundStyle(.secondary)
                 Text("\(progress.commitmentsDetected) potential commitments detected")
@@ -166,6 +171,16 @@ struct BackfillView: View {
         isProcessing = true
 
         Task {
+            let screenshotService = ScreenshotService()
+            let assets = await screenshotService.fetchNewScreenshots(since: selectedRange.date)
+            progress.screenshotsFound = assets.count
+
+            // Smart grouping: cluster related screenshots from the same conversation
+            let smartBackfill = SmartBackfillService()
+            let groups = await smartBackfill.groupRelatedScreenshots(assets: assets)
+            progress.conversationGroups = groups.filter { $0.assets.count > 1 }.count
+
+            // Process using standard pipeline (groups' combined text gives better context)
             let processingService = ScreenshotProcessingService()
             let result = await processingService.processNewScreenshots(
                 since: selectedRange.date,
@@ -174,7 +189,6 @@ struct BackfillView: View {
                 subscriptionTier: subscriptionService.currentTier
             )
 
-            progress.screenshotsFound = result.screenshotsFound
             progress.screenshotsProcessed = result.screenshotsProcessed
             progress.commitmentsDetected = result.commitmentsDetected
             isComplete = true

@@ -9,6 +9,7 @@ actor ScreenshotProcessingService {
     private let ocrService = OCRService()
     private let classifierService = ClassifierService()
     private let notificationService = NotificationService()
+    private let privacyAuditService = PrivacyAuditService()
 
     struct ProcessingResult {
         var screenshotsFound: Int = 0
@@ -115,6 +116,13 @@ actor ScreenshotProcessingService {
         guard let response = try? await aiService.extractCommitments(from: text) else {
             return 0
         }
+
+        // Record data transmission in privacy audit log
+        await privacyAuditService.recordAIExtraction(
+            textLength: text.count,
+            endpoint: endpoint,
+            context: context
+        )
 
         var count = 0
 

@@ -81,11 +81,17 @@ struct SettingsView: View {
                     NavigationLink("Merge Duplicate Entities") {
                         EntityMergeView()
                     }
+                    NavigationLink("Custom Workflows") {
+                        WorkflowManagementView()
+                    }
                 }
 
                 Section("Privacy") {
                     NavigationLink("How Your Data Works") {
                         PrivacyInfoView()
+                    }
+                    NavigationLink("Privacy Audit Report") {
+                        PrivacyAuditView()
                     }
                     Button("Delete All Data", role: .destructive) {
                         showDeleteConfirmation = true
@@ -114,6 +120,8 @@ struct SettingsView: View {
             try modelContext.delete(model: LocalCommitment.self)
             try modelContext.delete(model: LocalEntity.self)
             try modelContext.delete(model: ProcessingQueue.self)
+            try modelContext.delete(model: PrivacyAuditEntry.self)
+            try modelContext.delete(model: CustomWorkflow.self)
             try modelContext.save()
         } catch {
             // Deletion failed — SwiftData will retry on next save

@@ -92,4 +92,55 @@ final class LedgerViewModel {
         commitment.status = .dismissed
         commitment.updatedAt = .now
     }
+
+    // MARK: - Bulk Edit
+
+    var isSelecting = false
+    var selectedCommitments: Set<UUID> = []
+
+    func toggleSelection(for commitment: LocalCommitment) {
+        if selectedCommitments.contains(commitment.id) {
+            selectedCommitments.remove(commitment.id)
+        } else {
+            selectedCommitments.insert(commitment.id)
+        }
+    }
+
+    func isSelected(_ commitment: LocalCommitment) -> Bool {
+        selectedCommitments.contains(commitment.id)
+    }
+
+    func selectAll(_ commitments: [LocalCommitment]) {
+        selectedCommitments = Set(commitments.map(\.id))
+    }
+
+    func clearSelection() {
+        selectedCommitments.removeAll()
+        isSelecting = false
+    }
+
+    func bulkUpdateStatus(_ status: CommitmentStatus, in commitments: [LocalCommitment]) {
+        for commitment in commitments where selectedCommitments.contains(commitment.id) {
+            commitment.status = status
+            commitment.updatedAt = .now
+        }
+        clearSelection()
+    }
+
+    func bulkUpdateCategory(_ category: CommitmentCategory, in commitments: [LocalCommitment]) {
+        for commitment in commitments where selectedCommitments.contains(commitment.id) {
+            commitment.category = category
+            commitment.updatedAt = .now
+        }
+        clearSelection()
+    }
+
+    func bulkReassignEntity(_ entityName: String, entity: LocalEntity?, in commitments: [LocalCommitment]) {
+        for commitment in commitments where selectedCommitments.contains(commitment.id) {
+            commitment.entityName = entityName
+            commitment.entity = entity
+            commitment.updatedAt = .now
+        }
+        clearSelection()
+    }
 }

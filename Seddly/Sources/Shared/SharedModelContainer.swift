@@ -5,7 +5,9 @@ enum SharedModelContainer {
         let schema = Schema([
             LocalCommitment.self,
             LocalEntity.self,
-            ProcessingQueue.self
+            ProcessingQueue.self,
+            PrivacyAuditEntry.self,
+            CustomWorkflow.self
         ])
         let config = ModelConfiguration(
             schema: schema,

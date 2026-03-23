@@ -1,9 +1,12 @@
 import SwiftUI
+import SwiftData
 import PhotosUI
 
 struct CommitmentDetailView: View {
     @Bindable var commitment: LocalCommitment
     @Environment(SubscriptionService.self) private var subscriptionService
+    @Environment(CalendarService.self) private var calendarService
+    @Query(sort: \CustomWorkflow.createdAt) private var workflows: [CustomWorkflow]
     @State private var isEditing = false
     @State private var showingCustomReminder = false
     @State private var customReminderDate = Date()
@@ -92,9 +95,18 @@ struct CommitmentDetailView: View {
 
                 Picker("Status", selection: Binding(
                     get: { commitment.status },
-                    set: {
-                        commitment.status = $0
+                    set: { newStatus in
+                        commitment.status = newStatus
                         commitment.updatedAt = .now
+                        // Sync status to calendar event
+                        if let eventID = commitment.calendarEventID {
+                            if newStatus == .fulfilled || newStatus == .dismissed {
+                                calendarService.removeEvent(identifier: eventID)
+                                commitment.calendarEventID = nil
+                            } else {
+                                calendarService.updateEvent(identifier: eventID, commitment: commitment)
+                            }
+                        }
                     }
                 )) {
                     ForEach(CommitmentStatus.allCases) { status in
@@ -111,6 +123,39 @@ struct CommitmentDetailView: View {
                 )) {
                     ForEach(CommitmentCategory.allCases) { category in
                         Label(category.label, systemImage: category.icon).tag(category)
+                    }
+                }
+            }
+
+            if !workflows.isEmpty {
+                Section("Custom Workflow") {
+                    let activeWorkflow = workflows.first { $0.id == commitment.workflowID }
+                    Picker("Workflow", selection: Binding(
+                        get: { commitment.workflowID },
+                        set: { newID in
+                            commitment.workflowID = newID
+                            commitment.customStatusLabel = nil
+                            commitment.updatedAt = .now
+                        }
+                    )) {
+                        Text("None").tag(UUID?.none)
+                        ForEach(workflows) { workflow in
+                            Text(workflow.name).tag(UUID?.some(workflow.id))
+                        }
+                    }
+
+                    if let workflow = activeWorkflow {
+                        Picker("Step", selection: Binding(
+                            get: { commitment.customStatusLabel ?? workflow.steps.first ?? "" },
+                            set: {
+                                commitment.customStatusLabel = $0
+                                commitment.updatedAt = .now
+                            }
+                        )) {
+                            ForEach(workflow.steps, id: \.self) { step in
+                                Text(step).tag(step)
+                            }
+                        }
                     }
                 }
             }
@@ -168,11 +213,38 @@ struct CommitmentDetailView: View {
                     Label("Share as Text", systemImage: "square.and.arrow.up")
                 }
 
+                ShareLink(
+                    item: CommitmentSharingService.generateReminderMessage(for: commitment),
+                    subject: Text("Reminder: \(commitment.summary)"),
+                    message: Text(CommitmentSharingService.generateReminderMessage(for: commitment))
+                ) {
+                    Label("Send Reminder to \(commitment.entityName)", systemImage: "paperplane")
+                }
+
                 if subscriptionService.currentTier >= .proPlus, let entity = commitment.entity {
                     NavigationLink {
                         EntityProfileView(entity: entity)
                     } label: {
                         Label("Export Entity Timeline (Pro+)", systemImage: "doc.text")
+                    }
+                }
+
+                // Calendar integration
+                if commitment.deadline != nil {
+                    if let eventID = commitment.calendarEventID {
+                        Button {
+                            calendarService.removeEvent(identifier: eventID)
+                            commitment.calendarEventID = nil
+                            commitment.updatedAt = .now
+                        } label: {
+                            Label("Remove from Calendar", systemImage: "calendar.badge.minus")
+                        }
+                    } else {
+                        Button {
+                            addToCalendar()
+                        } label: {
+                            Label("Add to Calendar", systemImage: "calendar.badge.plus")
+                        }
                     }
                 }
 
@@ -230,6 +302,19 @@ struct CommitmentDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    private func addToCalendar() {
+        Task {
+            if !calendarService.isAuthorized {
+                let granted = await calendarService.requestAccess()
+                guard granted else { return }
+            }
+            if let eventID = calendarService.createEvent(for: commitment) {
+                commitment.calendarEventID = eventID
+                commitment.updatedAt = .now
+            }
+        }
     }
 
     private func scheduleCustomReminder() {

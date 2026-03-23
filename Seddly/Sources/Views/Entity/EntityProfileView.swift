@@ -24,6 +24,36 @@ struct EntityProfileView: View {
                 }
                 .padding(.vertical, 8)
 
+                // Accountability Score
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.secondary.opacity(0.2), lineWidth: 6)
+                            .frame(width: 50, height: 50)
+                        Circle()
+                            .trim(from: 0, to: Double(entity.accountabilityScore) / 100.0)
+                            .stroke(scoreColor, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                            .frame(width: 50, height: 50)
+                            .rotationEffect(.degrees(-90))
+                        Text(entity.accountabilityGrade)
+                            .font(.title3.bold())
+                            .foregroundStyle(scoreColor)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Accountability Score")
+                            .font(.subheadline.weight(.medium))
+                        Text("\(entity.accountabilityScore)/100")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ShareLink(item: entity.shareableScoreCard) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.subheadline)
+                    }
+                }
+                .padding(.vertical, 4)
+
                 if let avgDays = averageFulfillmentDays {
                     HStack {
                         Image(systemName: "clock")
@@ -49,6 +79,13 @@ struct EntityProfileView: View {
                         }
                     }
                     .disabled(isGeneratingSummary || entity.commitments.isEmpty)
+
+                    NavigationLink {
+                        EscalationLetterView(entity: entity)
+                    } label: {
+                        Label("Draft Escalation Letter", systemImage: "envelope.badge.person.crop")
+                    }
+                    .disabled(entity.commitments.isEmpty)
                 }
             }
 
@@ -120,6 +157,15 @@ struct EntityProfileView: View {
         }
 
         return totalDays / fulfilled.count
+    }
+
+    private var scoreColor: Color {
+        switch entity.accountabilityScore {
+        case 80...100: .green
+        case 60..<80: .yellow
+        case 40..<60: .orange
+        default: .red
+        }
     }
 
     private func nodeColor(for commitment: LocalCommitment) -> Color {

@@ -22,6 +22,9 @@ final class LocalCommitment {
     var needsAIProcessing: Bool
     var syncStatusRaw: String
     var categoryRaw: String?
+    var calendarEventID: String?
+    var customStatusLabel: String?
+    var workflowID: UUID?
     var createdAt: Date
     var updatedAt: Date
 

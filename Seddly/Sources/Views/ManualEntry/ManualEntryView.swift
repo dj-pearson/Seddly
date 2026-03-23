@@ -10,6 +10,7 @@ struct ManualEntryView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var attachedImage: UIImage?
     @State private var showingSuggestions = false
+    @State private var showingTemplates = false
 
     private var filteredEntities: [LocalEntity] {
         guard !viewModel.entityName.isEmpty else { return [] }
@@ -20,6 +21,14 @@ struct ManualEntryView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    Button {
+                        showingTemplates = true
+                    } label: {
+                        Label("Use a Template", systemImage: "doc.on.clipboard")
+                    }
+                }
+
                 Section("Who made the commitment?") {
                     TextField("Person or company name", text: $viewModel.entityName)
                         .onChange(of: viewModel.entityName) {
@@ -117,6 +126,72 @@ struct ManualEntryView: View {
                     if let data = try? await selectedPhoto?.loadTransferable(type: Data.self) {
                         attachedImage = UIImage(data: data)
                     }
+                }
+            }
+            .sheet(isPresented: $showingTemplates) {
+                TemplatePickerView { template in
+                    viewModel.summary = template.defaultSummary
+                    if let days = template.suggestedDeadlineDays {
+                        viewModel.hasDeadline = true
+                        viewModel.deadline = Calendar.current.date(
+                            byAdding: .day, value: days, to: .now
+                        )
+                    }
+                    showingTemplates = false
+                }
+            }
+        }
+    }
+}
+
+private struct TemplatePickerView: View {
+    let onSelect: (CommitmentTemplate) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var groupedTemplates: [CommitmentCategory: [CommitmentTemplate]] {
+        Dictionary(grouping: CommitmentTemplate.allTemplates, by: \.category)
+    }
+
+    private var sortedCategories: [CommitmentCategory] {
+        groupedTemplates.keys.sorted { $0.label < $1.label }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(sortedCategories, id: \.self) { category in
+                    Section(category.label) {
+                        ForEach(groupedTemplates[category] ?? []) { template in
+                            Button {
+                                onSelect(template)
+                            } label: {
+                                Label {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(template.name)
+                                            .font(.subheadline)
+                                        Text(template.defaultSummary)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if let days = template.suggestedDeadlineDays {
+                                            Text("Default deadline: \(days) days")
+                                                .font(.caption2)
+                                                .foregroundStyle(.tertiary)
+                                        }
+                                    }
+                                } icon: {
+                                    Image(systemName: template.icon)
+                                }
+                            }
+                            .foregroundStyle(.primary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Templates")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
                 }
             }
         }
