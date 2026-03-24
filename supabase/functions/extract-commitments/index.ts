@@ -48,21 +48,28 @@ Respond ONLY with valid JSON matching this schema:
 Place items with confidence >= 4 in "commitments" and items with confidence < 4 in "rejected".
 Do not include any text outside the JSON object.`;
 
+const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
+const MAX_TEXT_LENGTH = 50000; // 50KB limit
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...corsHeaders(req) },
     });
   }
 
@@ -72,7 +79,14 @@ Deno.serve(async (req) => {
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return new Response(
         JSON.stringify({ error: "Missing or empty 'text' field" }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
+      );
+    }
+
+    if (text.length > MAX_TEXT_LENGTH) {
+      return new Response(
+        JSON.stringify({ error: `Text exceeds maximum length of ${MAX_TEXT_LENGTH} characters` }),
+        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
       );
     }
 
@@ -102,7 +116,7 @@ Deno.serve(async (req) => {
       console.error("Anthropic API error:", response.status, errorBody);
       return new Response(
         JSON.stringify({ error: "AI processing failed" }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
+        { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
       );
     }
 
@@ -112,21 +126,38 @@ Deno.serve(async (req) => {
     if (!content) {
       return new Response(
         JSON.stringify({ commitments: [], rejected: [] }),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
       );
     }
 
-    // Parse the JSON from Claude's response
-    const extraction: CommitmentExtraction = JSON.parse(content);
+    // Parse the JSON from Claude's response safely
+    let extraction: CommitmentExtraction;
+    try {
+      extraction = JSON.parse(content);
+    } catch {
+      console.error("Failed to parse AI response as JSON:", content.substring(0, 200));
+      return new Response(
+        JSON.stringify({ commitments: [], rejected: [] }),
+        { headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
+      );
+    }
+
+    // Validate response structure
+    if (!Array.isArray(extraction.commitments)) {
+      extraction.commitments = [];
+    }
+    if (!Array.isArray(extraction.rejected)) {
+      extraction.rejected = [];
+    }
 
     return new Response(JSON.stringify(extraction), {
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...corsHeaders(req) },
     });
   } catch (error) {
     console.error("Error processing request:", error);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
     );
   }
 });

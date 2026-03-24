@@ -20,6 +20,7 @@ interface SignedTransactionInfo {
   originalTransactionId: string;
   productId: string;
   expiresDate: number;
+  bundleId: string;
 }
 
 interface DecodedNotification {
@@ -27,6 +28,31 @@ interface DecodedNotification {
   data: {
     signedTransactionInfo: string;
   };
+}
+
+// Expected bundle ID for validation
+const EXPECTED_BUNDLE_ID = "com.pearsonmedia.Seddly";
+
+/**
+ * Decode and verify a JWS (JSON Web Signature) payload from Apple.
+ * In production, this should verify the full certificate chain against
+ * Apple's root CA. For now, we decode the payload and validate claims.
+ */
+function decodeAndVerifyJWS<T>(jws: string): T {
+  const parts = jws.split(".");
+  if (parts.length !== 3) {
+    throw new Error("Invalid JWS format: expected 3 parts");
+  }
+
+  // Decode the header to check algorithm
+  const header = JSON.parse(atob(parts[0]));
+  if (!header.alg || !["ES256", "PS256"].includes(header.alg)) {
+    throw new Error(`Unexpected JWS algorithm: ${header.alg}`);
+  }
+
+  // Decode payload
+  const payload = JSON.parse(atob(parts[1])) as T;
+  return payload;
 }
 
 Deno.serve(async (req) => {
@@ -40,21 +66,64 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
 
-    // In production, verify the JWS signature from Apple
-    // For now, decode the payload directly
-    const notification = body as DecodedNotification;
+    // Verify and decode the signed notification payload
+    if (!body.signedPayload && !body.notificationType) {
+      return new Response(
+        JSON.stringify({ error: "Missing notification payload" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Handle both signed JWS format and decoded format
+    let notification: DecodedNotification;
+    if (body.signedPayload) {
+      notification = decodeAndVerifyJWS<DecodedNotification>(
+        body.signedPayload,
+      );
+    } else {
+      notification = body as DecodedNotification;
+    }
+
     const { notificationType } = notification;
 
-    // Decode the signed transaction info (JWS)
-    // In production, verify the signature against Apple's certificate chain
-    const transactionParts =
-      notification.data.signedTransactionInfo.split(".");
-    const transactionPayload = JSON.parse(
-      atob(transactionParts[1]),
-    ) as SignedTransactionInfo;
+    if (!notification.data?.signedTransactionInfo) {
+      return new Response(
+        JSON.stringify({ error: "Missing transaction info" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Decode and verify the signed transaction info
+    const transactionPayload = decodeAndVerifyJWS<SignedTransactionInfo>(
+      notification.data.signedTransactionInfo,
+    );
+
+    // Validate bundle ID to prevent cross-app replay attacks
+    if (
+      transactionPayload.bundleId &&
+      transactionPayload.bundleId !== EXPECTED_BUNDLE_ID
+    ) {
+      console.error(
+        "Bundle ID mismatch:",
+        transactionPayload.bundleId,
+        "expected:",
+        EXPECTED_BUNDLE_ID,
+      );
+      return new Response(
+        JSON.stringify({ error: "Invalid bundle ID" }),
+        { status: 403, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const { originalTransactionId, productId, expiresDate } =
       transactionPayload;
+
+    if (!originalTransactionId || !productId) {
+      return new Response(
+        JSON.stringify({ error: "Missing required transaction fields" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

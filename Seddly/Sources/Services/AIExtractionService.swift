@@ -46,6 +46,7 @@ actor AIExtractionService {
     func extractCommitments(from text: String) async throws -> ExtractionResponse {
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
+        request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let payload = ["text": text]

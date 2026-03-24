@@ -85,17 +85,45 @@ struct CommitmentCardView: View {
 
                 Spacer()
 
-                Text(commitment.status.label)
-                    .font(.caption2)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(statusColor.opacity(0.15))
-                    .foregroundStyle(statusColor)
-                    .clipShape(Capsule())
+                HStack(spacing: 4) {
+                    Image(systemName: statusIcon)
+                        .font(.caption2)
+                    Text(commitment.status.label)
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 3)
+                .background(statusColor.opacity(0.15))
+                .foregroundStyle(statusColor)
+                .clipShape(Capsule())
             }
         }
         .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityDescription)
+    }
+
+    private var accessibilityDescription: String {
+        var desc = "\(commitment.entityName): \(commitment.summary). Status: \(commitment.status.label)."
+        if let deadline = commitment.deadline {
+            desc += " Due \(deadline.formatted(date: .abbreviated, time: .omitted))."
+        }
+        if let amount = commitment.dollarAmount {
+            desc += " Amount: \(amount) dollars."
+        }
+        if isNew { desc += " New." }
+        return desc
+    }
+
+    private var statusIcon: String {
+        switch commitment.status {
+        case .pending: "clock"
+        case .fulfilled: "checkmark.circle"
+        case .overdue: "exclamationmark.triangle"
+        case .disputed: "questionmark.circle"
+        case .dismissed: "minus.circle"
+        }
     }
 
     @ViewBuilder

@@ -11,16 +11,22 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // PATCH /api-commitments — update commitment (requires id in body)
 // DELETE /api-commitments?id=<uuid> — delete commitment
 
+const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
+  };
+}
+
 Deno.serve(async (req) => {
   // CORS
   if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization, X-API-Key",
-      },
-    });
+    return new Response(null, { headers: corsHeaders(req) });
   }
 
   // Auth: require Bearer token (Supabase JWT) or X-API-Key
@@ -112,10 +118,10 @@ async function handleGet(
   if (status) query = query.eq("status", status);
 
   const entity = params.get("entity");
-  if (entity) query = query.ilike("entity_name", `%${entity}%`);
+  if (entity && entity.length <= 100) query = query.ilike("entity_name", `%${entity}%`);
 
-  const limit = parseInt(params.get("limit") || "50");
-  const offset = parseInt(params.get("offset") || "0");
+  const limit = Math.min(Math.max(parseInt(params.get("limit") || "50") || 50, 1), 100);
+  const offset = Math.max(parseInt(params.get("offset") || "0") || 0, 0);
   query = query.range(offset, offset + limit - 1);
 
   const { data, error, count } = await query;
@@ -234,12 +240,12 @@ async function handleDelete(
   return jsonResponse({ deleted: true });
 }
 
-function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
-    },
-  });
+function jsonResponse(data: unknown, status = 200, req?: Request) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (req) {
+    Object.assign(headers, corsHeaders(req));
+  }
+  return new Response(JSON.stringify(data), { status, headers });
 }

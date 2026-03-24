@@ -88,6 +88,16 @@ struct EntityProfileView: View {
                         Label("Draft Escalation Letter", systemImage: "envelope.badge.person.crop")
                     }
                     .disabled(entity.commitments.isEmpty)
+
+                    if let summaryError {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundStyle(.orange)
+                            Text("AI unavailable — using local summary. \(summaryError)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
 
@@ -185,9 +195,20 @@ struct EntityProfileView: View {
         summaryError = nil
 
         Task {
-            let service = DisputeSummaryService(
-                endpointURL: URL(string: "https://your-project.supabase.co/functions/v1/generate-dispute-summary")!
-            )
+            guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+                  let supabaseURL = URL(string: supabaseURLString) else {
+                // No Supabase URL configured — use local fallback
+                disputeSummary = DisputeSummaryService.generateLocalSummary(
+                    entityName: entity.name,
+                    commitments: entity.commitments
+                )
+                isGeneratingSummary = false
+                showingSummary = true
+                return
+            }
+
+            let endpointURL = supabaseURL.appendingPathComponent("functions/v1/generate-dispute-summary")
+            let service = DisputeSummaryService(endpointURL: endpointURL)
 
             do {
                 // Try AI-powered summary via Edge Function
@@ -200,7 +221,7 @@ struct EntityProfileView: View {
             } catch {
                 // Fallback to local generation
                 summaryError = error.localizedDescription
-                disputeSummary = service.generateLocalSummary(
+                disputeSummary = DisputeSummaryService.generateLocalSummary(
                     entityName: entity.name,
                     commitments: entity.commitments
                 )
