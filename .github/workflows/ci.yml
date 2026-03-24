@@ -48,6 +48,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify --quiet
 
+      - name: Build Watch target
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Seddly.xcodeproj \
+            -scheme SeddlyWatch \
+            -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm),OS=latest' \
+            -configuration Debug \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcbeautify --quiet
+
       - name: Run unit tests
         run: |
           set -o pipefail

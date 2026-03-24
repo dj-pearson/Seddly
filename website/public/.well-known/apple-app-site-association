@@ -1,0 +1,16 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["TEAM_ID.com.pearsonmedia.Seddly"],
+        "paths": ["/c/*"],
+        "components": [
+          {
+            "/": "/c/*"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -39,6 +39,8 @@ struct LedgerView: View {
     }
 
     @State private var showingBackfill = false
+    @AppStorage("showBackfillReviewBanner") private var showBackfillReviewBanner = false
+    @AppStorage("isSignedIn") private var isSignedIn = false
 
     var body: some View {
         NavigationStack {
@@ -105,6 +107,11 @@ struct LedgerView: View {
             .overlay(alignment: .top) {
                 if isProcessing {
                     processingBanner
+                }
+            }
+            .overlay(alignment: .top) {
+                if showBackfillReviewBanner {
+                    backfillReviewBanner
                 }
             }
             .overlay(alignment: .bottom) {
@@ -204,7 +211,15 @@ struct LedgerView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
+                    Task {
+                        await StatusUpdateService.processAndUpdateBadge(in: modelContext)
+                    }
                     processOnForeground()
+                    syncIfProPlus()
+                    PhotoCleanupService.cleanupStaleReferences(in: modelContext)
+                } else if newPhase == .background {
+                    // Mark current time so "New" badges clear next session
+                    UserDefaults.standard.set(Date.now, forKey: "lastViewedDate")
                 }
             }
         }
@@ -242,6 +257,7 @@ struct LedgerView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             viewModel.dismiss(commitment)
                         } label: {
                             Label("Dismiss", systemImage: "xmark")
@@ -249,6 +265,7 @@ struct LedgerView: View {
                     }
                     .swipeActions(edge: .leading) {
                         Button {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
                             viewModel.fulfill(commitment)
                         } label: {
                             Label("Fulfilled", systemImage: "checkmark")
@@ -276,6 +293,30 @@ struct LedgerView: View {
         .navigationDestination(for: LocalCommitment.self) { commitment in
             CommitmentDetailView(commitment: commitment)
         }
+    }
+
+    private var backfillReviewBanner: some View {
+        Button {
+            showBackfillReviewBanner = false
+        } label: {
+            HStack {
+                Image(systemName: "checklist")
+                    .foregroundStyle(.accent)
+                Text("Review your commitments — tap any to edit or dismiss")
+                    .font(.caption)
+                Spacer()
+                Image(systemName: "xmark")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            .padding()
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal)
+        .padding(.top, 4)
+        .transition(.move(edge: .top).combined(with: .opacity))
     }
 
     private var processingBanner: some View {
@@ -369,6 +410,7 @@ struct LedgerView: View {
     private var bulkActionBar: some View {
         HStack(spacing: 16) {
             Button {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 viewModel.bulkUpdateStatus(.fulfilled, in: visibleCommitments)
             } label: {
                 VStack(spacing: 2) {
@@ -378,6 +420,7 @@ struct LedgerView: View {
             }
 
             Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 viewModel.bulkUpdateStatus(.dismissed, in: visibleCommitments)
             } label: {
                 VStack(spacing: 2) {
@@ -488,6 +531,20 @@ struct LedgerView: View {
                 try? await Task.sleep(for: .seconds(5))
                 withAnimation { newCommitmentsCount = 0 }
             }
+        }
+    }
+
+    private func syncIfProPlus() {
+        guard subscriptionService.currentTier == .proPlus, isSignedIn else { return }
+
+        Task {
+            guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+                  let supabaseURL = URL(string: supabaseURLString),
+                  let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String else { return }
+
+            let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+            try? await syncService.pullCommitments(context: modelContext)
+            try? await syncService.syncCommitments(context: modelContext)
         }
     }
 

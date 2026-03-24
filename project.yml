@@ -109,6 +109,8 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.watchkitapp
+        INFOPLIST_FILE: SeddlyWatch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SeddlyWatch/SeddlyWatch.entitlements
         INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.pearsonmedia.Seddly
         INFOPLIST_KEY_CFBundleDisplayName: Seddly
         TARGETED_DEVICE_FAMILY: "4"
@@ -117,6 +119,8 @@ targets:
           CODE_SIGN_STYLE: Automatic
         Release:
           CODE_SIGN_STYLE: Manual
+    entitlements:
+      path: SeddlyWatch/SeddlyWatch.entitlements
 
   SeddlyTests:
     type: bundle.unit-test

@@ -1,4 +1,5 @@
 import SwiftUI
+import Security
 
 struct APIAccessView: View {
     @Environment(SubscriptionService.self) private var subscriptionService
@@ -6,12 +7,33 @@ struct APIAccessView: View {
     @State private var copiedEndpoint = false
     @State private var copiedToken = false
 
-    // In production, this would come from Supabase Auth
+    @AppStorage("isSignedIn") private var isSignedIn = false
+
     private var apiToken: String {
-        "Bearer your-supabase-jwt-token"
+        // Read JWT from Keychain if signed in
+        guard isSignedIn else { return "Sign in with Apple first" }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: "com.pearsonmedia.Seddly.auth",
+            kSecAttrAccount as String: "accessToken",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        guard status == errSecSuccess, let data = result as? Data,
+              let token = String(data: data, encoding: .utf8) else {
+            return "Token unavailable — sign in again"
+        }
+        return "Bearer \(token)"
     }
 
-    private let baseEndpoint = "https://your-project.supabase.co/functions/v1/api-commitments"
+    private var baseEndpoint: String {
+        guard let url = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String else {
+            return "https://your-project.supabase.co/functions/v1/api-commitments"
+        }
+        return "\(url)/functions/v1/api-commitments"
+    }
 
     var body: some View {
         List {

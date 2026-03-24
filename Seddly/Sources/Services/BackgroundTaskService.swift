@@ -108,6 +108,10 @@ actor BackgroundTaskService {
             context.insert(queueItem)
         }
 
+        // Update overdue statuses and app badge
+        let overdueCount = StatusUpdateService.updateOverdueStatuses(in: context)
+        await StatusUpdateService.updateBadgeCount(overdueCount)
+
         try? context.save()
 
         UserDefaults(suiteName: AppConstants.appGroupIdentifier)?

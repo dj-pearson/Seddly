@@ -12,6 +12,9 @@ class ShareViewController: UIViewController {
     private let titleLabel = UILabel()
     private let summaryLabel = UILabel()
     private let buttonStack = UIStackView()
+    private var editContainer: UIStackView?
+    private var entityField: UITextField?
+    private var summaryField: UITextField?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -112,6 +115,14 @@ class ShareViewController: UIViewController {
         confirmButton.layer.cornerRadius = 10
         confirmButton.addTarget(self, action: #selector(confirmTapped), for: .touchUpInside)
 
+        let editButton = UIButton(type: .system)
+        editButton.setTitle("Edit", for: .normal)
+        editButton.backgroundColor = .systemOrange.withAlphaComponent(0.15)
+        editButton.setTitleColor(.systemOrange, for: .normal)
+        editButton.titleLabel?.font = .systemFont(ofSize: 15, weight: .medium)
+        editButton.layer.cornerRadius = 10
+        editButton.addTarget(self, action: #selector(editTapped), for: .touchUpInside)
+
         let skipButton = UIButton(type: .system)
         skipButton.setTitle("Skip", for: .normal)
         skipButton.backgroundColor = .secondarySystemBackground
@@ -121,6 +132,7 @@ class ShareViewController: UIViewController {
         skipButton.addTarget(self, action: #selector(skipTapped), for: .touchUpInside)
 
         buttonStack.addArrangedSubview(skipButton)
+        buttonStack.addArrangedSubview(editButton)
         buttonStack.addArrangedSubview(confirmButton)
 
         containerStack.addArrangedSubview(buttonStack)
@@ -145,11 +157,61 @@ class ShareViewController: UIViewController {
         }
     }
 
+    @objc private func editTapped() {
+        buttonStack.isHidden = true
+
+        let stack = UIStackView()
+        stack.axis = .vertical
+        stack.spacing = 12
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        let entityTextField = UITextField()
+        entityTextField.placeholder = "Entity name (e.g. Landlord, Acme Corp)"
+        entityTextField.borderStyle = .roundedRect
+        entityTextField.text = "Unknown"
+        self.entityField = entityTextField
+
+        let summaryTextField = UITextField()
+        summaryTextField.placeholder = "Summary of the commitment"
+        summaryTextField.borderStyle = .roundedRect
+        summaryTextField.text = detectedSummary ?? String((extractedText ?? "").prefix(200))
+        self.summaryField = summaryTextField
+
+        let saveButton = UIButton(type: .system)
+        saveButton.setTitle("Save to Ledger", for: .normal)
+        saveButton.backgroundColor = .systemBlue
+        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.titleLabel?.font = .boldSystemFont(ofSize: 15)
+        saveButton.layer.cornerRadius = 10
+        saveButton.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        saveButton.addTarget(self, action: #selector(saveEditTapped), for: .touchUpInside)
+
+        stack.addArrangedSubview(entityTextField)
+        stack.addArrangedSubview(summaryTextField)
+        stack.addArrangedSubview(saveButton)
+
+        containerStack.addArrangedSubview(stack)
+        editContainer = stack
+    }
+
+    @objc private func saveEditTapped() {
+        detectedSummary = summaryField?.text ?? detectedSummary
+        saveToQueue(entityName: entityField?.text)
+        titleLabel.text = "Added to Seddly"
+        summaryLabel.text = "Open Seddly to review."
+        editContainer?.isHidden = true
+
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            completeRequest()
+        }
+    }
+
     @objc private func skipTapped() {
         completeRequest()
     }
 
-    private func saveToQueue() {
+    private func saveToQueue(entityName: String? = nil) {
         guard let text = extractedText else { return }
 
         do {
@@ -169,7 +231,7 @@ class ShareViewController: UIViewController {
             let score = RuleFilterService.score(text: text)
             if score >= AppConstants.defaultConfidenceThreshold {
                 let commitment = LocalCommitment(
-                    entityName: "Unknown",
+                    entityName: entityName ?? "Unknown",
                     summary: detectedSummary ?? String(text.prefix(200)),
                     fullText: text,
                     source: .shareSheet,

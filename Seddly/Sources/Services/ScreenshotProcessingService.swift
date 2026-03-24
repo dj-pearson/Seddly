@@ -144,6 +144,18 @@ actor ScreenshotProcessingService {
 
         var count = 0
 
+        // Pre-fetch entities to avoid N+1 queries
+        let uniqueEntityNames = Set(response.commitments.filter { $0.confidence >= 4 }.map(\.madeBy))
+        var entityCache: [String: LocalEntity] = [:]
+        for name in uniqueEntityNames {
+            let entityDescriptor = FetchDescriptor<LocalEntity>(
+                predicate: #Predicate { $0.name == name }
+            )
+            if let existing = try? context.fetch(entityDescriptor).first {
+                entityCache[name] = existing
+            }
+        }
+
         for extracted in response.commitments {
             guard extracted.confidence >= 4 else { continue }
 
@@ -179,16 +191,14 @@ actor ScreenshotProcessingService {
                 commitment.category = detectedCategory
             }
 
-            // Find or create entity
+            // Find or create entity (using pre-fetched cache)
             let entityName = extracted.madeBy
-            let entityDescriptor = FetchDescriptor<LocalEntity>(
-                predicate: #Predicate { $0.name == entityName }
-            )
-            if let existingEntity = try? context.fetch(entityDescriptor).first {
+            if let existingEntity = entityCache[entityName] {
                 commitment.entity = existingEntity
             } else {
                 let newEntity = LocalEntity(name: entityName)
                 context.insert(newEntity)
+                entityCache[entityName] = newEntity
                 commitment.entity = newEntity
             }
 

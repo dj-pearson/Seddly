@@ -12,6 +12,7 @@ struct CommitmentDetailView: View {
     @State private var isEditing = false
     @State private var showingCustomReminder = false
     @State private var showDeleteConfirmation = false
+    @State private var showDismissConfirmation = false
     @State private var customReminderDate = Date()
     @State private var screenshotImage: UIImage?
 
@@ -297,8 +298,7 @@ struct CommitmentDetailView: View {
                 }
 
                 Button(role: .destructive) {
-                    commitment.status = .dismissed
-                    commitment.updatedAt = .now
+                    showDismissConfirmation = true
                 } label: {
                     Label("Dismiss Commitment", systemImage: "eye.slash")
                 }
@@ -312,6 +312,15 @@ struct CommitmentDetailView: View {
         }
         .navigationTitle("Commitment")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("Dismiss Commitment?", isPresented: $showDismissConfirmation) {
+            Button("Dismiss", role: .destructive) {
+                commitment.status = .dismissed
+                commitment.updatedAt = .now
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This commitment will be marked as dismissed. You can change its status later.")
+        }
         .alert("Delete Commitment?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 deleteCommitment()

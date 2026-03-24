@@ -35,6 +35,7 @@ actor DisputeSummaryService {
 
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
+        request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
@@ -60,7 +61,7 @@ actor DisputeSummaryService {
     }
 
     /// Fallback: generate summary locally without AI
-    func generateLocalSummary(entityName: String, commitments: [LocalCommitment]) -> String {
+    static func generateLocalSummary(entityName: String, commitments: [LocalCommitment]) -> String {
         let sorted = commitments.sorted { $0.createdAt < $1.createdAt }
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .long

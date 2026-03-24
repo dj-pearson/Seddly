@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// Handles Pro+ cloud sync between local SwiftData and Supabase.
 actor SyncService {
@@ -45,6 +46,9 @@ actor SyncService {
                 "category": commitment.categoryRaw ?? "uncategorized",
                 "screenshot_date": commitment.screenshotDate?.ISO8601Format(),
                 "notes": commitment.notes,
+                "calendar_event_id": commitment.calendarEventID,
+                "custom_status_label": commitment.customStatusLabel,
+                "workflow_id": commitment.workflowID?.uuidString,
             ]
 
             request.httpBody = try JSONSerialization.data(
@@ -57,6 +61,9 @@ actor SyncService {
                (200...299).contains(httpResponse.statusCode) {
                 commitment.syncStatus = .synced
                 commitment.updatedAt = .now
+            } else {
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                AppLogger.sync.error("Sync push failed for commitment \(commitment.id) with status \(statusCode)")
             }
         }
 
@@ -85,6 +92,9 @@ actor SyncService {
             let category: String?
             let screenshot_date: String?
             let notes: String?
+            let calendar_event_id: String?
+            let custom_status_label: String?
+            let workflow_id: String?
         }
 
         let remoteCommitments = try JSONDecoder().decode([RemoteCommitment].self, from: data)
@@ -117,6 +127,11 @@ actor SyncService {
             )
             if let cat = remote.category, let category = CommitmentCategory(rawValue: cat) {
                 commitment.category = category
+            }
+            commitment.calendarEventID = remote.calendar_event_id
+            commitment.customStatusLabel = remote.custom_status_label
+            if let wfID = remote.workflow_id {
+                commitment.workflowID = UUID(uuidString: wfID)
             }
             commitment.syncStatus = .synced
             context.insert(commitment)
