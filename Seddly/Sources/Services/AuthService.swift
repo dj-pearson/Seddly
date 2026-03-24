@@ -1,5 +1,6 @@
 import AuthenticationServices
 import Foundation
+import os
 import Security
 
 /// Handles Apple Sign-In for Pro+ tier accounts.
@@ -56,6 +57,8 @@ actor AuthService {
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            AppLogger.auth.error("Apple Sign-In auth request failed with status \(statusCode)")
             throw AuthError.signInFailed
         }
 

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct CommitmentCardView: View {
     let commitment: LocalCommitment
+    @ScaledMetric(relativeTo: .caption2) private var badgePadding: CGFloat = 6
 
     private var isNew: Bool {
         let lastViewed = UserDefaults.standard.object(forKey: "lastViewedDate") as? Date ?? .distantPast

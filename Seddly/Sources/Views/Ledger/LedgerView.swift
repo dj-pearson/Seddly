@@ -216,6 +216,7 @@ struct LedgerView: View {
                     }
                     processOnForeground()
                     syncIfProPlus()
+                    PhotoCleanupService.cleanupStaleReferences(in: modelContext)
                 } else if newPhase == .background {
                     // Mark current time so "New" badges clear next session
                     UserDefaults.standard.set(Date.now, forKey: "lastViewedDate")
@@ -256,6 +257,7 @@ struct LedgerView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             viewModel.dismiss(commitment)
                         } label: {
                             Label("Dismiss", systemImage: "xmark")
@@ -263,6 +265,7 @@ struct LedgerView: View {
                     }
                     .swipeActions(edge: .leading) {
                         Button {
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
                             viewModel.fulfill(commitment)
                         } label: {
                             Label("Fulfilled", systemImage: "checkmark")
@@ -407,6 +410,7 @@ struct LedgerView: View {
     private var bulkActionBar: some View {
         HStack(spacing: 16) {
             Button {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
                 viewModel.bulkUpdateStatus(.fulfilled, in: visibleCommitments)
             } label: {
                 VStack(spacing: 2) {
@@ -416,6 +420,7 @@ struct LedgerView: View {
             }
 
             Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                 viewModel.bulkUpdateStatus(.dismissed, in: visibleCommitments)
             } label: {
                 VStack(spacing: 2) {

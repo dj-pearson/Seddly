@@ -11,7 +11,7 @@ struct SettingsView: View {
     @AppStorage("isSignedIn") private var isSignedIn = false
     @AppStorage("signedInEmail") private var signedInEmail = ""
     @State private var showDeleteConfirmation = false
-    @State private var notificationsEnabled = true
+    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     @State private var dailyDigestTime = DateComponents(hour: 20, minute: 0)
     @State private var signInError: String?
 
@@ -58,6 +58,11 @@ struct SettingsView: View {
 
                 Section("Notifications") {
                     Toggle("Deadline Alerts", isOn: $notificationsEnabled)
+                        .onChange(of: notificationsEnabled) { _, enabled in
+                            if !enabled {
+                                UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+                            }
+                        }
                     if notificationsEnabled {
                         DatePicker(
                             "Daily Digest Time",

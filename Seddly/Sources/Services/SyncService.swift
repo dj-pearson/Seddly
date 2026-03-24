@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// Handles Pro+ cloud sync between local SwiftData and Supabase.
 actor SyncService {
@@ -60,6 +61,9 @@ actor SyncService {
                (200...299).contains(httpResponse.statusCode) {
                 commitment.syncStatus = .synced
                 commitment.updatedAt = .now
+            } else {
+                let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+                AppLogger.sync.error("Sync push failed for commitment \(commitment.id) with status \(statusCode)")
             }
         }
 

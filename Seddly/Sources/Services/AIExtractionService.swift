@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 actor AIExtractionService {
     private let endpointURL: URL
@@ -56,10 +57,17 @@ actor AIExtractionService {
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            AppLogger.ai.error("AI extraction failed with status \(statusCode)")
             throw AIExtractionError.serverError
         }
 
-        return try JSONDecoder().decode(ExtractionResponse.self, from: data)
+        do {
+            return try JSONDecoder().decode(ExtractionResponse.self, from: data)
+        } catch {
+            AppLogger.ai.error("Failed to decode AI extraction response: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     enum AIExtractionError: LocalizedError {
