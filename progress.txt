@@ -1,0 +1,175 @@
+================================================================================
+  SNARKTANK — RALPH'S PRD LOOP REVIEW
+  Project: Seddly (iOS Screenshot Accountability Engine)
+  Date: 2026-03-24
+  Loop: 1
+  Reviewer: Ralph AI
+================================================================================
+
+OVERALL VERDICT: 0 / 24 USER STORIES PASSING
+COMPLETION RATE: 0%
+
+Ralph says: "So you've got 24 acceptance criteria... and zero of them pass.
+That's not a product, that's a PowerPoint deck with a build script."
+
+================================================================================
+CATEGORY BREAKDOWN
+================================================================================
+
+[ENTITLEMENTS & CONFIG] — 0/2 passing
+──────────────────────────────────────
+  US-001  FAIL  Add missing entitlements to Seddly.entitlements
+    → You remembered App Groups and push notifications. Congrats. But you
+      forgot Sign in with Apple. You know, the thing your AuthService actually
+      USES? Two out of three ain't shipping.
+
+  US-002  FAIL  Add NSCalendarsUsageDescription to Info.plist
+    → Your CalendarService calls requestFullAccessToEvents() but there's no
+      privacy string in Info.plist. This will crash on first calendar access.
+      Apple will reject this faster than I reject bad pitches.
+
+[AUTO-STATUS & UX POLISH] — 0/4 passing
+──────────────────────────────────────
+  US-003  FAIL  Build auto-status update service for overdue commitments
+    → StatusUpdateService.swift doesn't exist. Your overdue logic is a computed
+      property that never actually updates the stored status. It's like having
+      a smoke detector that knows there's a fire but doesn't bother to beep.
+
+  US-004  FAIL  Add New badge to recently detected commitments
+    → No "New" badge. No lastViewedDate tracking. Your users will never know
+      what just showed up. In the accountability business, that's ironic.
+
+  US-005  FAIL  Add review banner after first backfill
+    → BackfillView shows completion, then... nothing. No banner in LedgerView.
+      You're dumping commitments into the user's lap and walking away. Even I
+      give feedback after I tear someone apart.
+
+  US-006  FAIL  Add app badge count for overdue commitments
+    → setBadgeCount() appears zero times in your codebase. The app icon just
+      sits there, smiling, while commitments rot. Your accountability app has
+      no accountability. Let that sink in.
+
+[CI/CD] — 0/2 passing
+──────────────────────────────────────
+  US-007  FAIL  Update CI workflow to include Watch target
+    → You built a whole Watch app and then forgot to tell CI it exists. Your
+      Watch target could be broken for weeks and you'd never know. That's not
+      CI/CD, that's CI/pray.
+
+  US-008  FAIL  Add api-commitments to Supabase deploy workflow
+    → The api-commitments Edge Function is sitting in your repo, fully written,
+      never deployed. It's like cooking a meal and leaving it on the counter.
+
+[UNIT TESTS] — 0/7 passing
+──────────────────────────────────────
+  US-009  FAIL  Add unit tests for CommitmentSharingService
+    → Zero tests. You're sharing commitment reminders with no test coverage.
+      What could go wrong? Everything. Everything could go wrong.
+
+  US-010  FAIL  Add unit tests for EscalationTemplateService
+    → No tests for your escalation letter generator. You're generating legal-ish
+      documents for housing and freelance disputes with zero verification.
+      That's... bold.
+
+  US-011  FAIL  Add unit tests for CommitmentTemplate model
+    → Nine templates, zero tests. Are they valid? Do they have icons? Who knows!
+      Certainly not your test suite, because it doesn't exist.
+
+  US-012  FAIL  Add unit tests for PrivacyAuditService
+    → A privacy audit service with no tests. Your "privacy-first" app can't
+      prove its privacy features work. The irony is so thick I could spread
+      it on toast.
+
+  US-013  FAIL  Add unit tests for LocalEntity accountability score
+    → accountabilityScore, accountabilityGrade, shareableScoreCard — all
+      implemented, all untested. You're grading others' accountability while
+      having none of your own in the test department.
+
+  US-014  FAIL  Add unit tests for LedgerViewModel history limits
+    → Tier-based history limits and bulk edit operations exist in code, but
+      LedgerViewModelTests doesn't touch any of them. Free vs Pro vs Pro+
+      limits? Untested. Bulk updates? Untested.
+
+  US-015  FAIL  Add unit tests for ClipboardMonitorService
+    → 30-character threshold, confidence scoring, dismiss state reset — all
+      implemented, all flying blind without tests.
+
+[SHARE & DEEP LINKS] — 0/2 passing
+──────────────────────────────────────
+  US-016  FAIL  Wire Share Sheet Edit option for detected commitments
+    → Share Extension has "Add to Ledger" and "Skip." No Edit. Your PRD says
+      Confirm/Edit/Skip. You shipped 2 out of 3 buttons. That's a 67% on
+      button delivery.
+
+  US-017  FAIL  Add deep link handling for commitment share URLs
+    → CommitmentSharingService generates seddly.com/c/ URLs that go absolutely
+      nowhere. You're handing out addresses to a building that doesn't exist.
+      No onOpenURL handler. No associated domains. Nothing.
+
+[WATCH & DEPLOYMENT] — 0/2 passing
+──────────────────────────────────────
+  US-018  FAIL  Add Watch entitlements and Info.plist
+    → Watch target exists in project.yml. Source files exist. But no Info.plist,
+      no entitlements. It's like showing up to a job interview with no resume.
+
+[SUPABASE MIGRATIONS] — 0/2 passing
+──────────────────────────────────────
+  US-019  FAIL  Add Supabase migration for custom workflow and privacy audit tables
+    → PrivacyAuditEntry and CustomWorkflow live happily in SwiftData. Their
+      Supabase counterparts? Nonexistent. Pro+ sync for these models is a
+      fiction.
+
+  US-020  FAIL  Add commitments category_raw and custom workflow fields to Supabase
+    → Category column was added (slow clap). But calendar_event_id,
+      custom_status_label, and workflow_id? Missing from migrations AND from
+      the sync payload. Half-shipped data model.
+
+[SERVICE WIRING] — 0/3 passing
+──────────────────────────────────────
+  US-021  FAIL  Add PersistenceService implementation
+    → PersistenceService.swift is a stub with one preview helper. It's not used
+      anywhere. It's not even decorative — it's just dead code taking up space
+      and confusing developers.
+
+  US-022  FAIL  Add Apple Sign-In UI to Settings for Pro+ account creation
+    → AuthService has signInWithApple() fully implemented. Beautiful. Nobody
+      can reach it. There's no button. Anywhere. In the entire app. It's like
+      building an elevator with no call button.
+
+  US-023  FAIL  Wire SyncService into app lifecycle for Pro+ users
+    → SyncService has syncCommitments() and pullCommitments(). Both methods
+      are well-written. Both are called exactly zero times. You built the
+      engine and forgot to put it in the car.
+
+  US-024  FAIL  Add website apple-app-site-association file for universal links
+    → No AASA file. The .well-known directory doesn't exist. Universal links
+      can't work. This blocks US-017 too. Two stories, one missing file.
+
+================================================================================
+RALPH'S SUMMARY
+================================================================================
+
+Look, I'll give you this — you've got the foundation. The services are written.
+The models exist. The architecture is clean. But NONE of it is wired together,
+tested, or deployment-ready.
+
+You've got:
+  • Services that nobody calls (SyncService, AuthService UI)
+  • Features that nobody can reach (deep links, Apple Sign-In)
+  • Code that nobody verifies (7 untested services)
+  • Deployments that don't deploy (Watch CI, api-commitments)
+  • Config that's incomplete (entitlements, Info.plist, AASA)
+
+This is a classic case of "built the parts, forgot the product."
+
+PRIORITY ORDER FOR NEXT LOOP:
+  1. US-001 + US-002 — Fix entitlements & Info.plist (crash/rejection blockers)
+  2. US-003 + US-006 — Status updates & badge count (core UX)
+  3. US-007 + US-008 — CI/CD gaps (safety net before more work)
+  4. US-009 through US-015 — Test suite (prove what you've got works)
+  5. US-016 through US-024 — Everything else
+
+Next loop: Actually ship something.
+
+— Ralph, SnarktTank
+================================================================================

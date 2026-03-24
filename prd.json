@@ -2,6 +2,15 @@
     "project": "Seddly",
     "branchName": "ralph/remaining-gaps-completion",
     "description": "Complete all remaining gaps across the Seddly PRD — entitlements, auto-status updates, calendar permissions, CI/CD updates, tests, UX polish, and deployment config",
+    "ralphLoop": {
+      "currentLoop": 1,
+      "lastReviewDate": "2026-03-24",
+      "passingCount": 0,
+      "totalCount": 24,
+      "completionRate": "0%",
+      "reviewer": "Ralph AI — SnarktTank",
+      "verdict": "Foundation exists but nothing is wired, tested, or deployment-ready. Zero stories passing."
+    },
     "userStories": [
       {
         "id": "US-001",
