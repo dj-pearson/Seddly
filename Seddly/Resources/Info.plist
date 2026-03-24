@@ -7,6 +7,10 @@
     <string>Seddly reads only your Screenshots album to find commitments, promises, and deadlines. Your personal photos and videos are never accessed.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
     <string>Seddly needs permission to save exported commitment timelines to your photo library.</string>
+    <key>NSCalendarsUsageDescription</key>
+    <string>Seddly creates calendar events for your commitment deadlines so you never miss a due date.</string>
+    <key>NSCalendarsFullAccessUsageDescription</key>
+    <string>Seddly needs full calendar access to create and manage events for your commitment deadlines.</string>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.pearsonmedia.Seddly.screenshot-refresh</string>

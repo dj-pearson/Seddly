@@ -193,6 +193,10 @@ struct BackfillView: View {
             progress.commitmentsDetected = result.commitmentsDetected
             isComplete = true
             isProcessing = false
+
+            if progress.commitmentsDetected > 0 {
+                UserDefaults.standard.set(true, forKey: "showBackfillReviewBanner")
+            }
         }
     }
 }

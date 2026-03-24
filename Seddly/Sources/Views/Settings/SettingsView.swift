@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AuthenticationServices
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -7,9 +8,12 @@ struct SettingsView: View {
     @AppStorage("offlineMode") private var offlineMode = false
     @AppStorage("autoAnalyze") private var autoAnalyze = false
     @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
+    @AppStorage("isSignedIn") private var isSignedIn = false
+    @AppStorage("signedInEmail") private var signedInEmail = ""
     @State private var showDeleteConfirmation = false
     @State private var notificationsEnabled = true
     @State private var dailyDigestTime = DateComponents(hour: 20, minute: 0)
+    @State private var signInError: String?
 
     var body: some View {
         NavigationStack {
@@ -83,6 +87,26 @@ struct SettingsView: View {
                     NavigationLink("Refer a Friend") {
                         ReferralView()
                     }
+
+                    if subscriptionService.currentTier == .proPlus {
+                        if isSignedIn {
+                            LabeledContent("Account", value: signedInEmail.isEmpty ? "Signed In" : signedInEmail)
+                        } else {
+                            SignInWithAppleButton(.signIn) { request in
+                                request.requestedScopes = [.email]
+                            } onCompletion: { result in
+                                handleAppleSignIn(result)
+                            }
+                            .signInWithAppleButtonStyle(.black)
+                            .frame(height: 44)
+
+                            if let signInError {
+                                Text(signInError)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        }
+                    }
                 }
 
                 Section("Data") {
@@ -126,6 +150,19 @@ struct SettingsView: View {
             } message: {
                 Text("This will permanently delete all commitments, entities, and processing history. This cannot be undone.")
             }
+        }
+    }
+
+    private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case .success(let authorization):
+            if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
+                isSignedIn = true
+                signedInEmail = credential.email ?? ""
+                signInError = nil
+            }
+        case .failure(let error):
+            signInError = error.localizedDescription
         }
     }
 

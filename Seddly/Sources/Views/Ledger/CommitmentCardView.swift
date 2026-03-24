@@ -3,6 +3,11 @@ import SwiftUI
 struct CommitmentCardView: View {
     let commitment: LocalCommitment
 
+    private var isNew: Bool {
+        let lastViewed = UserDefaults.standard.object(forKey: "lastViewedDate") as? Date ?? .distantPast
+        return commitment.createdAt > lastViewed
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
@@ -12,6 +17,17 @@ struct CommitmentCardView: View {
                     .foregroundStyle(.secondary)
 
                 sourceIcon
+
+                if isNew {
+                    Text("New")
+                        .font(.caption2)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(.accent)
+                        .foregroundStyle(.white)
+                        .clipShape(Capsule())
+                }
 
                 Spacer()
 
