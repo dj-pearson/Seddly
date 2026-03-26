@@ -25,7 +25,7 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content="https://seddly.com/og-image.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
     <link rel="canonical" href={`https://seddly.com${Astro.url.pathname}`} />
     <title>{title}</title>
 
@@ -48,6 +48,9 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     <nav>
       <div class="nav-inner">
         <a href="/" class="logo">Seddly</a>
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
         <div class="nav-links">
           <a href="/how-it-works">How It Works</a>
           <a href="/privacy">Privacy</a>
@@ -57,6 +60,16 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
         </div>
       </div>
     </nav>
+
+    <script>
+      const toggle = document.querySelector('.nav-toggle');
+      const links = document.querySelector('.nav-links');
+      toggle?.addEventListener('click', () => {
+        const expanded = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!expanded));
+        links?.classList.toggle('open');
+      });
+    </script>
 
     <main>
       <slot />
@@ -130,9 +143,11 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--color-border);
     padding: 1rem 2rem;
+    /* Required for absolute-positioned mobile nav dropdown */
   }
 
   .nav-inner {
+    position: relative;
     max-width: var(--max-width);
     margin: 0 auto;
     display: flex;
@@ -204,8 +219,52 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     font-size: 0.8rem;
   }
 
+  .nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    flex-direction: column;
+    gap: 5px;
+    padding: 4px;
+  }
+
+  .nav-toggle span {
+    display: block;
+    width: 22px;
+    height: 2px;
+    background: var(--color-text);
+    border-radius: 2px;
+    transition: transform 0.2s, opacity 0.2s;
+  }
+
+  .nav-toggle[aria-expanded="true"] span:nth-child(1) {
+    transform: rotate(45deg) translate(5px, 5px);
+  }
+  .nav-toggle[aria-expanded="true"] span:nth-child(2) {
+    opacity: 0;
+  }
+  .nav-toggle[aria-expanded="true"] span:nth-child(3) {
+    transform: rotate(-45deg) translate(5px, -5px);
+  }
+
   @media (max-width: 768px) {
-    .nav-links { gap: 1rem; }
+    .nav-toggle { display: flex; }
+    .nav-links {
+      display: none;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: rgba(10, 10, 11, 0.95);
+      backdrop-filter: blur(12px);
+      flex-direction: column;
+      padding: 1rem 2rem 1.5rem;
+      gap: 0.8rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .nav-links.open { display: flex; }
+    .nav-links .cta-small { text-align: center; }
     .footer-inner { grid-template-columns: 1fr; }
   }
 </style>

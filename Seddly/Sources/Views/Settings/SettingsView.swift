@@ -5,6 +5,7 @@ import AuthenticationServices
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SubscriptionService.self) private var subscriptionService
+    @Environment(\.authService) private var authService
     @AppStorage("offlineMode") private var offlineMode = false
     @AppStorage("autoAnalyze") private var autoAnalyze = false
     @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
@@ -162,9 +163,17 @@ struct SettingsView: View {
         switch result {
         case .success(let authorization):
             if let credential = authorization.credential as? ASAuthorizationAppleIDCredential {
-                isSignedIn = true
                 signedInEmail = credential.email ?? ""
                 signInError = nil
+
+                Task {
+                    do {
+                        try await authService.signInWithApple(credential: credential)
+                        isSignedIn = true
+                    } catch {
+                        signInError = error.localizedDescription
+                    }
+                }
             }
         case .failure(let error):
             signInError = error.localizedDescription

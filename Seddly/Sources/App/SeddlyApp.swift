@@ -1,11 +1,28 @@
 import SwiftUI
 import SwiftData
 
+// MARK: - AuthService Environment Key
+
+private struct AuthServiceKey: EnvironmentKey {
+    static let defaultValue: AuthService = AuthService(
+        supabaseURL: URL(string: "https://placeholder.supabase.co")!,
+        supabaseKey: ""
+    )
+}
+
+extension EnvironmentValues {
+    var authService: AuthService {
+        get { self[AuthServiceKey.self] }
+        set { self[AuthServiceKey.self] = newValue }
+    }
+}
+
 @main
 struct SeddlyApp: App {
     let modelContainer: ModelContainer
     @State private var subscriptionService = SubscriptionService()
     @State private var calendarService = CalendarService()
+    private let authService: AuthService
     @State private var deepLinkCommitmentID: String?
     @State private var showDeepLinkNotFound = false
 
@@ -15,6 +32,12 @@ struct SeddlyApp: App {
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
+
+        // Read Supabase credentials from Info.plist
+        let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
+        let supabaseKey = Bundle.main.infoDictionary?["SUPABASE_KEY"] as? String ?? ""
+        let supabaseURL = URL(string: supabaseURLString) ?? URL(string: "https://placeholder.supabase.co")!
+        authService = AuthService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
 
         Task {
             await BackgroundTaskService.shared.registerBackgroundTasks()
@@ -27,6 +50,7 @@ struct SeddlyApp: App {
             ContentView()
                 .environment(subscriptionService)
                 .environment(calendarService)
+                .environment(\.authService, authService)
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
