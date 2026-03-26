@@ -21,6 +21,7 @@ actor ScreenshotProcessingService {
         since date: Date?,
         context: ModelContext,
         aiEndpoint: URL?,
+        authToken: String? = nil,
         subscriptionTier: SubscriptionService.SubscriptionTier,
         autoAnalyze: Bool = false,
         offlineMode: Bool = false
@@ -68,15 +69,18 @@ actor ScreenshotProcessingService {
             result.screenshotsProcessed += 1
 
             // Layer 4: AI extraction (Pro+ only, requires network + threshold + not offline)
+            // Skip AI extraction if text exceeds length limit
             if subscriptionTier >= .pro,
                !offlineMode,
                ruleScore >= adjustedThreshold,
+               ocrText.count <= AIExtractionService.maxTextLength,
                let endpoint = aiEndpoint {
                 if autoAnalyze {
                     // Auto-analyze: send directly to AI without user review
                     let commitments = await extractWithAI(
                         text: ocrText,
                         endpoint: endpoint,
+                        authToken: authToken,
                         assetID: assetID,
                         screenshotDate: asset.creationDate,
                         context: context,
@@ -124,12 +128,13 @@ actor ScreenshotProcessingService {
     private func extractWithAI(
         text: String,
         endpoint: URL,
+        authToken: String? = nil,
         assetID: String,
         screenshotDate: Date?,
         context: ModelContext,
         autoAnalyze: Bool = false
     ) async -> Int {
-        let aiService = AIExtractionService(endpointURL: endpoint)
+        let aiService = AIExtractionService(endpointURL: endpoint, authToken: authToken)
 
         guard let response = try? await aiService.extractCommitments(from: text) else {
             return 0
@@ -221,11 +226,13 @@ actor ScreenshotProcessingService {
         _ queueItem: ProcessingQueue,
         approvedText: String,
         aiEndpoint: URL,
+        authToken: String? = nil,
         context: ModelContext
     ) async -> Int {
         let commitments = await extractWithAI(
             text: approvedText,
             endpoint: aiEndpoint,
+            authToken: authToken,
             assetID: queueItem.screenshotAssetID,
             screenshotDate: queueItem.createdAt,
             context: context,

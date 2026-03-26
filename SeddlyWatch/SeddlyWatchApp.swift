@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WatchConnectivity
 
 @main
 struct SeddlyWatchApp: App {
@@ -11,6 +12,8 @@ struct SeddlyWatchApp: App {
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }
+
+        WatchSyncService.shared.activate(with: modelContainer)
     }
 
     var body: some Scene {

@@ -1,29 +1,23 @@
 {
   "permissions": {
     "allow": [
+      "Edit",
+      "Write",
+      "Read",
+      "Glob",
+      "Grep",
       "Bash(git:*)",
-      "WebSearch",
-      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/.github/workflows\")",
-      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/App\")",
-      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Models\")",
-      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/Ledger\")",
-      "Bash(mkdir -p \"C:/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/Detail\")",
-      "Bash(find C:/Users/dpearson/Documents/Seddly -name *.swift -not -path */.git/* -exec wc -l {} +)",
-      "Bash(find /c/Users/dpearson/Documents/Seddly -type f -name *Auth* -o -name *Supabase*)",
-      "Bash(find /c/Users/dpearson/Documents/Seddly/website -type f -name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js)",
-      "Bash(grep -n \"\\\\.present\\\\|\\\\.sheet\\\\|\\\\.navigation\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Views/**/*.swift)",
-      "Bash(xargs grep:*)",
-      "Bash(grep -r \"Progressive\\\\|progressive\\\\|auto.*analyze\\\\|autoApprove\\\\|Trust\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources --include=*.swift)",
-      "Bash(find /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Services -type f -name *.swift)",
-      "Bash(find /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Models -type f -name *Commitment*)",
-      "Bash(grep -r \"overdue\\\\|pending\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Models --include=*.swift)",
-      "Bash(grep -r \"SignInWithApple\\\\|ASAuthorization\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources --include=*.swift)",
+      "Bash(mkdir:*)",
       "Bash(find:*)",
-      "Bash(grep -r \"func test\\\\|@Test\" /c/Users/dpearson/Documents/Seddly/SeddlyTests --include=*.swift)",
-      "Bash(grep -r \"isOverdue\\\\|status.*overdue\\\\|updateStatus\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Services --include=*.swift)",
-      "Bash(xargs -0 ls -1)",
       "Bash(grep:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(jq:*)",
+      "Bash(xargs:*)",
+      "Bash(wc:*)",
+      "WebSearch",
+      "Skill(update-config)"
     ]
   }
 }

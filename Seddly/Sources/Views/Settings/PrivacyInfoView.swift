@@ -8,6 +8,8 @@ struct PrivacyInfoView: View {
     @State private var screenshotCount: Int?
     @State private var accessLevel: String = "Unknown"
     @State private var totalProcessed: Int = 0
+    @State private var isLoadingInfo = false
+    @State private var loadError = false
 
     private var totalCharsSent: Int {
         auditEntries.reduce(0) { $0 + $1.textLengthSent }
@@ -41,21 +43,38 @@ struct PrivacyInfoView: View {
             }
 
             Section("What Seddly Can See") {
-                HStack {
-                    Image(systemName: "photo.on.rectangle")
-                        .foregroundStyle(.accent)
-                    VStack(alignment: .leading) {
-                        Text("Screenshots Album Only")
-                            .font(.subheadline.weight(.medium))
-                        Text("Access level: \(accessLevel)")
-                            .font(.caption)
+                if isLoadingInfo {
+                    HStack {
+                        ProgressView()
+                        Text("Loading photo access info...")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-                    Spacer()
-                    if let count = screenshotCount {
-                        Text("\(count)")
-                            .font(.title3.bold())
+                } else if loadError {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                        Text("Couldn't load photo access info")
+                            .font(.subheadline)
                             .foregroundStyle(.secondary)
+                    }
+                } else {
+                    HStack {
+                        Image(systemName: "photo.on.rectangle")
+                            .foregroundStyle(.accent)
+                        VStack(alignment: .leading) {
+                            Text("Screenshots Album Only")
+                                .font(.subheadline.weight(.medium))
+                            Text("Access level: \(accessLevel)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if let count = screenshotCount {
+                            Text("\(count)")
+                                .font(.title3.bold())
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
@@ -122,28 +141,46 @@ struct PrivacyInfoView: View {
     }
 
     private func loadPhotoInfo() async {
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        switch status {
-        case .authorized: accessLevel = "Full (filtered to Screenshots only)"
-        case .limited: accessLevel = "Limited (user-selected)"
-        case .denied: accessLevel = "Denied"
-        case .restricted: accessLevel = "Restricted"
-        case .notDetermined: accessLevel = "Not yet requested"
-        @unknown default: accessLevel = "Unknown"
+        isLoadingInfo = true
+
+        // Timeout after 15 seconds
+        let loadTask = Task {
+            let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            switch status {
+            case .authorized: accessLevel = "Full (filtered to Screenshots only)"
+            case .limited: accessLevel = "Limited (user-selected)"
+            case .denied: accessLevel = "Denied"
+            case .restricted: accessLevel = "Restricted"
+            case .notDetermined: accessLevel = "Not yet requested"
+            @unknown default: accessLevel = "Unknown"
+            }
+
+            guard status == .authorized || status == .limited else { return }
+
+            guard let album = PHAssetCollection.fetchAssetCollections(
+                with: .smartAlbum,
+                subtype: .smartAlbumScreenshots,
+                options: nil
+            ).firstObject else { return }
+
+            screenshotCount = PHAsset.fetchAssets(in: album, options: nil).count
+
+            let descriptor = FetchDescriptor<ProcessingQueue>()
+            totalProcessed = (try? modelContext.fetchCount(descriptor)) ?? 0
         }
 
-        guard status == .authorized || status == .limited else { return }
+        let timeoutTask = Task {
+            try? await Task.sleep(for: .seconds(15))
+            if isLoadingInfo {
+                loadTask.cancel()
+                loadError = true
+                isLoadingInfo = false
+            }
+        }
 
-        guard let album = PHAssetCollection.fetchAssetCollections(
-            with: .smartAlbum,
-            subtype: .smartAlbumScreenshots,
-            options: nil
-        ).firstObject else { return }
-
-        screenshotCount = PHAsset.fetchAssets(in: album, options: nil).count
-
-        let descriptor = FetchDescriptor<ProcessingQueue>()
-        totalProcessed = (try? modelContext.fetchCount(descriptor)) ?? 0
+        await loadTask.value
+        timeoutTask.cancel()
+        isLoadingInfo = false
     }
 }
 

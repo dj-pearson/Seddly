@@ -12,6 +12,7 @@ struct ClipboardCommitmentView: View {
     @State private var summary = ""
     @State private var deadline: Date?
     @State private var hasDeadline = false
+    @State private var showingError = false
 
     var body: some View {
         NavigationStack {
@@ -47,11 +48,14 @@ struct ClipboardCommitmentView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         saveCommitment()
-                        onDismiss()
-                        dismiss()
                     }
                     .disabled(entityName.isEmpty || summary.isEmpty)
                 }
+            }
+            .alert("Couldn't Save Commitment", isPresented: $showingError) {
+                Button("OK") {}
+            } message: {
+                Text("Something went wrong while saving. Please try again.")
             }
         }
     }
@@ -81,6 +85,18 @@ struct ClipboardCommitmentView: View {
         )
         commitment.entity = entity
         modelContext.insert(commitment)
-        try? modelContext.save()
+
+        do {
+            try modelContext.save()
+            WatchSyncService.shared.sendCommitmentUpdate(
+                id: commitment.id, action: "created",
+                entityName: commitment.entityName, summary: commitment.summary,
+                statusRaw: commitment.statusRaw
+            )
+            onDismiss()
+            dismiss()
+        } catch {
+            showingError = true
+        }
     }
 }

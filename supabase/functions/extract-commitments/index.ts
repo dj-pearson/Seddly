@@ -1,6 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 interface CommitmentExtraction {
   commitments: Array<{
@@ -50,6 +53,29 @@ Do not include any text outside the JSON object.`;
 
 const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
 const MAX_TEXT_LENGTH = 50000; // 50KB limit
+const RATE_LIMIT_MAX = 10; // 10 requests per window
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
+
+const kv = await Deno.openKv();
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const key = ["rate_limit", "extract-commitments", userId];
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  const entry = await kv.get<{ timestamps: number[] }>(key);
+  const timestamps = (entry.value?.timestamps ?? []).filter((t) => t > windowStart);
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    const oldestInWindow = Math.min(...timestamps);
+    const retryAfterSeconds = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSeconds: Math.max(1, retryAfterSeconds) };
+  }
+
+  timestamps.push(now);
+  await kv.set(key, { timestamps }, { expireIn: RATE_LIMIT_WINDOW_MS });
+  return { allowed: true, retryAfterSeconds: 0 };
+}
 
 function corsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
@@ -71,6 +97,41 @@ Deno.serve(async (req) => {
       status: 405,
       headers: { "Content-Type": "application/json", ...corsHeaders(req) },
     });
+  }
+
+  // Auth: require Bearer token (Supabase JWT)
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return new Response(
+      JSON.stringify({ error: "Authentication required. Provide a valid Bearer token." }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
+    );
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    return new Response(
+      JSON.stringify({ error: "Invalid or expired token" }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
+    );
+  }
+
+  // Rate limiting: 10 requests per minute per user
+  const rateLimit = await checkRateLimit(user.id);
+  if (!rateLimit.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+          ...corsHeaders(req),
+        },
+      },
+    );
   }
 
   try {

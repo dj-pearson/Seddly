@@ -57,6 +57,12 @@ final class ManualEntryViewModel {
             }
         }
 
+        WatchSyncService.shared.sendCommitmentUpdate(
+            id: commitment.id, action: "created",
+            entityName: commitment.entityName, summary: commitment.summary,
+            statusRaw: commitment.statusRaw
+        )
+
         return commitment
     }
 

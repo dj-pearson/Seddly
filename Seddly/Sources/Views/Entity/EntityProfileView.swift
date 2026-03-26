@@ -3,6 +3,7 @@ import SwiftUI
 struct EntityProfileView: View {
     let entity: LocalEntity
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.authService) private var authService
     @Environment(SubscriptionService.self) private var subscriptionService
     @State private var disputeSummary: String?
     @State private var isGeneratingSummary = false
@@ -96,6 +97,12 @@ struct EntityProfileView: View {
                             Text("AI unavailable — using local summary. \(summaryError)")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Retry") {
+                                generateDisputeSummary()
+                            }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
                         }
                     }
                 }
@@ -106,12 +113,17 @@ struct EntityProfileView: View {
                     NavigationLink(value: commitment) {
                         HStack(spacing: 12) {
                             // Timeline node
-                            VStack {
+                            VStack(spacing: 2) {
                                 Circle()
                                     .fill(nodeColor(for: commitment))
                                     .frame(width: 12, height: 12)
+                                Text(commitment.status.label)
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(nodeColor(for: commitment))
+                                    .lineLimit(1)
                             }
-                            .frame(width: 12)
+                            .frame(width: 40)
+                            .accessibilityLabel("Status: \(commitment.status.label)")
 
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(commitment.summary)
@@ -194,7 +206,22 @@ struct EntityProfileView: View {
         isGeneratingSummary = true
         summaryError = nil
 
-        Task {
+        Task { @MainActor in
+            // Start a 15-second timeout
+            let timeoutTask = Task {
+                try? await Task.sleep(for: .seconds(15))
+                if isGeneratingSummary {
+                    isGeneratingSummary = false
+                    summaryError = "Request timed out. Please try again."
+                    disputeSummary = DisputeSummaryService.generateLocalSummary(
+                        entityName: entity.name,
+                        commitments: entity.commitments
+                    )
+                    showingSummary = true
+                }
+            }
+            defer { timeoutTask.cancel() }
+
             guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
                   let supabaseURL = URL(string: supabaseURLString) else {
                 // No Supabase URL configured — use local fallback
@@ -208,7 +235,8 @@ struct EntityProfileView: View {
             }
 
             let endpointURL = supabaseURL.appendingPathComponent("functions/v1/generate-dispute-summary")
-            let service = DisputeSummaryService(endpointURL: endpointURL)
+            let token = await authService.validAccessToken()
+            let service = DisputeSummaryService(endpointURL: endpointURL, authToken: token)
 
             do {
                 // Try AI-powered summary via Edge Function
@@ -218,6 +246,30 @@ struct EntityProfileView: View {
                     context: modelContext
                 )
                 disputeSummary = summary
+            } catch DisputeSummaryService.DisputeSummaryError.unauthorized {
+                // Token expired mid-request — refresh and retry once
+                if let newToken = await authService.handleUnauthorizedResponse() {
+                    let retryService = DisputeSummaryService(endpointURL: endpointURL, authToken: newToken)
+                    if let summary = try? await retryService.generateSummary(
+                        entityName: entity.name,
+                        commitments: entity.commitments,
+                        context: modelContext
+                    ) {
+                        disputeSummary = summary
+                    } else {
+                        summaryError = "Retry failed after token refresh."
+                        disputeSummary = DisputeSummaryService.generateLocalSummary(
+                            entityName: entity.name,
+                            commitments: entity.commitments
+                        )
+                    }
+                } else {
+                    summaryError = "Session expired. Please sign in again."
+                    disputeSummary = DisputeSummaryService.generateLocalSummary(
+                        entityName: entity.name,
+                        commitments: entity.commitments
+                    )
+                }
             } catch {
                 // Fallback to local generation
                 summaryError = error.localizedDescription

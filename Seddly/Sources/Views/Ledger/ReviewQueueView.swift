@@ -70,6 +70,11 @@ struct ReviewQueueView: View {
                                         commitment.needsAIProcessing = false
                                         commitment.updatedAt = .now
                                         ClassifierFeedbackService.recordDismissal()
+                                        WatchSyncService.shared.sendCommitmentUpdate(
+                                            id: commitment.id, action: "updated",
+                                            entityName: commitment.entityName, summary: commitment.summary,
+                                            statusRaw: commitment.statusRaw
+                                        )
                                     } label: {
                                         Label("Dismiss", systemImage: "xmark")
                                     }

@@ -11,6 +11,8 @@ struct ManualEntryView: View {
     @State private var attachedImage: UIImage?
     @State private var showingSuggestions = false
     @State private var showingTemplates = false
+    @State private var showingSaveError = false
+    @State private var isSaving = false
 
     private var filteredEntities: [LocalEntity] {
         guard !viewModel.entityName.isEmpty else { return [] }
@@ -122,11 +124,16 @@ struct ManualEntryView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        _ = viewModel.createCommitment(in: modelContext)
-                        dismiss()
+                    Button {
+                        saveCommitment()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                        }
                     }
-                    .disabled(!viewModel.isValid)
+                    .disabled(!viewModel.isValid || isSaving)
                 }
             }
             .onChange(of: selectedPhoto) {
@@ -135,6 +142,11 @@ struct ManualEntryView: View {
                         attachedImage = UIImage(data: data)
                     }
                 }
+            }
+            .alert("Couldn't Save Commitment", isPresented: $showingSaveError) {
+                Button("OK") {}
+            } message: {
+                Text("Something went wrong while saving your commitment. Please try again.")
             }
             .sheet(isPresented: $showingTemplates) {
                 TemplatePickerView { template in
@@ -148,6 +160,18 @@ struct ManualEntryView: View {
                     showingTemplates = false
                 }
             }
+        }
+    }
+
+    private func saveCommitment() {
+        isSaving = true
+        _ = viewModel.createCommitment(in: modelContext)
+        do {
+            try modelContext.save()
+            dismiss()
+        } catch {
+            isSaving = false
+            showingSaveError = true
         }
     }
 }

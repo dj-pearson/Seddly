@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ConfidenceBadgeView: View {
     let score: Int
+    @ScaledMetric(relativeTo: .caption2) private var badgeSize: CGFloat = 24
 
     var body: some View {
         if score > 0 {
@@ -9,9 +10,18 @@ struct ConfidenceBadgeView: View {
                 .font(.caption2)
                 .fontWeight(.bold)
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: badgeSize, height: badgeSize)
                 .background(badgeColor)
                 .clipShape(Circle())
+                .accessibilityLabel("Confidence: \(confidenceLevel), \(score) out of 10")
+        }
+    }
+
+    private var confidenceLevel: String {
+        switch score {
+        case 8...10: "High"
+        case 5...7: "Medium"
+        default: "Low"
         }
     }
 

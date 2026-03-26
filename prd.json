@@ -5,9 +5,9 @@
     "ralphLoop": {
       "currentLoop": 3,
       "lastReviewDate": "2026-03-26",
-      "passingCount": 0,
+      "passingCount": 16,
       "totalCount": 50,
-      "completionRate": "0%",
+      "completionRate": "32%",
       "reviewer": "Ralph AI — SnarktTank",
       "verdict": "Deep audit identified 50 new user stories across Security (critical), Performance, UI/UX, Functionality, and Website/Backend. Zero passing — work begins."
     },
@@ -41,8 +41,8 @@
           "Typecheck passes"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": "CRITICAL: Currently a public endpoint with no auth. Anyone can call it and incur Anthropic API costs."
+        "passes": true,
+        "notes": "Auth added: Bearer token validated via Supabase auth.getUser(). iOS client sends token via AIExtractionService. Returns 401 for missing/invalid tokens."
       },
       {
         "id": "US-026",
@@ -57,8 +57,8 @@
           "Typecheck passes"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": "CRITICAL: Currently public endpoint with CORS set to '*'. Anyone can call from any origin."
+        "passes": true,
+        "notes": "Auth added: Bearer token validated via Supabase auth.getUser(). CORS changed from wildcard to seddly.com domain whitelist. DisputeSummaryService.swift sends auth token in request header via EntityProfileView passing AuthService.accessToken."
       },
       {
         "id": "US-027",
@@ -73,8 +73,8 @@
           "Typecheck passes"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": "CRITICAL: Current implementation decodes but does not verify JWS signatures. A malicious actor could craft fake subscription events."
+        "passes": true,
+        "notes": "JWS signature verification implemented: full x5c certificate chain validated against pinned Apple Root CA - G3, each cert verified cryptographically via Web Crypto ECDSA, JWS signature verified using leaf cert public key. Invalid signatures return 400. Verification failures logged with timestamps. Old incomplete-verification comment removed."
       },
       {
         "id": "US-028",
@@ -89,8 +89,8 @@
           "Typecheck passes"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": "No rate limiting on any Edge Function. AI endpoints are expensive — a single abusive user could generate large bills."
+        "passes": true,
+        "notes": "Rate limiting added via Deno KV. extract-commitments: 10 req/min per user. generate-dispute-summary: 5 req/min per user. Returns 429 with Retry-After header when exceeded. State stored in Deno KV with auto-expiration."
       },
       {
         "id": "US-029",
@@ -106,8 +106,8 @@
           "Typecheck passes"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": "Current AuthService stores access token but never checks expiration or refreshes. All API calls will fail silently after token expires."
+        "passes": true,
+        "notes": "Token refresh implemented: refresh token stored in Keychain alongside access token. validAccessToken() checks expiration (with 60s buffer) and auto-refreshes. handleUnauthorizedResponse() handles 401 retry. Services throw .unauthorized on 401. EntityProfileView retries once on 401 then falls back. If refresh fails, signs out user. AIExtractionService and DisputeSummaryService distinguish 401 from other errors."
       },
       {
         "id": "US-030",
@@ -123,8 +123,8 @@
           "Typecheck passes"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": "OCR text sent directly to AI with no length or encoding validation. A 100KB OCR text from a dense screenshot could be expensive."
+        "passes": true,
+        "notes": "Input validation added: AIExtractionService validates UTF-8 encoding and max 10,000 character limit before sending. ScreenshotProcessingService checks text length before calling extractWithAI(). Edge Function already validates text field type and length (50KB server-side limit). Descriptive error messages returned for all validation failures."
       },
       {
         "id": "US-031",
@@ -139,8 +139,8 @@
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "All network calls use URLSession.shared with no certificate pinning. MITM attacks could intercept AI requests and auth tokens."
+        "passes": true,
+        "notes": "CertificatePinningService created with public key (SPKI) pinning for supabase.co. SHA-256 hashes of public keys used (not certificate pinning) for rotation resilience. Includes primary pin plus 2 backup pins. All four network services (AIExtractionService, DisputeSummaryService, SyncService, APIAccessService) updated to use CertificatePinningService.session. URLSessionDelegate validates server trust and checks certificate chain for matching SPKI hash."
       },
       {
         "id": "US-032",
@@ -156,8 +156,8 @@
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "Swipe actions immediately change status with no confirmation. Users report accidentally dismissing commitments."
+        "passes": true,
+        "notes": "Confirmation alerts added to both LedgerView and IPadLedgerView. Swipe-to-dismiss shows destructive alert with commitment summary. Swipe-to-fulfill shows confirmation alert. Both include undo hint text. Cancel button returns without action. Haptic feedback fires only after confirmation."
       },
       {
         "id": "US-033",
@@ -173,8 +173,8 @@
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "Currently no way to manually trigger refresh — only happens automatically on app foreground."
+        "passes": true,
+        "notes": "Pull-to-refresh added to both LedgerView and IPadLedgerView via .refreshable(). Triggers status updates, screenshot processing (Pro+), and SyncService pull/push (Pro+ signed-in). Haptic feedback on completion."
       },
       {
         "id": "US-034",
@@ -191,8 +191,8 @@
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "Multiple views use try? to swallow errors silently. Users get no feedback when operations fail."
+        "passes": true,
+        "notes": "Error alerts added: ClipboardCommitmentView shows alert on save failure. CommitmentDetailView shows alert on delete failure. EntityProfileView already had summaryError display — added Retry button. PrivacyAuditView shows alert on export failure (replaced try? with do/catch). ManualEntryView shows alert on save failure. All messages are user-friendly."
       },
       {
         "id": "US-035",
@@ -208,8 +208,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Several async operations have no loading indicators, making the app feel unresponsive."
+        "passes": true,
+        "notes": "Loading states added: CommitmentDetailView shows ProgressView while screenshot loads (with error fallback). ManualEntryView shows spinner on Save button during save. PrivacyInfoView shows ProgressView while loadPhotoInfo() runs with 15s timeout. EntityProfileView already had ProgressView for dispute summary — added 15s timeout with error state. All loading states transition to error after timeout."
       },
       {
         "id": "US-036",
@@ -226,8 +226,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Multiple views rely on color alone to convey status/urgency. Color-blind and VoiceOver users cannot distinguish states."
+        "passes": true,
+        "notes": "Accessibility labels added: CommitmentCardView already had comprehensive accessibilityLabel. ConfidenceBadgeView now has 'Confidence: High/Medium/Low, N out of 10'. DeadlineIndicatorView now has urgency text (Overdue/Approaching/On track). FilterView status circles have accessibilityLabel per status. EntityProfileView timeline nodes now have text labels below circles plus accessibilityLabel."
       },
       {
         "id": "US-037",
@@ -243,8 +243,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "Several views use fixed frame sizes that don't scale with Dynamic Type, making them unreadable at large text sizes."
+        "passes": true,
+        "notes": "All fixed-size elements converted to @ScaledMetric: ConfidenceBadgeView (already done), DeadlineIndicatorView (icon size + spacing), AICoachView (icon sizes, spacer heights), CoachStatusRow (icon width), CoachResultCard (thumbnail size), FilterView (status dots, category icons)."
       },
       {
         "id": "US-038",
@@ -278,8 +278,8 @@
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "CRITICAL GAP: Watch and iPhone maintain completely separate databases. Changes on one device never appear on the other."
+        "passes": true,
+        "notes": "WatchSyncService created in Shared/ with WCSession activation on both iPhone and Watch launch. iPhone sends transferUserInfo() on commitment create/update/delete from LedgerViewModel, CommitmentDetailView, ClipboardCommitmentView, ManualEntryViewModel, ReviewQueueView. Watch sends fulfillment updates to iPhone via sendFulfillment(). Pending transfers queued when Watch unreachable and flushed on reconnect. WatchLedgerView shows sync status indicator with color-coded dot and last sync time."
       },
       {
         "id": "US-040",
@@ -295,8 +295,8 @@
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "No migration plan defined. Any model changes in a future update will crash the app for existing users."
+        "passes": true,
+        "notes": "Migration plan implemented: SeddlySchemaV1 and SeddlySchemaV2 VersionedSchema types defined with all 5 models. SeddlyMigrationPlan with lightweight V1→V2 stage. SharedModelContainer.create() uses migrationPlan parameter. SeddlyApp handles migration failures gracefully with in-memory fallback and user alert. 6 unit tests verify plan structure, version ordering, model completeness, and container creation."
       },
       {
         "id": "US-041",
@@ -551,8 +551,8 @@
           "Tests pass"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "18 of 26 services have zero test coverage. Critical paths (auth, sync, subscription, processing) are completely untested."
+        "passes": true,
+        "notes": "Unit tests added for all 5 critical services using Swift Testing framework: AuthServiceTests (7 tests: signOut, isAuthenticated, validAccessToken, handleUnauthorized, needsRefresh, error descriptions, idempotent signOut), SubscriptionServiceTests (6 tests: initial tier, tier ordering, Pro+/Pro/free gating, product IDs, listener), BackgroundTaskServiceTests (6 tests: identifier, singleton, scheduling, registration, interval, cancellation), OCRServiceTests (4 tests: text extraction from rendered image, blank image, error description, multi-line), ScreenshotProcessingServiceTests (9 tests: defaults, duplicate detection, status transitions, confidence threshold, text length, rule filter integration, classifier routing/filtering, skipped persistence)."
       },
       {
         "id": "US-056",

@@ -15,6 +15,9 @@ struct CommitmentDetailView: View {
     @State private var showDismissConfirmation = false
     @State private var customReminderDate = Date()
     @State private var screenshotImage: UIImage?
+    @State private var isLoadingScreenshot = false
+    @State private var screenshotLoadFailed = false
+    @State private var showDeleteError = false
 
     var body: some View {
         List {
@@ -25,6 +28,25 @@ struct CommitmentDetailView: View {
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            } else if isLoadingScreenshot {
+                Section {
+                    HStack {
+                        ProgressView()
+                        Text("Loading screenshot...")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else if screenshotLoadFailed {
+                Section {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.orange)
+                        Text("Screenshot couldn't be loaded")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } else if commitment.source == .manual {
                 Section {
@@ -122,6 +144,11 @@ struct CommitmentDetailView: View {
                                 calendarService.updateEvent(identifier: eventID, commitment: commitment)
                             }
                         }
+                        WatchSyncService.shared.sendCommitmentUpdate(
+                            id: commitment.id, action: "updated",
+                            entityName: commitment.entityName, summary: commitment.summary,
+                            statusRaw: commitment.statusRaw
+                        )
                     }
                 )) {
                     ForEach(CommitmentStatus.allCases) { status in
@@ -316,6 +343,11 @@ struct CommitmentDetailView: View {
             Button("Dismiss", role: .destructive) {
                 commitment.status = .dismissed
                 commitment.updatedAt = .now
+                WatchSyncService.shared.sendCommitmentUpdate(
+                    id: commitment.id, action: "updated",
+                    entityName: commitment.entityName, summary: commitment.summary,
+                    statusRaw: commitment.statusRaw
+                )
             }
             Button("Cancel", role: .cancel) {}
         } message: {
@@ -338,6 +370,11 @@ struct CommitmentDetailView: View {
                     }
                 }
             }
+        }
+        .alert("Couldn't Delete Commitment", isPresented: $showDeleteError) {
+            Button("OK") {}
+        } message: {
+            Text("Something went wrong while deleting. Please try again.")
         }
         .sheet(isPresented: $showingCustomReminder) {
             customReminderSheet
@@ -370,17 +407,29 @@ struct CommitmentDetailView: View {
     }
 
     private func deleteCommitment() {
+        let commitmentID = commitment.id
+        let entityName = commitment.entityName
+        let summary = commitment.summary
         // Remove calendar event if linked
         if let eventID = commitment.calendarEventID {
             calendarService.removeEvent(identifier: eventID)
         }
         // Remove notifications
         let notificationService = NotificationService()
-        notificationService.removeNotifications(for: commitment.id)
+        notificationService.removeNotifications(for: commitmentID)
         // Delete from SwiftData
         modelContext.delete(commitment)
-        try? modelContext.save()
-        dismiss()
+        do {
+            try modelContext.save()
+            WatchSyncService.shared.sendCommitmentUpdate(
+                id: commitmentID, action: "deleted",
+                entityName: entityName, summary: summary,
+                statusRaw: "deleted"
+            )
+            dismiss()
+        } catch {
+            showDeleteError = true
+        }
     }
 
     private func addToCalendar() {
@@ -419,14 +468,20 @@ struct CommitmentDetailView: View {
         guard let assetID = commitment.screenshotAssetID,
               !assetID.starts(with: "share-") else { return }
 
+        isLoadingScreenshot = true
+
         let results = PHAsset.fetchAssets(withLocalIdentifiers: [assetID], options: nil)
-        guard let asset = results.firstObject else { return }
+        guard let asset = results.firstObject else {
+            isLoadingScreenshot = false
+            screenshotLoadFailed = true
+            return
+        }
 
         let options = PHImageRequestOptions()
         options.deliveryMode = .highQualityFormat
         options.isSynchronous = false
 
-        screenshotImage = await withCheckedContinuation { continuation in
+        let image: UIImage? = await withCheckedContinuation { continuation in
             PHImageManager.default().requestImage(
                 for: asset,
                 targetSize: CGSize(width: 600, height: 600),
@@ -435,6 +490,14 @@ struct CommitmentDetailView: View {
             ) { image, _ in
                 continuation.resume(returning: image)
             }
+        }
+
+        // Timeout: if we got here within 15s, just check result
+        isLoadingScreenshot = false
+        if let image {
+            screenshotImage = image
+        } else {
+            screenshotLoadFailed = true
         }
     }
 

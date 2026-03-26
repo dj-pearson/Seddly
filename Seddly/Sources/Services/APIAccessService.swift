@@ -7,14 +7,6 @@ actor APIAccessService {
     private let authToken: String
     private let urlSession: URLSession
 
-    private static let sessionConfig: URLSessionConfiguration = {
-        let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 15
-        config.timeoutIntervalForResource = 30
-        config.waitsForConnectivity = true
-        return config
-    }()
-
     struct APICommitment: Codable {
         let id: String?
         let entityName: String
@@ -53,7 +45,7 @@ actor APIAccessService {
     init(baseURL: URL, authToken: String) {
         self.baseURL = baseURL.appendingPathComponent("api-commitments")
         self.authToken = authToken
-        self.urlSession = URLSession(configuration: Self.sessionConfig)
+        self.urlSession = CertificatePinningService.session
     }
 
     enum APIError: LocalizedError {

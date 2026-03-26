@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import WatchConnectivity
 
 // MARK: - AuthService Environment Key
 
@@ -25,19 +26,44 @@ struct SeddlyApp: App {
     private let authService: AuthService
     @State private var deepLinkCommitmentID: String?
     @State private var showDeepLinkNotFound = false
+    @State private var showMigrationError = false
+    private let migrationErrorMessage: String?
 
     init() {
+        var migrationError: String?
         do {
             modelContainer = try SharedModelContainer.create()
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            migrationError = error.localizedDescription
+            // Fall back to a fresh in-memory container so the app doesn't crash
+            do {
+                let schema = Schema([
+                    LocalCommitment.self,
+                    LocalEntity.self,
+                    ProcessingQueue.self,
+                    PrivacyAuditEntry.self,
+                    CustomWorkflow.self
+                ])
+                let fallbackConfig = ModelConfiguration(
+                    schema: schema,
+                    isStoredInMemoryOnly: true
+                )
+                modelContainer = try ModelContainer(for: schema, configurations: [fallbackConfig])
+            } catch {
+                fatalError("Failed to create even in-memory ModelContainer: \(error)")
+            }
         }
+        self.migrationErrorMessage = migrationError
 
         // Read Supabase credentials from Info.plist
         let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
         let supabaseKey = Bundle.main.infoDictionary?["SUPABASE_KEY"] as? String ?? ""
         let supabaseURL = URL(string: supabaseURLString) ?? URL(string: "https://placeholder.supabase.co")!
         authService = AuthService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+
+        if migrationError == nil {
+            WatchSyncService.shared.activate(with: modelContainer)
+        }
 
         Task {
             await BackgroundTaskService.shared.registerBackgroundTasks()
@@ -58,6 +84,16 @@ struct SeddlyApp: App {
                     Button("OK", role: .cancel) {}
                 } message: {
                     Text("This commitment is not on this device.")
+                }
+                .alert("Data Migration Issue", isPresented: $showMigrationError) {
+                    Button("OK", role: .cancel) {}
+                } message: {
+                    Text("Your data could not be migrated. The app is running with temporary storage. Please reinstall the app or contact support to restore your data.")
+                }
+                .onAppear {
+                    if migrationErrorMessage != nil {
+                        showMigrationError = true
+                    }
                 }
         }
         .modelContainer(modelContainer)

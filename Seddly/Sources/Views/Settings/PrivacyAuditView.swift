@@ -8,6 +8,7 @@ struct PrivacyAuditView: View {
 
     @State private var exportText: String?
     @State private var showExportSheet = false
+    @State private var showExportError = false
 
     private var totalCharsSent: Int {
         entries.reduce(0) { $0 + $1.textLengthSent }
@@ -37,6 +38,11 @@ struct PrivacyAuditView: View {
                 }
                 .disabled(entries.isEmpty)
             }
+        }
+        .alert("Export Failed", isPresented: $showExportError) {
+            Button("OK") {}
+        } message: {
+            Text("Couldn't generate the privacy audit report. Please try again.")
         }
         .sheet(isPresented: $showExportSheet) {
             if let exportText {
@@ -123,9 +129,12 @@ struct PrivacyAuditView: View {
     private func generateExport() {
         let service = PrivacyAuditService()
         Task {
-            if let text = try? await service.exportReport(context: modelContext) {
+            do {
+                let text = try await service.exportReport(context: modelContext)
                 exportText = text
                 showExportSheet = true
+            } catch {
+                showExportError = true
             }
         }
     }

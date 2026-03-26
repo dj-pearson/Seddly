@@ -11,6 +11,10 @@ struct AICoachView: View {
     @State private var processedResults: [CoachResult] = []
     @State private var isProcessing = false
     @State private var currentImage: UIImage?
+    @ScaledMetric(relativeTo: .title) private var largeIconSize: CGFloat = 60
+    @ScaledMetric(relativeTo: .title) private var mediumIconSize: CGFloat = 50
+    @ScaledMetric(relativeTo: .body) private var topSpacing: CGFloat = 40
+    @ScaledMetric(relativeTo: .body) private var sectionSpacing: CGFloat = 20
 
     struct CoachResult: Identifiable {
         let id = UUID()
@@ -48,10 +52,10 @@ struct AICoachView: View {
 
     private var introStep: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 40)
+            Spacer().frame(height: topSpacing)
 
             Image(systemName: "sparkles")
-                .font(.system(size: 60))
+                .font(.system(size: largeIconSize))
                 .foregroundStyle(.accent)
 
             Text("Let's See Seddly in Action")
@@ -87,7 +91,7 @@ struct AICoachView: View {
 
     private var processingStep: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 20)
+            Spacer().frame(height: sectionSpacing)
 
             if let image = currentImage {
                 Image(uiImage: image)
@@ -126,10 +130,10 @@ struct AICoachView: View {
 
     private var resultsStep: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 20)
+            Spacer().frame(height: sectionSpacing)
 
             Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 50))
+                .font(.system(size: mediumIconSize))
                 .foregroundStyle(.green)
 
             Text("Analysis Complete")
@@ -168,10 +172,10 @@ struct AICoachView: View {
 
     private var completeStep: some View {
         VStack(spacing: 24) {
-            Spacer().frame(height: 40)
+            Spacer().frame(height: topSpacing)
 
             Image(systemName: "hand.thumbsup.fill")
-                .font(.system(size: 60))
+                .font(.system(size: largeIconSize))
                 .foregroundStyle(.accent)
 
             Text("You're All Set")
@@ -300,13 +304,14 @@ struct AICoachView: View {
 private struct CoachBullet: View {
     let number: Int
     let text: String
+    @ScaledMetric(relativeTo: .caption) private var bulletSize: CGFloat = 24
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.caption.bold())
                 .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
+                .frame(width: bulletSize, height: bulletSize)
                 .background(.accent)
                 .clipShape(Circle())
             Text(text)
@@ -319,12 +324,13 @@ private struct CoachStatusRow: View {
     let icon: String
     let label: String
     let done: Bool
+    @ScaledMetric(relativeTo: .subheadline) private var iconWidth: CGFloat = 24
 
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: done ? "checkmark.circle.fill" : icon)
                 .foregroundStyle(done ? .green : .secondary)
-                .frame(width: 24)
+                .frame(width: iconWidth)
             Text(label)
                 .font(.subheadline)
                 .foregroundStyle(done ? .primary : .secondary)
@@ -334,6 +340,7 @@ private struct CoachStatusRow: View {
 
 private struct CoachResultCard: View {
     let result: AICoachView.CoachResult
+    @ScaledMetric(relativeTo: .body) private var thumbnailSize: CGFloat = 50
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -341,7 +348,7 @@ private struct CoachResultCard: View {
                 Image(uiImage: result.image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: 50, height: 50)
+                    .frame(width: thumbnailSize, height: thumbnailSize)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
 
                 VStack(alignment: .leading, spacing: 2) {

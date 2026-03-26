@@ -16,6 +16,9 @@ struct LedgerView: View {
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
     @State private var showingBulkAction = false
+    @State private var showingDismissConfirm = false
+    @State private var showingFulfillConfirm = false
+    @State private var pendingSwipeCommitment: LocalCommitment?
     @State private var showingAIReview = false
     @State private var pendingAIText: String?
     @State private var pendingAICallback: ((String?) -> Void)?
@@ -149,6 +152,38 @@ struct LedgerView: View {
                 }
                 Button("Cancel", role: .cancel) {}
             }
+            .alert("Dismiss Commitment?", isPresented: $showingDismissConfirm) {
+                Button("Dismiss", role: .destructive) {
+                    if let commitment = pendingSwipeCommitment {
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                        viewModel.dismiss(commitment)
+                    }
+                    pendingSwipeCommitment = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingSwipeCommitment = nil
+                }
+            } message: {
+                if let commitment = pendingSwipeCommitment {
+                    Text("\"\(commitment.summary)\" will be dismissed. You can undo this from the commitment detail view.")
+                }
+            }
+            .alert("Mark as Fulfilled?", isPresented: $showingFulfillConfirm) {
+                Button("Fulfill") {
+                    if let commitment = pendingSwipeCommitment {
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                        viewModel.fulfill(commitment)
+                    }
+                    pendingSwipeCommitment = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingSwipeCommitment = nil
+                }
+            } message: {
+                if let commitment = pendingSwipeCommitment {
+                    Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this from the commitment detail view.")
+                }
+            }
             .sheet(isPresented: $showingAIReview) {
                 if let text = pendingAIText {
                     AITextReviewView(
@@ -257,16 +292,16 @@ struct LedgerView: View {
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            viewModel.dismiss(commitment)
+                            pendingSwipeCommitment = commitment
+                            showingDismissConfirm = true
                         } label: {
                             Label("Dismiss", systemImage: "xmark")
                         }
                     }
                     .swipeActions(edge: .leading) {
                         Button {
-                            UINotificationFeedbackGenerator().notificationOccurred(.success)
-                            viewModel.fulfill(commitment)
+                            pendingSwipeCommitment = commitment
+                            showingFulfillConfirm = true
                         } label: {
                             Label("Fulfilled", systemImage: "checkmark")
                         }
@@ -290,9 +325,52 @@ struct LedgerView: View {
                 }
             }
         }
+        .refreshable {
+            await refreshLedger()
+        }
         .navigationDestination(for: LocalCommitment.self) { commitment in
             CommitmentDetailView(commitment: commitment)
         }
+    }
+
+    private func refreshLedger() async {
+        await StatusUpdateService.processAndUpdateBadge(in: modelContext)
+
+        if subscriptionService.currentTier >= .pro {
+            let processingService = ScreenshotProcessingService()
+            let lastProcessed = UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
+                .object(forKey: "lastProcessedDate") as? Date
+
+            let result = await processingService.processNewScreenshots(
+                since: lastProcessed,
+                context: modelContext,
+                aiEndpoint: nil,
+                subscriptionTier: subscriptionService.currentTier,
+                autoAnalyze: autoAnalyze,
+                offlineMode: offlineMode
+            )
+
+            withAnimation {
+                newCommitmentsCount = result.commitmentsDetected
+            }
+
+            if newCommitmentsCount > 0 {
+                try? await Task.sleep(for: .seconds(5))
+                withAnimation { newCommitmentsCount = 0 }
+            }
+        }
+
+        if subscriptionService.currentTier == .proPlus, isSignedIn {
+            if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+               let supabaseURL = URL(string: supabaseURLString),
+               let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
+                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+                try? await syncService.pullCommitments(context: modelContext)
+                try? await syncService.syncCommitments(context: modelContext)
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private var backfillReviewBanner: some View {

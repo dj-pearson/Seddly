@@ -10,7 +10,11 @@ struct IPadLedgerView: View {
     @State private var selectedCommitment: LocalCommitment?
     @State private var showingManualEntry = false
     @State private var showingFilter = false
+    @State private var showingDismissConfirm = false
+    @State private var showingFulfillConfirm = false
+    @State private var pendingSwipeCommitment: LocalCommitment?
     @State private var columnVisibility = NavigationSplitViewVisibility.all
+    @AppStorage("isSignedIn") private var isSignedIn = false
 
     private var visibleCommitments: [LocalCommitment] {
         viewModel.applyHistoryLimit(Array(commitments), tier: subscriptionService.currentTier)
@@ -27,6 +31,36 @@ struct IPadLedgerView: View {
         .navigationSplitViewStyle(.balanced)
         .sheet(isPresented: $showingManualEntry) {
             ManualEntryView()
+        }
+        .alert("Dismiss Commitment?", isPresented: $showingDismissConfirm) {
+            Button("Dismiss", role: .destructive) {
+                if let commitment = pendingSwipeCommitment {
+                    viewModel.dismiss(commitment)
+                }
+                pendingSwipeCommitment = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingSwipeCommitment = nil
+            }
+        } message: {
+            if let commitment = pendingSwipeCommitment {
+                Text("\"\(commitment.summary)\" will be dismissed. You can undo this from the commitment detail view.")
+            }
+        }
+        .alert("Mark as Fulfilled?", isPresented: $showingFulfillConfirm) {
+            Button("Fulfill") {
+                if let commitment = pendingSwipeCommitment {
+                    viewModel.fulfill(commitment)
+                }
+                pendingSwipeCommitment = nil
+            }
+            Button("Cancel", role: .cancel) {
+                pendingSwipeCommitment = nil
+            }
+        } message: {
+            if let commitment = pendingSwipeCommitment {
+                Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this from the commitment detail view.")
+            }
         }
         .sheet(isPresented: $showingFilter) {
             FilterView(
@@ -110,19 +144,24 @@ struct IPadLedgerView: View {
                 .tag(commitment)
                 .swipeActions(edge: .trailing) {
                     Button(role: .destructive) {
-                        viewModel.dismiss(commitment)
+                        pendingSwipeCommitment = commitment
+                        showingDismissConfirm = true
                     } label: {
                         Label("Dismiss", systemImage: "xmark")
                     }
                 }
                 .swipeActions(edge: .leading) {
                     Button {
-                        viewModel.fulfill(commitment)
+                        pendingSwipeCommitment = commitment
+                        showingFulfillConfirm = true
                     } label: {
                         Label("Fulfilled", systemImage: "checkmark")
                     }
                     .tint(.green)
                 }
+        }
+        .refreshable {
+            await refreshLedger()
         }
         .navigationTitle(viewModel.filterEntityName ?? "All Commitments")
         .searchable(text: $viewModel.searchText, prompt: "Search commitments")
@@ -145,6 +184,24 @@ struct IPadLedgerView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Refresh
+
+    private func refreshLedger() async {
+        await StatusUpdateService.processAndUpdateBadge(in: modelContext)
+
+        if subscriptionService.currentTier == .proPlus, isSignedIn {
+            if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
+               let supabaseURL = URL(string: supabaseURLString),
+               let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
+                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+                try? await syncService.pullCommitments(context: modelContext)
+                try? await syncService.syncCommitments(context: modelContext)
+            }
+        }
+
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     // MARK: - Detail pane

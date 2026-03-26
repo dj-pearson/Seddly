@@ -3,10 +3,12 @@ import SwiftData
 
 actor DisputeSummaryService {
     private let endpointURL: URL
+    private let authToken: String?
     private let privacyAuditService = PrivacyAuditService()
 
-    init(endpointURL: URL) {
+    init(endpointURL: URL, authToken: String? = nil) {
         self.endpointURL = endpointURL
+        self.authToken = authToken
     }
 
     struct SummaryResponse: Codable {
@@ -37,12 +39,19 @@ actor DisputeSummaryService {
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let authToken {
+            request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        }
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await CertificatePinningService.session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse,
               (200...299).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            if statusCode == 401 {
+                throw DisputeSummaryError.unauthorized
+            }
             throw DisputeSummaryError.serverError
         }
 
@@ -97,9 +106,13 @@ actor DisputeSummaryService {
 
     enum DisputeSummaryError: LocalizedError {
         case serverError
+        case unauthorized
 
         var errorDescription: String? {
-            "Failed to generate dispute summary. A local summary will be used instead."
+            switch self {
+            case .serverError: "Failed to generate dispute summary. A local summary will be used instead."
+            case .unauthorized: "Authentication expired. Please sign in again."
+            }
         }
     }
 }

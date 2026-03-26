@@ -55,7 +55,7 @@ actor SyncService {
                 withJSONObject: payload.compactMapValues { $0 }
             )
 
-            let (_, response) = try await URLSession.shared.data(for: request)
+            let (_, response) = try await CertificatePinningService.session.data(for: request)
 
             if let httpResponse = response as? HTTPURLResponse,
                (200...299).contains(httpResponse.statusCode) {
@@ -76,7 +76,7 @@ actor SyncService {
         request.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
         request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
 
-        let (data, _) = try await URLSession.shared.data(for: request)
+        let (data, _) = try await CertificatePinningService.session.data(for: request)
 
         struct RemoteCommitment: Codable {
             let id: String

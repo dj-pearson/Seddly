@@ -14,6 +14,26 @@ final class LedgerViewModel {
     var filterAmountMax: Double?
     var searchText = ""
 
+    // MARK: - Pagination
+
+    static let pageSize = 50
+    var displayedCount = 50
+    var isLoadingMore = false
+    var hasMoreItems = false
+
+    func loadNextPage() {
+        guard hasMoreItems, !isLoadingMore else { return }
+        isLoadingMore = true
+        displayedCount += Self.pageSize
+        isLoadingMore = false
+    }
+
+    func resetPagination() {
+        displayedCount = Self.pageSize
+        isLoadingMore = false
+        hasMoreItems = false
+    }
+
     var hasActiveFilters: Bool {
         filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil || filterCategory != nil || filterAmountMin != nil
     }
@@ -80,23 +100,28 @@ final class LedgerViewModel {
             }
         }
 
+        let sorted: [LocalCommitment]
         switch sortOrder {
         case .deadline:
-            return filtered.sorted {
+            sorted = filtered.sorted {
                 ($0.deadline ?? .distantFuture) < ($1.deadline ?? .distantFuture)
             }
         case .entity:
-            return filtered.sorted { $0.entityName < $1.entityName }
+            sorted = filtered.sorted { $0.entityName < $1.entityName }
         case .dateAdded:
-            return filtered.sorted { $0.createdAt > $1.createdAt }
+            sorted = filtered.sorted { $0.createdAt > $1.createdAt }
         case .status:
             let statusPriority: [CommitmentStatus: Int] = [
                 .overdue: 0, .pending: 1, .disputed: 2, .fulfilled: 3, .dismissed: 4
             ]
-            return filtered.sorted {
+            sorted = filtered.sorted {
                 (statusPriority[$0.status] ?? 5) < (statusPriority[$1.status] ?? 5)
             }
         }
+
+        // Apply pagination
+        hasMoreItems = sorted.count > displayedCount
+        return Array(sorted.prefix(displayedCount))
     }
 
     /// Applies history limits based on subscription tier.
@@ -126,6 +151,11 @@ final class LedgerViewModel {
         if commitment.source == .auto {
             ClassifierFeedbackService.recordAutoDetection()
         }
+        WatchSyncService.shared.sendCommitmentUpdate(
+            id: commitment.id, action: "updated",
+            entityName: commitment.entityName, summary: commitment.summary,
+            statusRaw: commitment.statusRaw
+        )
     }
 
     func dismiss(_ commitment: LocalCommitment) {
@@ -135,6 +165,11 @@ final class LedgerViewModel {
         if commitment.source == .auto {
             ClassifierFeedbackService.recordDismissal()
         }
+        WatchSyncService.shared.sendCommitmentUpdate(
+            id: commitment.id, action: "updated",
+            entityName: commitment.entityName, summary: commitment.summary,
+            statusRaw: commitment.statusRaw
+        )
     }
 
     // MARK: - Bulk Edit
@@ -167,6 +202,11 @@ final class LedgerViewModel {
         for commitment in commitments where selectedCommitments.contains(commitment.id) {
             commitment.status = status
             commitment.updatedAt = .now
+            WatchSyncService.shared.sendCommitmentUpdate(
+                id: commitment.id, action: "updated",
+                entityName: commitment.entityName, summary: commitment.summary,
+                statusRaw: commitment.statusRaw
+            )
         }
         clearSelection()
     }

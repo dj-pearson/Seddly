@@ -12,6 +12,8 @@ struct FilterView: View {
     @Binding var amountMax: Double?
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \LocalEntity.name) private var entities: [LocalEntity]
+    @ScaledMetric(relativeTo: .caption) private var statusDotSize: CGFloat = 10
+    @ScaledMetric(relativeTo: .body) private var categoryIconWidth: CGFloat = 20
 
     var body: some View {
         NavigationStack {
@@ -31,11 +33,13 @@ struct FilterView: View {
                             HStack {
                                 Circle()
                                     .fill(colorForStatus(status))
-                                    .frame(width: 10, height: 10)
+                                    .frame(width: statusDotSize, height: statusDotSize)
+                                    .accessibilityLabel("\(status.label) status")
                                 filterRow(label: status.label, isSelected: selectedStatus == status)
                             }
                         }
                         .foregroundStyle(.primary)
+                        .accessibilityLabel("Filter by \(status.label)\(selectedStatus == status ? ", selected" : "")")
                     }
                 }
 
@@ -74,7 +78,7 @@ struct FilterView: View {
                         } label: {
                             HStack {
                                 Image(systemName: category.icon)
-                                    .frame(width: 20)
+                                    .frame(width: categoryIconWidth)
                                 filterRow(label: category.label, isSelected: selectedCategory == category)
                             }
                         }
