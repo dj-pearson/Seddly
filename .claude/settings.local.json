@@ -22,7 +22,8 @@
       "Bash(grep -r \"func test\\\\|@Test\" /c/Users/dpearson/Documents/Seddly/SeddlyTests --include=*.swift)",
       "Bash(grep -r \"isOverdue\\\\|status.*overdue\\\\|updateStatus\" /c/Users/dpearson/Documents/Seddly/Seddly/Sources/Services --include=*.swift)",
       "Bash(xargs -0 ls -1)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(python:*)"
     ]
   }
 }

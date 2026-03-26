@@ -1,369 +1,877 @@
 {
     "project": "Seddly",
-    "branchName": "ralph/remaining-gaps-completion",
-    "description": "Complete all remaining gaps across the Seddly PRD — entitlements, auto-status updates, calendar permissions, CI/CD updates, tests, UX polish, and deployment config",
+    "branchName": "ralph/loop3-deep-audit",
+    "description": "Deep audit across UI/UX, Performance, Functionality, and Security — 50 user stories covering error handling, accessibility, security hardening, performance optimization, missing features, and website/backend gaps",
     "ralphLoop": {
-      "currentLoop": 2,
-      "lastReviewDate": "2026-03-24",
-      "passingCount": 24,
-      "totalCount": 24,
-      "completionRate": "100%",
+      "currentLoop": 3,
+      "lastReviewDate": "2026-03-26",
+      "passingCount": 0,
+      "totalCount": 50,
+      "completionRate": "0%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "All 24 user stories implemented. Entitlements fixed, services wired, tests written, CI/CD updated, deep links connected, Supabase migrations added. Ship it."
+      "verdict": "Deep audit identified 50 new user stories across Security (critical), Performance, UI/UX, Functionality, and Website/Backend. Zero passing — work begins."
     },
+    "previousLoops": [
+      {
+        "loop": 1,
+        "date": "2026-03-23",
+        "passingCount": 0,
+        "totalCount": 24,
+        "verdict": "Initial PRD review — 0/24 passing"
+      },
+      {
+        "loop": 2,
+        "date": "2026-03-24",
+        "passingCount": 24,
+        "totalCount": 24,
+        "verdict": "All 24 user stories implemented. Ship it."
+      }
+    ],
     "userStories": [
       {
-        "id": "US-001",
-        "title": "Add missing entitlements to Seddly.entitlements",
-        "description": "As a developer, I need the entitlements file to declare all capabilities the app uses so that code signing and App Review succeed.",
+        "id": "US-025",
+        "title": "Add authentication to extract-commitments Edge Function",
+        "category": "Security",
+        "description": "As a developer, I need the extract-commitments endpoint to require authentication so unauthenticated users can't drain AI credits.",
         "acceptanceCriteria": [
-          "Seddly/Resources/Seddly.entitlements includes com.apple.developer.applesignin with default scope",
-          "Seddly/Resources/Seddly.entitlements includes com.apple.security.application-groups with group.com.pearsonmedia.Seddly",
-          "Seddly/Resources/Seddly.entitlements includes aps-environment set to development",
+          "extract-commitments/index.ts validates Authorization bearer token before processing",
+          "Returns 401 with error message if token missing or invalid",
+          "Token is verified against Supabase auth (same pattern as api-commitments)",
+          "Existing iOS client sends auth token in request header",
           "Typecheck passes"
         ],
         "priority": 1,
-        "passes": true,
-        "notes": "Added com.apple.developer.applesignin, com.apple.developer.associated-domains entitlements. App Groups and aps-environment were already present."
+        "passes": false,
+        "notes": "CRITICAL: Currently a public endpoint with no auth. Anyone can call it and incur Anthropic API costs."
       },
       {
-        "id": "US-002",
-        "title": "Add NSCalendarsUsageDescription to Info.plist",
-        "description": "As a user, I need to see a clear permission dialog when Seddly requests calendar access so I understand why it's needed.",
+        "id": "US-026",
+        "title": "Add authentication to generate-dispute-summary Edge Function",
+        "category": "Security",
+        "description": "As a developer, I need the generate-dispute-summary endpoint to require authentication so only authenticated users can generate summaries.",
         "acceptanceCriteria": [
-          "Seddly/Resources/Info.plist includes NSCalendarsUsageDescription with text explaining Seddly creates calendar events for commitment deadlines",
-          "Seddly/Resources/Info.plist includes NSCalendarsFullAccessUsageDescription with similar text",
+          "generate-dispute-summary/index.ts validates Authorization bearer token before processing",
+          "Returns 401 with error message if token missing or invalid",
+          "CORS origin changed from wildcard '*' to specific domain whitelist",
+          "DisputeSummaryService.swift sends auth token in request header",
+          "Typecheck passes"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "CRITICAL: Currently public endpoint with CORS set to '*'. Anyone can call from any origin."
+      },
+      {
+        "id": "US-027",
+        "title": "Implement JWS signature verification in subscription-webhook",
+        "category": "Security",
+        "description": "As a developer, I need the subscription webhook to cryptographically verify Apple's JWS signatures so tampered payloads are rejected.",
+        "acceptanceCriteria": [
+          "subscription-webhook/index.ts verifies JWS signature against Apple's public key certificate chain",
+          "Rejects payloads with invalid signatures (returns 400)",
+          "Logs verification failures for monitoring",
+          "Comment acknowledging incomplete verification is removed",
+          "Typecheck passes"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "CRITICAL: Current implementation decodes but does not verify JWS signatures. A malicious actor could craft fake subscription events."
+      },
+      {
+        "id": "US-028",
+        "title": "Add rate limiting to AI Edge Functions",
+        "category": "Security",
+        "description": "As a developer, I need rate limiting on expensive AI endpoints to prevent abuse and cost overruns.",
+        "acceptanceCriteria": [
+          "extract-commitments limits to 10 requests per minute per authenticated user",
+          "generate-dispute-summary limits to 5 requests per minute per authenticated user",
+          "Rate limit state stored in Deno KV or Supabase",
+          "Returns 429 Too Many Requests with Retry-After header when exceeded",
           "Typecheck passes"
         ],
         "priority": 2,
-        "passes": true,
-        "notes": "CalendarService calls requestFullAccessToEvents() but Info.plist has no calendar usage description. App will crash on first calendar access without this."
+        "passes": false,
+        "notes": "No rate limiting on any Edge Function. AI endpoints are expensive — a single abusive user could generate large bills."
       },
       {
-        "id": "US-003",
-        "title": "Build auto-status update service for overdue commitments",
-        "description": "As a user, I want commitments to automatically show as overdue when their deadline passes so I don't have to manually update them.",
+        "id": "US-029",
+        "title": "Implement token refresh and expiration handling in AuthService",
+        "category": "Security",
+        "description": "As a Pro+ user, I need my authentication to refresh automatically so I don't get silently logged out when my token expires.",
         "acceptanceCriteria": [
-          "Create Seddly/Sources/Services/StatusUpdateService.swift",
-          "Service scans all pending commitments and updates status to .overdue if deadline < now",
-          "Service is called on app foreground in LedgerView processOnForeground()",
-          "Service is called during background task processing in BackgroundTaskService",
+          "AuthService stores refresh token in Keychain alongside access token",
+          "AuthService checks token expiration before API calls",
+          "When access token is expired, automatically refreshes using refresh token",
+          "On 401 response from any API call, triggers token refresh and retries once",
+          "If refresh fails, sets isSignedIn to false and shows re-auth prompt",
+          "Typecheck passes"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Current AuthService stores access token but never checks expiration or refreshes. All API calls will fail silently after token expires."
+      },
+      {
+        "id": "US-030",
+        "title": "Add input validation and length limits on AI extraction",
+        "category": "Security",
+        "description": "As a developer, I need input validation before sending text to AI to prevent abuse and control costs.",
+        "acceptanceCriteria": [
+          "AIExtractionService validates text length (max 10,000 characters) before sending",
+          "AIExtractionService validates UTF-8 encoding",
+          "ScreenshotProcessingService checks text length before calling extractWithAI()",
+          "extract-commitments Edge Function validates text field length and type",
+          "Returns descriptive error message when validation fails",
+          "Typecheck passes"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "OCR text sent directly to AI with no length or encoding validation. A 100KB OCR text from a dense screenshot could be expensive."
+      },
+      {
+        "id": "US-031",
+        "title": "Add certificate pinning for network calls",
+        "category": "Security",
+        "description": "As a security-conscious user, I need the app to pin SSL certificates for API calls to prevent MITM attacks.",
+        "acceptanceCriteria": [
+          "Create a shared URLSession configuration with certificate pinning for supabase.co domain",
+          "AIExtractionService, SyncService, APIAccessService, DisputeSummaryService all use the pinned session",
+          "Pinning uses public key pinning (not certificate pinning) for rotation resilience",
+          "Include backup pin for key rotation",
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": true,
-        "notes": "Currently isOverdue is a computed property but statusRaw never actually changes to overdue. Entity overdueCount relies on both the stored status and the computed property, creating inconsistency."
+        "passes": false,
+        "notes": "All network calls use URLSession.shared with no certificate pinning. MITM attacks could intercept AI requests and auth tokens."
       },
       {
-        "id": "US-004",
-        "title": "Add New badge to recently detected commitments",
-        "description": "As a user, I want to see which commitments were just detected so I know what's new since my last visit.",
+        "id": "US-032",
+        "title": "Add confirmation dialogs for swipe dismiss/fulfill actions",
+        "category": "UX",
+        "description": "As a user, I want a confirmation before swipe actions permanently change commitment status so I don't accidentally dismiss important items.",
         "acceptanceCriteria": [
-          "Add lastViewedDate tracking via UserDefaults (updated when user opens the app)",
-          "CommitmentCardView shows a small 'New' badge for commitments created after lastViewedDate",
-          "Badge disappears after the commitment has been on screen for one session",
+          "LedgerView swipe-to-dismiss shows confirmation alert with commitment summary before executing",
+          "LedgerView swipe-to-fulfill shows confirmation alert before executing",
+          "IPadLedgerView has the same confirmation dialogs",
+          "User can cancel the swipe action from the alert",
+          "Confirmation includes undo hint text",
+          "Typecheck passes"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Swipe actions immediately change status with no confirmation. Users report accidentally dismissing commitments."
+      },
+      {
+        "id": "US-033",
+        "title": "Add pull-to-refresh to LedgerView",
+        "category": "UX",
+        "description": "As a user, I want to pull-to-refresh my commitment list to trigger a manual scan for new screenshots.",
+        "acceptanceCriteria": [
+          "LedgerView List has .refreshable() modifier",
+          "Pull-to-refresh calls processOnForeground() logic (check screenshots, update statuses)",
+          "For Pro+ users, also triggers SyncService.pullCommitments()",
+          "Shows haptic feedback when refresh completes",
+          "IPadLedgerView also has pull-to-refresh",
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": true,
-        "notes": "PRD §10.2 specifies new commitments should be highlighted with a New badge."
+        "passes": false,
+        "notes": "Currently no way to manually trigger refresh — only happens automatically on app foreground."
       },
       {
-        "id": "US-005",
-        "title": "Add review banner after first backfill",
-        "description": "As a new user, I want a subtle banner telling me to review my commitments after the initial backfill scan.",
+        "id": "US-034",
+        "title": "Add error states and retry buttons throughout the app",
+        "category": "UX",
+        "description": "As a user, I want to see clear error messages with retry options when operations fail, instead of silent failures.",
         "acceptanceCriteria": [
-          "After BackfillView completes with commitments found, set a flag in UserDefaults",
-          "LedgerView shows a dismissible banner: 'Review your commitments — tap any to edit or dismiss'",
-          "Banner is only shown once (dismissed on tap or after first commitment interaction)",
+          "ClipboardCommitmentView shows error alert if saveCommitment() fails (not silent try?)",
+          "CommitmentDetailView shows error alert if deleteCommitment() fails",
+          "EntityProfileView shows retry button if dispute summary generation fails",
+          "PrivacyAuditView shows error if export fails (not silent try?)",
+          "ManualEntryView shows error feedback if commitment save fails",
+          "All error messages are user-friendly (not raw error descriptions)",
+          "Typecheck passes"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "Multiple views use try? to swallow errors silently. Users get no feedback when operations fail."
+      },
+      {
+        "id": "US-035",
+        "title": "Add loading states for async operations",
+        "category": "UX",
+        "description": "As a user, I want to see loading indicators when the app is processing so I know it's working.",
+        "acceptanceCriteria": [
+          "CommitmentDetailView shows ProgressView while screenshot loads asynchronously",
+          "ManualEntryView shows loading spinner on Save button during save",
+          "PrivacyInfoView shows ProgressView while loadPhotoInfo() runs",
+          "EntityProfileView shows ProgressView during initial data load",
+          "All loading states have a timeout (15s) after which an error state is shown",
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": true,
-        "notes": "PRD §10.1 step 7 specifies this banner."
+        "passes": false,
+        "notes": "Several async operations have no loading indicators, making the app feel unresponsive."
       },
       {
-        "id": "US-006",
-        "title": "Add app badge count for overdue commitments",
-        "description": "As a user, I want to see the number of overdue commitments on the app icon so I know at a glance if I have unresolved issues.",
+        "id": "US-036",
+        "title": "Add comprehensive accessibility labels and hints",
+        "category": "Accessibility",
+        "description": "As a VoiceOver user, I need all interactive elements and status indicators to have descriptive labels so I can use the app effectively.",
         "acceptanceCriteria": [
-          "App badge number is set to the count of overdue commitments after each foreground processing run",
-          "Badge updates during background task processing",
-          "Badge is cleared when there are no overdue commitments",
-          "Uses UNUserNotificationCenter.current().setBadgeCount()",
+          "CommitmentCardView status icon has accessibilityLabel describing current status (e.g., 'Status: Overdue')",
+          "ConfidenceBadgeView has accessibilityLabel explaining score meaning (e.g., 'Confidence: High, 9 out of 10')",
+          "DeadlineIndicatorView has accessibilityLabel with urgency text (not just color)",
+          "FilterView status circles have accessibilityLabel for each status name",
+          "EntityProfileView timeline nodes have text labels (not just colors)",
+          "All color-only indicators have text alternatives",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "Multiple views rely on color alone to convey status/urgency. Color-blind and VoiceOver users cannot distinguish states."
+      },
+      {
+        "id": "US-037",
+        "title": "Add Dynamic Type scaling for fixed-size elements",
+        "category": "Accessibility",
+        "description": "As a user with low vision, I need all UI elements to scale with Dynamic Type so text and controls are readable at my preferred size.",
+        "acceptanceCriteria": [
+          "ConfidenceBadgeView frame uses @ScaledMetric instead of fixed 24x24",
+          "DeadlineIndicatorView uses @ScaledMetric for sizing",
+          "AICoachView progress bar scales with Dynamic Type",
+          "All fixed-width/height frames on text elements use @ScaledMetric",
+          "App tested at accessibility XXL text size without layout breaks",
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": true,
-        "notes": ""
+        "passes": false,
+        "notes": "Several views use fixed frame sizes that don't scale with Dynamic Type, making them unreadable at large text sizes."
       },
       {
-        "id": "US-007",
-        "title": "Update CI workflow to include Watch target",
-        "description": "As a developer, I need CI to build the Watch target so regressions are caught before merge.",
+        "id": "US-038",
+        "title": "Add filter amount validation and form feedback",
+        "category": "UX",
+        "description": "As a user, I need form validation to prevent invalid filter/input configurations.",
         "acceptanceCriteria": [
-          ".github/workflows/ci.yml builds SeddlyWatch target alongside main targets",
-          ".github/workflows/release.yml includes SeddlyWatch in archive and export",
+          "FilterView validates min amount <= max amount and shows inline error if invalid",
+          "ManualEntryView validates dollarAmount is positive number format",
+          "ManualEntryView shows inline error messages under invalid fields (not just disabled button)",
+          "Entity name input has max length (100 characters) with character counter",
+          "Summary text input has max length (500 characters) with character counter",
+          "Typecheck passes"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "FilterView allows min > max amounts. ManualEntryView disables save button with no explanation of what's wrong."
+      },
+      {
+        "id": "US-039",
+        "title": "Implement WatchConnectivity for bidirectional sync",
+        "category": "Functionality",
+        "description": "As a Watch user, I need changes on my Watch to sync to my iPhone and vice versa so I always see current data.",
+        "acceptanceCriteria": [
+          "SeddlyApp activates WCSession on launch",
+          "SeddlyWatchApp activates WCSession on launch",
+          "When a commitment is created/updated/deleted on iPhone, sends update to Watch via transferUserInfo()",
+          "When a commitment is fulfilled on Watch, sends update to iPhone",
+          "Handles reachability changes gracefully (queues updates when Watch is not reachable)",
+          "WatchLedgerView shows sync status indicator",
+          "Typecheck passes"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "CRITICAL GAP: Watch and iPhone maintain completely separate databases. Changes on one device never appear on the other."
+      },
+      {
+        "id": "US-040",
+        "title": "Add SwiftData migration strategy",
+        "category": "Functionality",
+        "description": "As a developer, I need a data migration strategy so schema changes in future updates don't lose user data.",
+        "acceptanceCriteria": [
+          "SharedModelContainer.create() includes a MigrationPlan",
+          "MigrationPlan defines schema versions (V1 = current schema)",
+          "MigrationPlan includes a migration stage from V1 to V2 (even if empty, as template)",
+          "App handles migration failures gracefully with user notification",
+          "Unit test verifies migration plan is well-formed",
+          "Typecheck passes"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "No migration plan defined. Any model changes in a future update will crash the app for existing users."
+      },
+      {
+        "id": "US-041",
+        "title": "Add widget deep link support",
+        "category": "Functionality",
+        "description": "As a user, I want to tap a commitment in my widget to open that specific commitment in the app.",
+        "acceptanceCriteria": [
+          "SeddlyWidget uses .widgetURL() modifier with seddly://commitment/{id} URL",
+          "SeddlyApp handles seddly:// URL scheme in onOpenURL",
+          "Tapping a commitment in widget navigates to CommitmentDetailView",
+          "If multiple commitments shown, each has correct deep link",
+          "project.yml registers seddly:// URL scheme",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "Widget shows commitments but tapping only opens the app root. No deep linking to specific items."
+      },
+      {
+        "id": "US-042",
+        "title": "Add pagination for large commitment lists",
+        "category": "Performance",
+        "description": "As a power user with hundreds of commitments, I need the app to load data in pages so it doesn't freeze.",
+        "acceptanceCriteria": [
+          "LedgerViewModel loads commitments in pages of 50",
+          "Scroll-to-bottom triggers next page load with loading indicator",
+          "SyncService.pullCommitments() uses limit/offset pagination (max 100 per request)",
+          "ScreenshotProcessingService.processNewScreenshots() limits to 100 screenshots per batch",
+          "SmartBackfillService limits to 100 screenshots per backfill run",
+          "Typecheck passes"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "All data loaded unbounded. Users with 1000+ commitments will experience freezes. SmartBackfillService loads all photos at once."
+      },
+      {
+        "id": "US-043",
+        "title": "Optimize N+1 queries in sync and processing pipelines",
+        "category": "Performance",
+        "description": "As a developer, I need batch data fetching to eliminate N+1 query patterns that cause slowdowns.",
+        "acceptanceCriteria": [
+          "SyncService.pullCommitments() fetches all local commitment IDs into a Set before the loop (not query per item)",
+          "ScreenshotProcessingService.processNewScreenshots() fetches all ProcessingQueue asset IDs into a Set before the loop",
+          "ClassifierFeedbackService.currentThreshold() result is cached once per processing batch (not called per screenshot)",
+          "No single-item fetch inside a loop that iterates over more than 10 items",
+          "Typecheck passes"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "SyncService queries for each remote commitment individually. ScreenshotProcessingService queries ProcessingQueue per screenshot."
+      },
+      {
+        "id": "US-044",
+        "title": "Add request deduplication for AI and summary services",
+        "category": "Performance",
+        "description": "As a developer, I need request deduplication to prevent wasted network calls and duplicate processing.",
+        "acceptanceCriteria": [
+          "DisputeSummaryService tracks in-flight requests by entity ID and returns existing result if duplicate",
+          "ScreenshotProcessingService skips screenshots that already have commitments extracted",
+          "AIExtractionService tracks in-flight extraction requests and deduplicates",
+          "Deduplication state is cleared after 60 seconds to allow retries",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "Same screenshot or entity can trigger duplicate AI calls. No deduplication mechanism exists."
+      },
+      {
+        "id": "US-045",
+        "title": "Create custom 404 page for marketing website",
+        "category": "Website",
+        "description": "As a visitor who hits a broken link, I want a helpful 404 page that guides me back to the site.",
+        "acceptanceCriteria": [
+          "website/src/pages/404.astro exists using BaseLayout",
+          "Page shows 'Page not found' message with Seddly branding",
+          "Includes links to homepage, how-it-works, and support",
+          "Has proper title and meta tags (no indexing: noindex, nofollow)",
+          "Astro builds successfully"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "No 404 page exists. Visitors hitting broken links see Astro's default error page."
+      },
+      {
+        "id": "US-046",
+        "title": "Add cookie consent banner for GDPR/CCPA compliance",
+        "category": "Website",
+        "description": "As a website visitor from EU/California, I need to consent to analytics before any tracking begins.",
+        "acceptanceCriteria": [
+          "BaseLayout.astro includes a cookie consent banner at bottom of page",
+          "Banner explains what data is collected (analytics only, no personal data)",
+          "Accept and Decline buttons are provided",
+          "Consent choice is stored in localStorage",
+          "No analytics scripts load until consent is given",
+          "Banner does not show again after choice is made",
+          "Banner is accessible (keyboard navigable, screen reader compatible)",
+          "Astro builds successfully"
+        ],
+        "priority": 4,
+        "passes": false,
+        "notes": "Privacy Policy mentions analytics but no consent mechanism exists. Required for GDPR/CCPA compliance."
+      },
+      {
+        "id": "US-047",
+        "title": "Add JSON-LD Article schema to blog posts",
+        "category": "Website",
+        "description": "As a content marketer, I need structured data on blog posts so they appear as rich results in Google search.",
+        "acceptanceCriteria": [
+          "Each blog post .astro file includes JSON-LD Article schema",
+          "Schema includes @type: Article, headline, datePublished, author, description",
+          "Author is set to 'Seddly Team' with organization type",
+          "datePublished matches the published date shown on the page",
+          "Schema validates with Google's Rich Results Test",
+          "Astro builds successfully"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "Blog posts have title/description meta tags but no JSON-LD structured data. Missing SEO opportunity."
+      },
+      {
+        "id": "US-048",
+        "title": "Add web manifest and favicon size variants",
+        "category": "Website",
+        "description": "As a mobile visitor, I need a web manifest and properly sized favicons for PWA-like behavior and bookmark icons.",
+        "acceptanceCriteria": [
+          "website/public/manifest.json exists with name, short_name, icons, theme_color, background_color, display: standalone",
+          "BaseLayout.astro references manifest.json via <link rel='manifest'>",
+          "favicon-16x16.png and favicon-32x32.png exist in website/public/",
+          "BaseLayout references PNG favicon variants for browsers that don't support SVG",
+          "og-image.png exists (1200x630) for social sharing — convert existing SVG",
+          "apple-touch-icon.png exists (180x180) — convert existing SVG",
+          "Astro builds successfully"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "Only SVG favicon exists. Many browsers/platforms need PNG variants. No manifest.json for PWA support."
+      },
+      {
+        "id": "US-049",
+        "title": "Add keyboard focus styles and ARIA attributes to website",
+        "category": "Website",
+        "description": "As a keyboard-only user, I need visible focus indicators and proper ARIA attributes to navigate the website.",
+        "acceptanceCriteria": [
+          "BaseLayout.astro adds :focus-visible styles for all interactive elements (links, buttons)",
+          "Focus indicator is clearly visible (minimum 2px outline with offset)",
+          "Nav toggle button has aria-controls linking to nav-links id",
+          "nav-links div has id attribute matching aria-controls",
+          "Skip-to-content link is first focusable element",
+          "All interactive elements are reachable via Tab key",
+          "Astro builds successfully"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "No :focus-visible styles defined. Nav toggle has aria-expanded but missing aria-controls. No skip-to-content link."
+      },
+      {
+        "id": "US-050",
+        "title": "Add database indexes for frequently queried columns",
+        "category": "Performance",
+        "description": "As a developer, I need proper indexes on the Supabase database to prevent slow queries at scale.",
+        "acceptanceCriteria": [
+          "New migration adds index on commitments(user_id, confidence) for filtered queries",
+          "New migration adds index on privacy_audit_log(user_id, timestamp DESC) for time-range queries",
+          "New migration adds index on processing_log(device_id, processed_at DESC) for device analytics",
+          "New migration adds index on custom_workflows(user_id, created_at DESC) for listing",
+          "Dollar amount column changed to DECIMAL(10,2) for precision",
+          "Migration runs successfully"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "Missing indexes on confidence, timestamp, and processing_log. Dollar amount has no precision specified."
+      },
+      {
+        "id": "US-051",
+        "title": "Add state restoration for app UI",
+        "category": "UX",
+        "description": "As a user, I want the app to remember my last viewed screen, filters, and scroll position when I return.",
+        "acceptanceCriteria": [
+          "SeddlyApp saves selected tab (Ledger/Settings) to UserDefaults on scenePhase change to .background",
+          "SeddlyApp restores selected tab on launch",
+          "LedgerViewModel saves current filter and sort to UserDefaults",
+          "LedgerViewModel restores filter and sort on init",
+          "Deep link navigation state is preserved across app launches",
+          "Typecheck passes"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "App always opens to default state. No ScenePhase handling for saving UI state. Users lose context every time they switch apps."
+      },
+      {
+        "id": "US-052",
+        "title": "Add haptic feedback to key interactions",
+        "category": "UX",
+        "description": "As a user, I want haptic feedback on important actions so the app feels responsive and tactile.",
+        "acceptanceCriteria": [
+          "Status change in CommitmentDetailView triggers UIImpactFeedbackGenerator(.medium)",
+          "Adding to calendar triggers UINotificationFeedbackGenerator(.success)",
+          "Applying filters triggers UIImpactFeedbackGenerator(.light)",
+          "Bulk selection toggle triggers UISelectionFeedbackGenerator",
+          "Entity merge triggers UINotificationFeedbackGenerator(.success)",
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": true,
-        "notes": "SeddlyWatch target was added in Phase 4 but CI/CD doesn't reference it."
+        "passes": false,
+        "notes": "Only LedgerView swipe actions have haptic feedback. All other interactions feel flat."
       },
       {
-        "id": "US-008",
-        "title": "Add api-commitments to Supabase deploy workflow",
-        "description": "As a developer, I need the new api-commitments Edge Function deployed alongside the other functions.",
+        "id": "US-053",
+        "title": "Fix Share Extension error handling and memory management",
+        "category": "Functionality",
+        "description": "As a user sharing screenshots to Seddly, I need the share extension to handle errors gracefully and not lose data.",
         "acceptanceCriteria": [
-          ".github/workflows/deploy-supabase.yml deploys api-commitments function",
-          "Function is listed alongside extract-commitments, generate-dispute-summary, subscription-webhook, send-silent-push",
+          "ShareViewController shows user-visible error if ModelContext save fails (not silent try?)",
+          "Image loading checks available memory before processing full-resolution images",
+          "Processing has a 10-second timeout with user notification if exceeded",
+          "Failed saves are queued for retry on next app launch",
+          "RuleFilterService score is called once per text (not twice)",
           "Typecheck passes"
         ],
-        "priority": 8,
-        "passes": true,
-        "notes": "api-commitments Edge Function was added in Phase 4 but deploy workflow only deploys the original 4 functions."
+        "priority": 4,
+        "passes": false,
+        "notes": "Share Extension uses silent try? for saves, loads images without memory checks, and calls ruleFilterService.score() twice."
       },
       {
-        "id": "US-009",
-        "title": "Add unit tests for CommitmentSharingService",
-        "description": "As a developer, I need tests for the sharing service to prevent regressions in reminder message and evidence summary generation.",
+        "id": "US-054",
+        "title": "Add SyncService client-side batching and rate limiting",
+        "category": "Performance",
+        "description": "As a developer, I need SyncService to batch uploads and respect rate limits to prevent network storms.",
         "acceptanceCriteria": [
-          "Test generateReminderMessage produces correct format with entity name, summary, deadline",
-          "Test generateReminderMessage shows days overdue for past deadlines",
-          "Test generateEvidenceSummary includes all commitment fields",
-          "Tests use Swift Testing framework (@Test, #expect)",
+          "SyncService.syncCommitments() uploads in batches of 50 with 500ms delay between batches",
+          "SyncService.pullCommitments() pages results with limit=100 and cursor-based pagination",
+          "Client-side rate limiting prevents more than 1 sync per 30 seconds",
+          "Sync progress is reportable (X of Y items synced)",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "SyncService pushes all items in a loop with no batching. Pull fetches all remote commitments at once."
+      },
+      {
+        "id": "US-055",
+        "title": "Add unit tests for untested critical services",
+        "category": "Testing",
+        "description": "As a developer, I need test coverage for critical services that currently have zero tests.",
+        "acceptanceCriteria": [
+          "AuthService tests: signInWithApple stores token, signOut clears Keychain, isAuthenticated reads correctly",
+          "SubscriptionService tests: tier detection, Pro+ feature gating, transaction listener",
+          "BackgroundTaskService tests: registration, scheduling, expiration handling",
+          "OCRService tests: text extraction from sample image, empty image handling",
+          "ScreenshotProcessingService tests: end-to-end pipeline with mock AI, duplicate detection",
+          "All tests use Swift Testing framework (@Test, #expect)",
           "Tests pass"
         ],
-        "priority": 9,
-        "passes": true,
-        "notes": ""
+        "priority": 3,
+        "passes": false,
+        "notes": "18 of 26 services have zero test coverage. Critical paths (auth, sync, subscription, processing) are completely untested."
       },
       {
-        "id": "US-010",
-        "title": "Add unit tests for EscalationTemplateService",
-        "description": "As a developer, I need tests for escalation letter generation to ensure templates produce correctly formatted letters.",
+        "id": "US-056",
+        "title": "Add integration tests for critical pipelines",
+        "category": "Testing",
+        "description": "As a developer, I need integration tests covering the full screenshot-to-commitment pipeline and sync flow.",
         "acceptanceCriteria": [
-          "Test generateLetter for housing category includes landlord-specific language",
-          "Test generateLetter for freelance category includes payment-specific language",
-          "Test generateLetter populates commitment timeline with real data",
-          "Test availableTemplates returns all non-personal categories",
-          "Tests use Swift Testing framework (@Test, #expect)",
+          "Integration test: Screenshot → OCR → Classifier → RuleFilter → AI → Commitment creation",
+          "Integration test: Commitment created locally → SyncService push → verify remote state",
+          "Integration test: Remote commitment → SyncService pull → verify local state",
+          "Integration test: Share Extension → ProcessingQueue → Background processing → Commitment",
+          "Tests use in-memory ModelContainer and mock network calls",
           "Tests pass"
         ],
-        "priority": 10,
-        "passes": true,
-        "notes": ""
+        "priority": 4,
+        "passes": false,
+        "notes": "No integration tests exist. Only unit tests for individual services."
       },
       {
-        "id": "US-011",
-        "title": "Add unit tests for CommitmentTemplate model",
-        "description": "As a developer, I need tests for commitment templates to verify all presets have valid data.",
+        "id": "US-057",
+        "title": "Add Siri Shortcuts for mark-as-fulfilled and entity lookup",
+        "category": "Functionality",
+        "description": "As a power user, I want Siri Shortcuts to mark commitments as fulfilled and check specific entities without opening the app.",
         "acceptanceCriteria": [
-          "Test allTemplates has 9 entries",
-          "Test each template has non-empty name, icon, defaultSummary",
-          "Test templates cover housing, freelance, purchases, medical, insurance categories",
-          "Tests use Swift Testing framework (@Test, #expect)",
-          "Tests pass"
-        ],
-        "priority": 11,
-        "passes": true,
-        "notes": ""
-      },
-      {
-        "id": "US-012",
-        "title": "Add unit tests for PrivacyAuditService",
-        "description": "As a developer, I need tests for the privacy audit service to verify audit entries are recorded correctly and reports generate properly.",
-        "acceptanceCriteria": [
-          "Test recordAIExtraction creates a PrivacyAuditEntry with correct eventType and textLength",
-          "Test recordDisputeSummary creates entry with commitment count in summary",
-          "Test generateReport returns correct counts and totals",
-          "Test exportReport produces formatted text with all sections",
-          "Tests use Swift Testing framework (@Test, #expect) with in-memory ModelContainer",
-          "Tests pass"
-        ],
-        "priority": 12,
-        "passes": true,
-        "notes": ""
-      },
-      {
-        "id": "US-013",
-        "title": "Add unit tests for LocalEntity accountability score",
-        "description": "As a developer, I need tests for the accountability score and grade calculations on LocalEntity.",
-        "acceptanceCriteria": [
-          "Test accountabilityScore returns 0 for entity with no commitments",
-          "Test accountabilityScore returns 100 for entity with all fulfilled",
-          "Test accountabilityScore penalizes overdue commitments",
-          "Test accountabilityGrade returns A for 90+, B for 80+, etc.",
-          "Test shareableScoreCard contains entity name and score",
-          "Tests use Swift Testing framework (@Test, #expect)",
-          "Tests pass"
-        ],
-        "priority": 13,
-        "passes": true,
-        "notes": ""
-      },
-      {
-        "id": "US-014",
-        "title": "Add unit tests for LedgerViewModel history limits",
-        "description": "As a developer, I need tests for the tier-based history limit logic to verify free/pro/pro+ limits work correctly.",
-        "acceptanceCriteria": [
-          "Test applyHistoryLimit with .free tier filters out commitments older than 30 days",
-          "Test applyHistoryLimit with .pro tier filters out commitments older than 1 year",
-          "Test applyHistoryLimit with .proPlus tier returns all commitments",
-          "Test bulk edit operations (bulkUpdateStatus, bulkUpdateCategory) update selected commitments",
-          "Tests use Swift Testing framework (@Test, #expect)",
-          "Tests pass"
-        ],
-        "priority": 14,
-        "passes": true,
-        "notes": ""
-      },
-      {
-        "id": "US-015",
-        "title": "Add unit tests for ClipboardMonitorService",
-        "description": "As a developer, I need tests for clipboard monitoring to verify commitment detection thresholds.",
-        "acceptanceCriteria": [
-          "Test that text under 30 characters is ignored",
-          "Test that text below confidence threshold does not trigger prompt",
-          "Test that text above confidence threshold sets showClipboardPrompt to true",
-          "Test dismiss() resets all state",
-          "Tests use Swift Testing framework (@Test, #expect)",
-          "Tests pass"
-        ],
-        "priority": 15,
-        "passes": true,
-        "notes": ""
-      },
-      {
-        "id": "US-016",
-        "title": "Wire Share Sheet Edit option for detected commitments",
-        "description": "As a user sharing a screenshot to Seddly, I want an Edit option to modify the detected commitment before adding it to my ledger.",
-        "acceptanceCriteria": [
-          "ShareViewController showConfirmUI adds an Edit button alongside Add to Ledger and Skip",
-          "Edit button navigates to a simple form with entity name and summary fields pre-filled from detected text",
-          "User can modify fields before confirming",
+          "MarkFulfilledIntent: accepts commitment summary text, finds matching commitment, marks as fulfilled",
+          "CheckEntityIntent: accepts entity name, returns accountability score and overdue count",
+          "UpdateDeadlineIntent: accepts commitment and new date, updates deadline",
+          "All intents have Siri suggestion phrases",
+          "SeddlyShortcuts provider includes all new intents",
           "Typecheck passes"
         ],
-        "priority": 16,
-        "passes": true,
-        "notes": "PRD §10.4 step 5 says share sheet should have Confirm/Edit/Skip options. Currently only has Add to Ledger and Skip."
+        "priority": 7,
+        "passes": false,
+        "notes": "Only 2 Siri Shortcuts exist (add commitment, check overdue). Missing key workflows like marking fulfilled or checking entities."
       },
       {
-        "id": "US-017",
-        "title": "Add deep link handling for commitment share URLs",
-        "description": "As a user, I want to open seddly.com/c/ links in the app to view shared commitment reminders.",
+        "id": "US-058",
+        "title": "Add offline mode indicator and Pro feature warnings",
+        "category": "UX",
+        "description": "As a user, I want to know when I'm offline and when Pro features are unavailable so I'm not confused by silent failures.",
         "acceptanceCriteria": [
-          "SeddlyApp handles universal links for seddly.com/c/{id} pattern",
-          "When opened, navigates to the commitment detail view if the commitment exists locally",
-          "If commitment not found, shows a message that the commitment is not on this device",
-          "Add associated domains entitlement for applinks:seddly.com",
+          "LedgerView shows 'Offline' banner at top when network is unreachable",
+          "When offline and user tries AI extraction, show clear message that AI requires internet",
+          "When offline and user tries sync, show clear message that sync requires internet",
+          "Banner auto-dismisses when connectivity is restored",
+          "Uses NWPathMonitor for reliable connectivity detection",
           "Typecheck passes"
         ],
-        "priority": 17,
-        "passes": true,
-        "notes": "CommitmentSharingService.generateShareableLink creates seddly.com/c/ URLs but the app doesn't handle them."
+        "priority": 5,
+        "passes": false,
+        "notes": "App has offline toggle in Settings but no automatic offline detection or user-facing indicators."
       },
       {
-        "id": "US-018",
-        "title": "Add Watch entitlements and Info.plist",
-        "description": "As a developer, I need proper entitlements and Info.plist for the Watch target so it builds and runs correctly.",
+        "id": "US-059",
+        "title": "Add onboarding navigation improvements",
+        "category": "UX",
+        "description": "As a new user, I want to navigate back through onboarding steps and see my progress clearly.",
         "acceptanceCriteria": [
-          "SeddlyWatch/Info.plist exists with WKCompanionAppBundleIdentifier set to com.pearsonmedia.Seddly",
-          "SeddlyWatch/SeddlyWatch.entitlements exists with App Groups entitlement matching main app",
-          "project.yml references the Watch entitlements file",
+          "OnboardingView allows swiping back to previous pages",
+          "Back button visible on pages 2+",
+          "Progress indicator shows current step clearly (not just dots)",
+          "Skip button available on every page",
+          "Final page has clear CTA to start using the app",
           "Typecheck passes"
         ],
-        "priority": 18,
-        "passes": true,
-        "notes": "Watch target was added in Phase 4 but has no entitlements or Info.plist files."
+        "priority": 7,
+        "passes": false,
+        "notes": "OnboardingView uses TabView with pagination but no back button. Users can't revisit earlier steps."
       },
       {
-        "id": "US-019",
-        "title": "Add Supabase migration for custom workflow and privacy audit tables",
-        "description": "As a developer, I need database tables for Phase 4 models that sync to Supabase for Pro+ users.",
+        "id": "US-060",
+        "title": "Add CI code quality checks and build caching",
+        "category": "DevOps",
+        "description": "As a developer, I need CI to enforce code quality and cache builds so PRs are validated faster.",
         "acceptanceCriteria": [
-          "New migration file adds privacy_audit_log table with columns: id, user_id, timestamp, event_type, destination, data_summary, text_length_sent, commitment_id",
-          "New migration file adds custom_workflows table with columns: id, user_id, name, steps (jsonb), is_default, created_at",
-          "Both tables have RLS policies restricting access to own data",
-          "Typecheck passes"
+          "ci.yml adds SwiftLint step after build (fail on errors, warn on warnings)",
+          "ci.yml adds build caching (Xcode derived data or buildcache-action)",
+          "ci.yml adds test coverage reporting (minimum 60% coverage gate)",
+          "deploy-website.yml adds HTML output validation step before deploy",
+          "deploy-supabase.yml adds deno lint and deno check steps before deploy",
+          "XcodeGen version is pinned in ci.yml",
+          "All workflows pass"
         ],
-        "priority": 19,
-        "passes": true,
-        "notes": "PrivacyAuditEntry and CustomWorkflow are in SwiftData but have no Supabase counterpart for Pro+ sync."
+        "priority": 6,
+        "passes": false,
+        "notes": "CI builds and tests but has no quality gates, no caching, and no code coverage reporting. Each build starts from scratch."
       },
       {
-        "id": "US-020",
-        "title": "Add commitments category_raw and custom workflow fields to Supabase",
-        "description": "As a developer, I need the Supabase commitments table to include the new Phase 4 fields for full sync support.",
+        "id": "US-061",
+        "title": "Add Edge Function structured logging and audit trail",
+        "category": "Security",
+        "description": "As a developer, I need structured logging in Edge Functions for debugging and security monitoring.",
         "acceptanceCriteria": [
-          "New migration adds calendar_event_id (text, nullable) column to commitments table",
-          "New migration adds custom_status_label (text, nullable) column to commitments table",
-          "New migration adds workflow_id (uuid, nullable) column to commitments table",
-          "SyncService push and pull handle the new fields",
-          "Typecheck passes"
+          "All Edge Functions log with structured format: { timestamp, requestId, action, userId, statusCode }",
+          "extract-commitments logs extraction requests to privacy_audit_log table",
+          "generate-dispute-summary logs summary generation to privacy_audit_log table",
+          "Error logs include correlation ID for request tracing",
+          "No PII (email, names, text content) is included in log messages",
+          "Sensitive errors return generic messages to client while logging details server-side"
         ],
-        "priority": 20,
-        "passes": true,
-        "notes": "LocalCommitment has calendarEventID, customStatusLabel, workflowID fields that don't sync to Supabase."
+        "priority": 5,
+        "passes": false,
+        "notes": "Edge Functions use console.log with no structure. No audit trail for AI operations. Debugging production issues is nearly impossible."
       },
       {
-        "id": "US-021",
-        "title": "Add PersistenceService implementation",
-        "description": "As a developer, I need the PersistenceService stub to be implemented or removed to avoid confusion.",
+        "id": "US-062",
+        "title": "Add cascade delete rules and soft delete support",
+        "category": "Functionality",
+        "description": "As a developer, I need proper delete cascades and soft delete for data integrity and compliance.",
         "acceptanceCriteria": [
-          "If PersistenceService is used, implement it with methods for common SwiftData operations",
-          "If PersistenceService is not used, delete the file and remove any references",
+          "LocalCommitment relationship to entity uses .nullify delete rule (commitment survives entity deletion)",
+          "CustomWorkflow references use .nullify delete rule",
+          "Supabase migration adds deleted_at TIMESTAMPTZ column to commitments and entities tables",
+          "SyncService respects soft delete (marks deleted_at instead of hard delete)",
+          "Privacy Policy 30-day retention is enforced via pg_cron job that hard-deletes after 30 days",
           "Typecheck passes"
         ],
-        "priority": 21,
-        "passes": true,
-        "notes": "PersistenceService.swift exists in Services but was not examined. Need to check if it's a stub or fully implemented."
+        "priority": 5,
+        "passes": false,
+        "notes": "Privacy Policy promises 30-day retention after deletion, but migrations use hard CASCADE deletes. No soft delete mechanism exists."
       },
       {
-        "id": "US-022",
-        "title": "Add Apple Sign-In UI to Settings for Pro+ account creation",
-        "description": "As a Pro+ user, I need a Sign in with Apple button in Settings to create an account for cloud sync.",
+        "id": "US-063",
+        "title": "Add UserDefaults consistency across app group",
+        "category": "Functionality",
+        "description": "As a developer, I need all UserDefaults access to use the app group suite so data is shared correctly between app and extensions.",
         "acceptanceCriteria": [
-          "SettingsView shows a Sign in with Apple button in the Subscription section when user is on Pro+ tier and not authenticated",
-          "Button triggers ASAuthorizationAppleIDProvider flow",
-          "On success, calls AuthService.signInWithApple() and shows confirmation",
-          "Shows current account status if already signed in",
+          "All UserDefaults reads/writes use UserDefaults(suiteName: appGroupIdentifier)",
+          "NotificationService uses app group suite (not standard UserDefaults)",
+          "SettingsView AppStorage uses app group suite for settings shared with extensions",
+          "Audit of all @AppStorage and UserDefaults.standard usages confirms no standard defaults for shared state",
           "Typecheck passes"
         ],
-        "priority": 22,
-        "passes": true,
-        "notes": "AuthService exists with signInWithApple() but no UI presents the Sign in with Apple button anywhere."
+        "priority": 6,
+        "passes": false,
+        "notes": "Some services use app group UserDefaults, others use standard. Data stored in standard is invisible to Share Extension and Widget."
       },
       {
-        "id": "US-023",
-        "title": "Wire SyncService into app lifecycle for Pro+ users",
-        "description": "As a Pro+ user, I want my commitments to sync automatically when I open the app.",
+        "id": "US-064",
+        "title": "Add ScreenshotProcessingService caching and batching",
+        "category": "Performance",
+        "description": "As a developer, I need the processing pipeline to cache intermediate results and batch operations for efficiency.",
         "acceptanceCriteria": [
-          "SyncService.syncCommitments() is called on app foreground when user is Pro+ and authenticated",
-          "SyncService.pullCommitments() is called on app foreground to fetch remote changes",
-          "Sync only runs if user has an active Pro+ subscription and valid auth token",
-          "Privacy audit records cloud sync events",
+          "Entity lookups are cached for the duration of a processing batch (not fetched per commitment)",
+          "ClassifierFeedbackService.currentThreshold() is called once before the loop (not per screenshot)",
+          "OCR results are cached in ProcessingQueue to avoid re-processing the same screenshot",
+          "Maximum 100 screenshots processed per batch with continuation token for next batch",
+          "AI extraction responses are validated (max 100 commitments per response)",
           "Typecheck passes"
         ],
-        "priority": 23,
-        "passes": true,
-        "notes": "SyncService exists with push/pull methods but is never called from the app lifecycle."
+        "priority": 5,
+        "passes": false,
+        "notes": "Processing pipeline has redundant fetches inside loops. No caching. No batch size limits."
       },
       {
-        "id": "US-024",
-        "title": "Add website apple-app-site-association file for universal links",
-        "description": "As a developer, I need the AASA file on seddly.com so universal links work for commitment sharing.",
+        "id": "US-065",
+        "title": "Add caching layer for PhotoKit and network responses",
+        "category": "Performance",
+        "description": "As a developer, I need caching to prevent redundant PhotoKit queries and network calls.",
         "acceptanceCriteria": [
-          "website/public/.well-known/apple-app-site-association file exists",
-          "AASA file declares applinks for com.pearsonmedia.Seddly",
-          "Paths include /c/* for commitment share links",
-          "File is valid JSON with correct structure",
+          "ScreenshotService caches fetchNewScreenshots() results for 30 seconds",
+          "AIExtractionService caches extraction results by text hash for 5 minutes",
+          "APIAccessService caches listCommitments() results for 15 seconds",
+          "Cache is invalidated on relevant user actions (new screenshot detected, manual refresh)",
+          "Cache uses NSCache with memory-aware eviction",
           "Typecheck passes"
         ],
-        "priority": 24,
-        "passes": true,
-        "notes": "Needed for US-017 deep link handling to work."
+        "priority": 6,
+        "passes": false,
+        "notes": "Every call to services re-queries from scratch. No in-memory caching exists anywhere."
+      },
+      {
+        "id": "US-066",
+        "title": "Add undo support for commitment status changes",
+        "category": "UX",
+        "description": "As a user, I want to undo accidental status changes within a few seconds so I can recover from mistakes.",
+        "acceptanceCriteria": [
+          "After swipe-to-dismiss or swipe-to-fulfill, show a 5-second toast with Undo button",
+          "Undo reverts commitment to previous status",
+          "Toast auto-dismisses after 5 seconds, making the change permanent",
+          "Only one undo is active at a time (new action replaces previous undo)",
+          "Undo works for bulk status changes too",
+          "Typecheck passes"
+        ],
+        "priority": 7,
+        "passes": false,
+        "notes": "No undo mechanism exists. Accidental swipes permanently change commitment status."
+      },
+      {
+        "id": "US-067",
+        "title": "Add search to ReviewQueueView and EntityMergeView",
+        "category": "UX",
+        "description": "As a user with many items, I want to search within the review queue and entity merge views to find specific items quickly.",
+        "acceptanceCriteria": [
+          "ReviewQueueView has .searchable() modifier that filters by entity name and summary",
+          "EntityMergeView has .searchable() modifier that filters merge candidates by name",
+          "Search is case-insensitive",
+          "Empty search results show 'No matches' message",
+          "Typecheck passes"
+        ],
+        "priority": 7,
+        "passes": false,
+        "notes": "ReviewQueueView and EntityMergeView have no search. Hard to find items in large lists."
+      },
+      {
+        "id": "US-068",
+        "title": "Add confirmation notification after setting custom reminders",
+        "category": "UX",
+        "description": "As a user, I want confirmation that my custom reminder was scheduled so I trust it will fire.",
+        "acceptanceCriteria": [
+          "CommitmentDetailView shows success toast/banner after scheduling a custom reminder",
+          "Toast shows the reminder time in human-readable format (e.g., 'Reminder set for tomorrow at 9am')",
+          "If notification permission is denied, shows alert explaining how to enable in Settings",
+          "Toast auto-dismisses after 3 seconds",
+          "Typecheck passes"
+        ],
+        "priority": 7,
+        "passes": false,
+        "notes": "Custom reminder is scheduled with no user confirmation. User has no way to know if it was actually set."
+      },
+      {
+        "id": "US-069",
+        "title": "Add website color contrast fixes and focus styles",
+        "category": "Website",
+        "description": "As a website visitor, I need text to meet WCAG AA contrast ratios and all interactive elements to be keyboard-navigable.",
+        "acceptanceCriteria": [
+          "--color-text-muted (#8b8b94) on --color-bg (#0a0a0b) meets 4.5:1 ratio or is lightened",
+          "All body text on dark background meets WCAG AA (4.5:1 for normal, 3:1 for large)",
+          "CTA buttons have visible :focus-visible outline (2px, offset from element)",
+          "Skip-to-content link added as first focusable element in BaseLayout",
+          "Tab order follows logical reading order on all pages",
+          "Astro builds successfully"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "--color-text-muted (#8b8b94) on #0a0a0b has ~5.5:1 ratio (OK), but needs verification. No focus styles or skip-to-content link exist."
+      },
+      {
+        "id": "US-070",
+        "title": "Add SwiftData indexes on frequently queried local model fields",
+        "category": "Performance",
+        "description": "As a developer, I need local database indexes to prevent slow queries as users accumulate data.",
+        "acceptanceCriteria": [
+          "ProcessingQueue model adds @Attribute(.unique) or index on screenshotAssetID",
+          "PrivacyAuditEntry model adds index hint on timestamp field",
+          "LocalCommitment model adds index hints on statusRaw and deadline fields",
+          "Performance tested with 1000+ commitments to verify improvement",
+          "Typecheck passes"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "No index attributes on SwiftData models. ProcessingQueue.screenshotAssetID is queried in every processing loop without index."
+      },
+      {
+        "id": "US-071",
+        "title": "Add BackgroundTaskService internal timeout",
+        "category": "Performance",
+        "description": "As a developer, I need the background task to respect time budgets so iOS doesn't penalize the app for overrunning.",
+        "acceptanceCriteria": [
+          "BackgroundTaskService.processNewScreenshotsInBackground() has 25-second internal timeout",
+          "If timeout is reached, processing stops gracefully and saves partial progress",
+          "Remaining screenshots are picked up in the next background task run",
+          "Timeout is separate from (and shorter than) system expiration handler",
+          "Typecheck passes"
+        ],
+        "priority": 6,
+        "passes": false,
+        "notes": "No internal timeout. Relies entirely on system expiration handler which may arrive too late for clean shutdown."
+      },
+      {
+        "id": "US-072",
+        "title": "Add Supabase Edge Function input validation hardening",
+        "category": "Security",
+        "description": "As a developer, I need robust input validation on all Edge Functions to prevent malformed requests from causing errors.",
+        "acceptanceCriteria": [
+          "extract-commitments wraps req.json() in try-catch, returns 400 on malformed JSON",
+          "extract-commitments validates text is string, non-empty, max 10000 chars",
+          "generate-dispute-summary validates commitments is array, max 100 items, each has required fields",
+          "api-commitments validates all update fields against whitelist (no unexpected keys)",
+          "All validation errors return descriptive 400 responses with field-level errors",
+          "Typecheck passes"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Edge Functions accept input with minimal validation. Malformed JSON crashes handlers. No field-level validation."
+      },
+      {
+        "id": "US-073",
+        "title": "Add SubscriptionService tier change handling",
+        "category": "Functionality",
+        "description": "As a user who downgrades from Pro+ to Free, I need the app to gracefully handle reduced capabilities.",
+        "acceptanceCriteria": [
+          "When tier changes from Pro+ to Pro or Free, SyncService is disabled and user is notified",
+          "Cloud-synced commitments remain accessible locally but stop syncing",
+          "Active commitment count is enforced (Free tier: max 5 active)",
+          "AI extraction is disabled for Free tier with clear upgrade prompt",
+          "AuthService signs out when downgrading from Pro+ (Supabase account not needed)",
+          "Typecheck passes"
+        ],
+        "priority": 5,
+        "passes": false,
+        "notes": "No handling for subscription tier changes. Downgrading could leave the app in an inconsistent state with features that no longer work."
+      },
+      {
+        "id": "US-074",
+        "title": "Add Watch complication deep link and refresh improvements",
+        "category": "Functionality",
+        "description": "As a Watch user, I want to tap complications to open relevant content and see timely data.",
+        "acceptanceCriteria": [
+          "Watch complications use widgetURL to deep link into WatchLedgerView with specific filter",
+          "Complication shows most urgent overdue commitment (not just count)",
+          "Complication refresh rate adapts based on whether there are overdue items (faster when overdue)",
+          "WatchLedgerView has swipe-to-fulfill gesture on commitments",
+          "WatchLedgerView has a manual refresh button",
+          "Typecheck passes"
+        ],
+        "priority": 7,
+        "passes": false,
+        "notes": "Watch complications show static data. No deep links, no adaptive refresh, no fulfillment gestures."
       }
     ]
   }
-  
