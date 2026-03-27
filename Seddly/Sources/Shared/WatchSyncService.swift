@@ -48,6 +48,21 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
         transferUserInfo(userInfo)
     }
 
+    func requestSync() {
+        guard let session, session.activationState == .activated else { return }
+        syncStatus = .syncing
+        let message: [String: Any] = [
+            "action": "requestSync",
+            "timestamp": Date().timeIntervalSince1970
+        ]
+        if session.isReachable {
+            session.sendMessage(message, replyHandler: nil)
+        }
+        flushPendingTransfers()
+        syncStatus = session.isReachable ? .synced : .unreachable
+        lastSyncDate = Date()
+    }
+
     func sendFulfillment(commitmentID: UUID) {
         let userInfo: [String: Any] = [
             "action": "fulfilled",

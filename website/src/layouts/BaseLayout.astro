@@ -2,9 +2,10 @@
 interface Props {
   title: string;
   description?: string;
+  robots?: string;
 }
 
-const { title, description = "Every promise. Every deadline. Every receipt. Seddly turns your screenshots into an accountability system." } = Astro.props;
+const { title, description = "Every promise. Every deadline. Every receipt. Seddly turns your screenshots into an accountability system.", robots } = Astro.props;
 ---
 
 <!doctype html>
@@ -24,8 +25,12 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content="https://seddly.com/og-image.png" />
+    {robots && <meta name="robots" content={robots} />}
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="canonical" href={`https://seddly.com${Astro.url.pathname}`} />
     <title>{title}</title>
 
@@ -45,13 +50,14 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     })} />
   </head>
   <body>
+    <a href="#main-content" class="skip-to-content">Skip to content</a>
     <nav>
       <div class="nav-inner">
         <a href="/" class="logo">Seddly</a>
-        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false">
+        <button class="nav-toggle" aria-label="Toggle navigation" aria-expanded="false" aria-controls="nav-links">
           <span></span><span></span><span></span>
         </button>
-        <div class="nav-links">
+        <div class="nav-links" id="nav-links">
           <a href="/how-it-works">How It Works</a>
           <a href="/privacy">Privacy</a>
           <a href="/blog">Blog</a>
@@ -71,9 +77,61 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
       });
     </script>
 
-    <main>
+    <main id="main-content">
       <slot />
     </main>
+
+    <div id="cookie-consent" class="cookie-banner" role="dialog" aria-label="Cookie consent" aria-hidden="true">
+      <div class="cookie-inner">
+        <p class="cookie-text">We use analytics cookies to understand how visitors interact with our website. No personal data is collected. <a href="/privacy">Learn more</a></p>
+        <div class="cookie-actions">
+          <button id="cookie-decline" class="cookie-btn cookie-btn-decline">Decline</button>
+          <button id="cookie-accept" class="cookie-btn cookie-btn-accept">Accept</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        const consent = localStorage.getItem('seddly_cookie_consent');
+        if (consent === null) {
+          const banner = document.getElementById('cookie-consent');
+          if (banner) {
+            banner.setAttribute('aria-hidden', 'false');
+            banner.classList.add('visible');
+          }
+        } else if (consent === 'accepted') {
+          loadAnalytics();
+        }
+
+        document.getElementById('cookie-accept')?.addEventListener('click', () => {
+          localStorage.setItem('seddly_cookie_consent', 'accepted');
+          hideBanner();
+          loadAnalytics();
+        });
+
+        document.getElementById('cookie-decline')?.addEventListener('click', () => {
+          localStorage.setItem('seddly_cookie_consent', 'declined');
+          hideBanner();
+        });
+
+        function hideBanner() {
+          const banner = document.getElementById('cookie-consent');
+          if (banner) {
+            banner.classList.remove('visible');
+            banner.setAttribute('aria-hidden', 'true');
+          }
+        }
+
+        function loadAnalytics() {
+          // Analytics scripts load only after consent is given.
+          // Add analytics script tags here when ready, e.g.:
+          // const s = document.createElement('script');
+          // s.src = 'https://...';
+          // document.head.appendChild(s);
+        }
+      })();
+    </script>
 
     <footer>
       <div class="footer-inner">
@@ -133,6 +191,34 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
 
   a:hover {
     color: var(--color-accent-hover);
+  }
+
+  /* Focus styles for keyboard navigation */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .skip-to-content {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 300;
+    background: var(--color-accent);
+    color: white;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 0 0 8px 0;
+  }
+
+  .skip-to-content:focus {
+    left: 0;
   }
 
   nav {
@@ -246,6 +332,94 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
   }
   .nav-toggle[aria-expanded="true"] span:nth-child(3) {
     transform: rotate(-45deg) translate(5px, -5px);
+  }
+
+  .cookie-banner {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 200;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border);
+    padding: 1rem 2rem;
+  }
+
+  .cookie-banner.visible {
+    display: block;
+  }
+
+  .cookie-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+  }
+
+  .cookie-text {
+    color: var(--color-text-muted);
+    font-size: 0.85rem;
+    flex: 1;
+  }
+
+  .cookie-text a {
+    color: var(--color-accent);
+  }
+
+  .cookie-actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-shrink: 0;
+  }
+
+  .cookie-btn {
+    padding: 0.5rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    font-family: inherit;
+  }
+
+  .cookie-btn:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  .cookie-btn-decline {
+    background: transparent;
+    color: var(--color-text-muted);
+    border: 1px solid var(--color-border);
+  }
+
+  .cookie-btn-decline:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-muted);
+  }
+
+  .cookie-btn-accept {
+    background: var(--color-accent);
+    color: white;
+  }
+
+  .cookie-btn-accept:hover {
+    background: var(--color-accent-hover);
+  }
+
+  @media (max-width: 768px) {
+    .cookie-inner {
+      flex-direction: column;
+      text-align: center;
+    }
+
+    .cookie-actions {
+      width: 100%;
+      justify-content: center;
+    }
   }
 
   @media (max-width: 768px) {

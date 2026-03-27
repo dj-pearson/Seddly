@@ -5,6 +5,15 @@ actor AIExtractionService {
     private let endpointURL: URL
     private let authToken: String?
 
+    /// In-flight request deduplication: keyed by text hash, value is the pending Task.
+    private var inFlightRequests: [Int: Task<ExtractionResponse, Error>] = [:]
+    /// Timestamps for when each dedup entry was created, cleared after 60 seconds to allow retries.
+    private var inFlightTimestamps: [Int: Date] = [:]
+
+    /// Result cache: keyed by text hash, stores (response, timestamp) for 5-minute TTL.
+    private static let cacheTTL: TimeInterval = 300 // 5 minutes
+    private var resultCache: [Int: (response: ExtractionResponse, timestamp: Date)] = [:]
+
     struct ExtractionResponse: Codable {
         let commitments: [ExtractedCommitment]
         let rejected: [RejectedCommitment]
@@ -60,6 +69,40 @@ actor AIExtractionService {
             throw AIExtractionError.inputTooLong(length: text.count, max: Self.maxTextLength)
         }
 
+        // Check result cache first (5-minute TTL)
+        let textHash = text.hashValue
+        if let cached = resultCache[textHash],
+           Date().timeIntervalSince(cached.timestamp) < Self.cacheTTL {
+            return cached.response
+        }
+
+        // Deduplication: return existing in-flight request for same text
+        cleanupStaleDedup()
+
+        if let existing = inFlightRequests[textHash] {
+            return try await existing.value
+        }
+
+        let task = Task<ExtractionResponse, Error> {
+            try await performExtraction(text: text)
+        }
+        inFlightRequests[textHash] = task
+        inFlightTimestamps[textHash] = Date()
+
+        do {
+            let result = try await task.value
+            inFlightRequests.removeValue(forKey: textHash)
+            inFlightTimestamps.removeValue(forKey: textHash)
+            resultCache[textHash] = (response: result, timestamp: Date())
+            return result
+        } catch {
+            inFlightRequests.removeValue(forKey: textHash)
+            inFlightTimestamps.removeValue(forKey: textHash)
+            throw error
+        }
+    }
+
+    private func performExtraction(text: String) async throws -> ExtractionResponse {
         var request = URLRequest(url: endpointURL)
         request.httpMethod = "POST"
         request.timeoutInterval = 30
@@ -88,6 +131,16 @@ actor AIExtractionService {
         } catch {
             AppLogger.ai.error("Failed to decode AI extraction response: \(error.localizedDescription)")
             throw error
+        }
+    }
+
+    /// Removes deduplication entries older than 60 seconds to allow retries.
+    private func cleanupStaleDedup() {
+        let cutoff = Date().addingTimeInterval(-60)
+        for (hash, timestamp) in inFlightTimestamps where timestamp < cutoff {
+            inFlightRequests[hash]?.cancel()
+            inFlightRequests.removeValue(forKey: hash)
+            inFlightTimestamps.removeValue(forKey: hash)
         }
     }
 

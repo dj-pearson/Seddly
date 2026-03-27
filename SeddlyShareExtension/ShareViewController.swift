@@ -16,6 +16,9 @@ class ShareViewController: UIViewController {
     private var entityField: UITextField?
     private var summaryField: UITextField?
 
+    /// Maximum image dimension (pixels) to process — downscale larger images to stay within extension memory budget (~120 MB).
+    private static let maxImageDimension: CGFloat = 2048
+
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -62,25 +65,54 @@ class ShareViewController: UIViewController {
         }
 
         Task {
-            for item in extensionItems {
-                guard let attachments = item.attachments else { continue }
-
-                for attachment in attachments {
-                    if attachment.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                        let (text, summary) = await processImageAttachment(attachment)
-                        if let text {
-                            extractedText = text
-                            detectedSummary = summary
-                            await MainActor.run { showConfirmUI(text: text, summary: summary) }
-                            return // Wait for user action
+            let result: (String?, String?)? = await withTaskGroup(of: (String?, String?)?.self) { group in
+                group.addTask { [weak self] in
+                    guard let self else { return nil }
+                    for item in extensionItems {
+                        guard let attachments = item.attachments else { continue }
+                        for attachment in attachments {
+                            if attachment.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+                                let result = await self.processImageAttachment(attachment)
+                                if result.0 != nil { return result }
+                            }
                         }
                     }
+                    return nil
                 }
+
+                // 10-second timeout task
+                group.addTask {
+                    try? await Task.sleep(for: .seconds(10))
+                    return nil
+                }
+
+                // Return whichever finishes first
+                for await value in group {
+                    if let value {
+                        group.cancelAll()
+                        return value
+                    }
+                }
+                group.cancelAll()
+                return nil
             }
 
+            if let result, let text = result.0 {
+                extractedText = text
+                detectedSummary = result.1
+                await MainActor.run { showConfirmUI(text: text, summary: result.1) }
+                return
+            }
+
+            // Either no text found or timed out
             await MainActor.run {
-                titleLabel.text = "No commitments found"
-                summaryLabel.text = "This screenshot didn't contain detectable text."
+                if Task.isCancelled {
+                    titleLabel.text = "Processing timed out"
+                    summaryLabel.text = "The screenshot took too long to process. Try again from the app."
+                } else {
+                    titleLabel.text = "No commitments found"
+                    summaryLabel.text = "This screenshot didn't contain detectable text."
+                }
                 spinner.stopAnimating()
             }
 
@@ -145,10 +177,15 @@ class ShareViewController: UIViewController {
     }
 
     @objc private func confirmTapped() {
-        saveToQueue()
+        let success = saveToQueue()
 
-        titleLabel.text = "Added to Seddly"
-        summaryLabel.text = "Open Seddly to review."
+        if success {
+            titleLabel.text = "Added to Seddly"
+            summaryLabel.text = "Open Seddly to review."
+        } else {
+            titleLabel.text = "Save failed"
+            summaryLabel.text = "Couldn't save right now. Open Seddly — it will pick this up automatically."
+        }
         buttonStack.isHidden = true
 
         Task {
@@ -196,9 +233,15 @@ class ShareViewController: UIViewController {
 
     @objc private func saveEditTapped() {
         detectedSummary = summaryField?.text ?? detectedSummary
-        saveToQueue(entityName: entityField?.text)
-        titleLabel.text = "Added to Seddly"
-        summaryLabel.text = "Open Seddly to review."
+        let success = saveToQueue(entityName: entityField?.text)
+
+        if success {
+            titleLabel.text = "Added to Seddly"
+            summaryLabel.text = "Open Seddly to review."
+        } else {
+            titleLabel.text = "Save failed"
+            summaryLabel.text = "Couldn't save right now. Open Seddly — it will pick this up automatically."
+        }
         editContainer?.isHidden = true
 
         Task {
@@ -211,24 +254,26 @@ class ShareViewController: UIViewController {
         completeRequest()
     }
 
-    private func saveToQueue(entityName: String? = nil) {
-        guard let text = extractedText else { return }
+    /// Saves the extracted text to the processing queue and returns whether the save succeeded.
+    @discardableResult
+    private func saveToQueue(entityName: String? = nil) -> Bool {
+        guard let text = extractedText else { return false }
 
         do {
             let container = try SharedModelContainer.create()
             let context = ModelContext(container)
 
             let shareID = "share-\(UUID().uuidString)"
+            let score = RuleFilterService.score(text: text)
 
             // Save to processing queue for tracking
             let queueItem = ProcessingQueue(screenshotAssetID: shareID)
             queueItem.extractedText = text
-            queueItem.ruleBasedScore = RuleFilterService.score(text: text)
+            queueItem.ruleBasedScore = score
             queueItem.processingStatus = .completed
             context.insert(queueItem)
 
             // If rule filter passes threshold, create a commitment directly
-            let score = RuleFilterService.score(text: text)
             if score >= AppConstants.defaultConfidenceThreshold {
                 let commitment = LocalCommitment(
                     entityName: entityName ?? "Unknown",
@@ -243,8 +288,23 @@ class ShareViewController: UIViewController {
             }
 
             try context.save()
+
+            // Clear any pending retry since we succeeded
+            UserDefaults(suiteName: SharedConstants.appGroupIdentifier)?.removeObject(forKey: "pendingShareRetry")
+
+            return true
         } catch {
-            // Silently fail — the screenshot will be picked up on next app launch
+            // Queue for retry on next app launch
+            let retryData: [String: String] = [
+                "text": text,
+                "summary": detectedSummary ?? "",
+                "entityName": entityName ?? "",
+                "shareID": "share-\(UUID().uuidString)",
+            ]
+            if let data = try? JSONEncoder().encode(retryData) {
+                UserDefaults(suiteName: SharedConstants.appGroupIdentifier)?.set(data, forKey: "pendingShareRetry")
+            }
+            return false
         }
     }
 
@@ -266,19 +326,40 @@ class ShareViewController: UIViewController {
             return (nil, nil)
         }
 
-        guard let image, let cgImage = image.cgImage else { return (nil, nil) }
+        guard let image else { return (nil, nil) }
+
+        // Downscale if image exceeds memory-safe dimensions
+        let safeImage = downsampleIfNeeded(image)
+        guard let cgImage = safeImage.cgImage else { return (nil, nil) }
 
         guard let ocrText = await performOCR(on: cgImage), !ocrText.isEmpty else {
             return (nil, nil)
         }
 
-        // Quick rule-based check for a summary
+        // Quick rule-based check for a summary — called once, reused below
         let score = RuleFilterService.score(text: ocrText)
         let summary = score >= AppConstants.defaultConfidenceThreshold
             ? String(ocrText.prefix(200))
             : nil
 
         return (ocrText, summary)
+    }
+
+    /// Downscales the image if either dimension exceeds `maxImageDimension` to keep memory usage within the extension's budget.
+    private func downsampleIfNeeded(_ image: UIImage) -> UIImage {
+        let maxDim = Self.maxImageDimension
+        let width = image.size.width
+        let height = image.size.height
+
+        guard width > maxDim || height > maxDim else { return image }
+
+        let scale = min(maxDim / width, maxDim / height)
+        let newSize = CGSize(width: width * scale, height: height * scale)
+
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            image.draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 
     private func performOCR(on cgImage: CGImage) async -> String? {

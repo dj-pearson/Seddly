@@ -5,6 +5,16 @@ const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY")!;
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+function structuredLog(
+  level: "info" | "warn" | "error",
+  fields: { requestId: string; action: string; userId?: string; statusCode?: number; [key: string]: unknown },
+) {
+  const entry = { timestamp: new Date().toISOString(), ...fields };
+  if (level === "error") console.error(JSON.stringify(entry));
+  else if (level === "warn") console.warn(JSON.stringify(entry));
+  else console.log(JSON.stringify(entry));
+}
+
 const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
 const RATE_LIMIT_MAX = 5; // 5 requests per window
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
@@ -69,11 +79,14 @@ function corsHeaders(req: Request) {
 }
 
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req) });
   }
 
   if (req.method !== "POST") {
+    structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { "Content-Type": "application/json", ...corsHeaders(req) },
@@ -83,6 +96,7 @@ Deno.serve(async (req) => {
   // Auth: require Bearer token (Supabase JWT)
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
+    structuredLog("warn", { requestId, action: "auth_missing", statusCode: 401 });
     return new Response(
       JSON.stringify({ error: "Authentication required. Provide a valid Bearer token." }),
       { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
@@ -93,15 +107,19 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
   if (authError || !user) {
+    structuredLog("warn", { requestId, action: "auth_failed", statusCode: 401 });
     return new Response(
       JSON.stringify({ error: "Invalid or expired token" }),
       { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
     );
   }
 
+  const userId = user.id;
+
   // Rate limiting: 5 requests per minute per user
-  const rateLimit = await checkRateLimit(user.id);
+  const rateLimit = await checkRateLimit(userId);
   if (!rateLimit.allowed) {
+    structuredLog("warn", { requestId, action: "rate_limited", userId, statusCode: 429 });
     return new Response(
       JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
       {
@@ -115,25 +133,66 @@ Deno.serve(async (req) => {
     );
   }
 
+  let body: Record<string, unknown>;
   try {
-    const { entity_name, commitments } = (await req.json()) as {
-      entity_name: string;
-      commitments: Commitment[];
-    };
+    body = await req.json();
+  } catch {
+    structuredLog("warn", { requestId, action: "invalid_json", userId, statusCode: 400 });
+    return new Response(
+      JSON.stringify({ error: "Malformed JSON in request body", fields: { body: "Must be valid JSON" } }),
+      { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
+    );
+  }
 
-    if (!entity_name || !commitments?.length) {
+  try {
+    const entity_name = body.entity_name;
+    const commitments = body.commitments;
+
+    const fieldErrors: Record<string, string> = {};
+
+    if (!entity_name || typeof entity_name !== "string" || (entity_name as string).trim().length === 0) {
+      fieldErrors.entity_name = "Required, must be a non-empty string";
+    }
+
+    if (!Array.isArray(commitments)) {
+      fieldErrors.commitments = "Required, must be an array";
+    } else if (commitments.length === 0) {
+      fieldErrors.commitments = "Must contain at least one commitment";
+    } else if (commitments.length > 100) {
+      fieldErrors.commitments = "Must not exceed 100 items";
+    } else {
+      const requiredCommitmentFields = ["summary", "status", "screenshot_date"];
+      for (let i = 0; i < commitments.length; i++) {
+        const c = commitments[i] as Record<string, unknown>;
+        for (const field of requiredCommitmentFields) {
+          if (!c[field] || typeof c[field] !== "string") {
+            fieldErrors[`commitments[${i}].${field}`] = `Required, must be a non-empty string`;
+          }
+        }
+      }
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      structuredLog("warn", { requestId, action: "validation_failed", userId, statusCode: 400, fieldCount: Object.keys(fieldErrors).length });
       return new Response(
-        JSON.stringify({ error: "Missing entity_name or commitments" }),
+        JSON.stringify({ error: "Validation failed", fields: fieldErrors }),
         { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
       );
     }
 
-    const commitmentsText = commitments
+    const typedCommitments = commitments as Commitment[];
+    const typedEntityName = entity_name as string;
+
+    structuredLog("info", { requestId, action: "summary_started", userId, commitmentCount: typedCommitments.length });
+
+    const commitmentsText = typedCommitments
       .map(
         (c, i) =>
           `${i + 1}. Summary: "${c.summary}" | Date: ${c.screenshot_date} | Deadline: ${c.deadline ?? "None"} | Amount: ${c.dollar_amount ? `$${c.dollar_amount}` : "None"} | Status: ${c.status} | Source: ${c.source}`,
       )
       .join("\n");
+
+    const textLengthSent = commitmentsText.length + typedEntityName.length;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -148,7 +207,7 @@ Deno.serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: `${SUMMARY_PROMPT}\n\nEntity Name: ${entity_name}\n\nCommitments:\n${commitmentsText}`,
+            content: `${SUMMARY_PROMPT}\n\nEntity Name: ${typedEntityName}\n\nCommitments:\n${commitmentsText}`,
           },
         ],
       }),
@@ -156,7 +215,7 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.error("Anthropic API error:", response.status, errorBody);
+      structuredLog("error", { requestId, action: "ai_api_error", userId, statusCode: 502, upstreamStatus: response.status, detail: errorBody.substring(0, 500) });
       return new Response(
         JSON.stringify({ error: "AI processing failed" }),
         { status: 502, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
@@ -166,12 +225,23 @@ Deno.serve(async (req) => {
     const aiResponse = await response.json();
     const summaryText = aiResponse.content?.[0]?.text ?? "";
 
+    // Log summary generation to privacy_audit_log
+    await supabase.from("privacy_audit_log").insert({
+      user_id: userId,
+      event_type: "dispute_summary",
+      destination: "anthropic_api",
+      data_summary: `Generated dispute summary for entity with ${typedCommitments.length} commitments`,
+      text_length_sent: textLengthSent,
+    });
+
+    structuredLog("info", { requestId, action: "summary_completed", userId, statusCode: 200, commitmentCount: typedCommitments.length, summaryLength: summaryText.length });
+
     return new Response(
       JSON.stringify({ summary: summaryText }),
       { headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
     );
   } catch (error) {
-    console.error("Error:", error);
+    structuredLog("error", { requestId, action: "unhandled_error", userId, statusCode: 500, detail: String(error) });
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },

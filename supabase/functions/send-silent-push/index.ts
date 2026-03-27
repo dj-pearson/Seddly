@@ -3,6 +3,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+function structuredLog(
+  level: "info" | "warn" | "error",
+  fields: { requestId: string; action: string; userId?: string; statusCode?: number; [key: string]: unknown },
+) {
+  const entry = { timestamp: new Date().toISOString(), ...fields };
+  if (level === "error") console.error(JSON.stringify(entry));
+  else if (level === "warn") console.warn(JSON.stringify(entry));
+  else console.log(JSON.stringify(entry));
+}
 const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID")!;
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID")!;
 const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY")!;
@@ -62,8 +72,11 @@ async function sendSilentPush(
 }
 
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
+
   // This function is triggered by pg_cron, not external requests
   if (req.method !== "POST") {
+    structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
@@ -82,7 +95,7 @@ Deno.serve(async (req) => {
       .not("device_token", "is", null);
 
     if (error) {
-      console.error("Database query error:", error);
+      structuredLog("error", { requestId, action: "db_query_failed", statusCode: 500, detail: String(error) });
       return new Response(JSON.stringify({ error: "Database query failed" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -90,6 +103,7 @@ Deno.serve(async (req) => {
     }
 
     if (!users?.length) {
+      structuredLog("info", { requestId, action: "push_skipped", statusCode: 200, reason: "no_eligible_users" });
       return new Response(
         JSON.stringify({ sent: 0, message: "No eligible users" }),
         { headers: { "Content-Type": "application/json" } },
@@ -109,11 +123,13 @@ Deno.serve(async (req) => {
       }
     }
 
+    structuredLog("info", { requestId, action: "push_completed", statusCode: 200, sent, failed, total: users.length });
+
     return new Response(JSON.stringify({ sent, failed, total: users.length }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Error:", error);
+    structuredLog("error", { requestId, action: "unhandled_error", statusCode: 500, detail: String(error) });
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

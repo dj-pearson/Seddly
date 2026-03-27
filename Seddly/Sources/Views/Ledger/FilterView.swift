@@ -116,6 +116,12 @@ struct FilterView: View {
                                 .textFieldStyle(.roundedBorder)
                         }
                         .font(.subheadline)
+
+                        if let min = amountMin, let max = amountMax, min > max {
+                            Text("Min amount must be less than or equal to max amount")
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
                     }
                 }
 
@@ -164,7 +170,10 @@ struct FilterView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button("Done") {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        dismiss()
+                    }
                 }
             }
         }

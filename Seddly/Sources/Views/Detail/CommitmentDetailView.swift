@@ -18,6 +18,9 @@ struct CommitmentDetailView: View {
     @State private var isLoadingScreenshot = false
     @State private var screenshotLoadFailed = false
     @State private var showDeleteError = false
+    @State private var showReminderToast = false
+    @State private var reminderToastMessage = ""
+    @State private var showNotificationPermissionAlert = false
 
     var body: some View {
         List {
@@ -133,6 +136,7 @@ struct CommitmentDetailView: View {
                 Picker("Status", selection: Binding(
                     get: { commitment.status },
                     set: { newStatus in
+                        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         commitment.status = newStatus
                         commitment.updatedAt = .now
                         // Sync status to calendar event
@@ -379,6 +383,30 @@ struct CommitmentDetailView: View {
         .sheet(isPresented: $showingCustomReminder) {
             customReminderSheet
         }
+        .alert("Notifications Disabled", isPresented: $showNotificationPermissionAlert) {
+            Button("Open Settings") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Seddly needs notification permission to send reminders. Please enable notifications in Settings.")
+        }
+        .overlay(alignment: .bottom) {
+            if showReminderToast {
+                Text(reminderToastMessage)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .shadow(radius: 4)
+                    .padding(.bottom, 32)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut, value: showReminderToast)
         .task {
             await loadScreenshot()
         }
@@ -441,27 +469,48 @@ struct CommitmentDetailView: View {
             if let eventID = calendarService.createEvent(for: commitment) {
                 commitment.calendarEventID = eventID
                 commitment.updatedAt = .now
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
             }
         }
     }
 
     private func scheduleCustomReminder() {
-        let content = UNMutableNotificationContent()
-        content.title = "Reminder: \(commitment.entityName)"
-        content.body = commitment.summary
-        content.sound = .default
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
 
-        let components = Calendar.current.dateComponents(
-            [.year, .month, .day, .hour, .minute],
-            from: customReminderDate
-        )
-        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
-        let request = UNNotificationRequest(
-            identifier: "custom-\(commitment.id.uuidString)",
-            content: content,
-            trigger: trigger
-        )
-        UNUserNotificationCenter.current().add(request)
+            guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else {
+                showNotificationPermissionAlert = true
+                return
+            }
+
+            let content = UNMutableNotificationContent()
+            content.title = "Reminder: \(commitment.entityName)"
+            content.body = commitment.summary
+            content.sound = .default
+
+            let components = Calendar.current.dateComponents(
+                [.year, .month, .day, .hour, .minute],
+                from: customReminderDate
+            )
+            let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+            let request = UNNotificationRequest(
+                identifier: "custom-\(commitment.id.uuidString)",
+                content: content,
+                trigger: trigger
+            )
+            try? await center.add(request)
+
+            let formatted = customReminderDate.formatted(.dateTime.month(.wide).day().hour().minute())
+            reminderToastMessage = "Reminder set for \(formatted)"
+            withAnimation {
+                showReminderToast = true
+            }
+            try? await Task.sleep(for: .seconds(3))
+            withAnimation {
+                showReminderToast = false
+            }
+        }
     }
 
     private func loadScreenshot() async {

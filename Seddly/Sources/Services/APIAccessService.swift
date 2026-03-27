@@ -7,6 +7,10 @@ actor APIAccessService {
     private let authToken: String
     private let urlSession: URLSession
 
+    /// Cache for listCommitments results, expires after 15 seconds.
+    private var listCache: (response: ListResponse, key: String, timestamp: Date)?
+    private static let listCacheTTL: TimeInterval = 15
+
     struct APICommitment: Codable {
         let id: String?
         let entityName: String
@@ -64,6 +68,14 @@ actor APIAccessService {
         limit: Int = 50,
         offset: Int = 0
     ) async throws -> ListResponse {
+        // Check cache (15-second TTL)
+        let cacheKey = "\(status ?? "")-\(entity ?? "")-\(limit)-\(offset)"
+        if let cached = listCache,
+           cached.key == cacheKey,
+           Date().timeIntervalSince(cached.timestamp) < Self.listCacheTTL {
+            return cached.response
+        }
+
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
             throw APIError.invalidURL
         }
@@ -78,7 +90,17 @@ actor APIAccessService {
         guard let url = components.url else { throw APIError.invalidURL }
         let request = authenticatedRequest(url: url, method: "GET")
         let (data, _) = try await urlSession.data(for: request)
-        return try JSONDecoder().decode(ListResponse.self, from: data)
+        let response = try JSONDecoder().decode(ListResponse.self, from: data)
+
+        // Cache the result
+        listCache = (response: response, key: cacheKey, timestamp: Date())
+
+        return response
+    }
+
+    /// Invalidates cached list results (call after user actions like adding/updating commitments).
+    func invalidateListCache() {
+        listCache = nil
     }
 
     func getCommitment(id: String) async throws -> APICommitment {

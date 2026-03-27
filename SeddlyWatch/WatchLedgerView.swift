@@ -1,5 +1,12 @@
 import SwiftUI
 import SwiftData
+import WidgetKit
+
+enum WatchLedgerFilter: String {
+    case all
+    case overdue
+    case pending
+}
 
 struct WatchLedgerView: View {
     @Query(
@@ -10,6 +17,7 @@ struct WatchLedgerView: View {
     private var pendingCommitments: [LocalCommitment]
 
     @Environment(\.modelContext) private var modelContext
+    @State private var activeFilter: WatchLedgerFilter = .all
 
     private var overdueCommitments: [LocalCommitment] {
         pendingCommitments.filter { $0.isOverdue }
@@ -19,6 +27,14 @@ struct WatchLedgerView: View {
         pendingCommitments
             .filter { !$0.isOverdue }
             .sorted { ($0.deadline ?? .distantFuture) < ($1.deadline ?? .distantFuture) }
+    }
+
+    private var filteredOverdue: [LocalCommitment] {
+        activeFilter == .pending ? [] : overdueCommitments
+    }
+
+    private var filteredUpcoming: [LocalCommitment] {
+        activeFilter == .overdue ? [] : upcomingCommitments
     }
 
     var body: some View {
@@ -33,9 +49,9 @@ struct WatchLedgerView: View {
                 List {
                     syncStatusSection
 
-                    if !overdueCommitments.isEmpty {
+                    if !filteredOverdue.isEmpty {
                         Section {
-                            ForEach(overdueCommitments) { commitment in
+                            ForEach(filteredOverdue) { commitment in
                                 WatchCommitmentRow(commitment: commitment)
                                     .swipeActions(edge: .trailing) {
                                         Button {
@@ -52,9 +68,9 @@ struct WatchLedgerView: View {
                         }
                     }
 
-                    if !upcomingCommitments.isEmpty {
+                    if !filteredUpcoming.isEmpty {
                         Section("Upcoming") {
-                            ForEach(upcomingCommitments.prefix(5)) { commitment in
+                            ForEach(filteredUpcoming.prefix(5)) { commitment in
                                 WatchCommitmentRow(commitment: commitment)
                                     .swipeActions(edge: .trailing) {
                                         Button {
@@ -70,6 +86,18 @@ struct WatchLedgerView: View {
                 }
                 .navigationTitle("Seddly")
             }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    refreshData()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+            }
+        }
+        .onOpenURL { url in
+            handleDeepLink(url)
         }
     }
 
@@ -118,6 +146,22 @@ struct WatchLedgerView: View {
         try? modelContext.save()
 
         WatchSyncService.shared.sendFulfillment(commitmentID: commitment.id)
+    }
+
+    private func refreshData() {
+        WatchSyncService.shared.requestSync()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "seddly-watch",
+              url.host == "ledger",
+              let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let filterParam = components.queryItems?.first(where: { $0.name == "filter" })?.value,
+              let filter = WatchLedgerFilter(rawValue: filterParam) else {
+            return
+        }
+        activeFilter = filter
     }
 }
 

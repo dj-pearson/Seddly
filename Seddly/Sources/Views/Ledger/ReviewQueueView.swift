@@ -4,14 +4,24 @@ import SwiftData
 struct ReviewQueueView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
-    @AppStorage("autoAnalyze") private var autoAnalyze = false
+    private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
+    @AppStorage("approvedExtractionCount", store: appGroupDefaults) private var approvedExtractionCount = 0
+    @AppStorage("autoAnalyze", store: appGroupDefaults) private var autoAnalyze = false
     @Query(
         filter: #Predicate<LocalCommitment> { $0.needsAIProcessing == true },
         sort: \LocalCommitment.createdAt,
         order: .reverse
     )
     private var pendingReview: [LocalCommitment]
+    @State private var searchText = ""
+
+    private var filteredReview: [LocalCommitment] {
+        guard !searchText.isEmpty else { return pendingReview }
+        return pendingReview.filter {
+            $0.entityName.localizedCaseInsensitiveContains(searchText) ||
+            $0.summary.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -22,6 +32,8 @@ struct ReviewQueueView: View {
                         systemImage: "checkmark.circle",
                         description: Text("No commitments need your review right now.")
                     )
+                } else if filteredReview.isEmpty {
+                    ContentUnavailableView.search(text: searchText)
                 } else {
                     List {
                         Section {
@@ -30,7 +42,7 @@ struct ReviewQueueView: View {
                                 .foregroundStyle(.secondary)
                         }
 
-                        ForEach(pendingReview) { commitment in
+                        ForEach(filteredReview) { commitment in
                             VStack(alignment: .leading, spacing: 8) {
                                 HStack {
                                     Text(commitment.entityName)
@@ -89,6 +101,7 @@ struct ReviewQueueView: View {
             }
             .navigationTitle("Review Queue")
             .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $searchText, prompt: "Search by name or summary")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }

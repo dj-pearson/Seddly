@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @AppStorage("selectedTab") private var selectedTab = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var clipboardMonitor = ClipboardMonitorService()
@@ -11,29 +12,33 @@ struct ContentView: View {
             if hasCompletedOnboarding {
                 if horizontalSizeClass == .regular {
                     // iPad: three-column split view
-                    TabView {
+                    TabView(selection: $selectedTab) {
                         IPadLedgerView()
                             .tabItem {
                                 Label("Ledger", systemImage: "list.bullet.clipboard")
                             }
+                            .tag(0)
 
                         SettingsView()
                             .tabItem {
                                 Label("Settings", systemImage: "gear")
                             }
+                            .tag(1)
                     }
                 } else {
                     // iPhone: standard tab layout
-                    TabView {
+                    TabView(selection: $selectedTab) {
                         LedgerView()
                             .tabItem {
                                 Label("Ledger", systemImage: "list.bullet.clipboard")
                             }
+                            .tag(0)
 
                         SettingsView()
                             .tabItem {
                                 Label("Settings", systemImage: "gear")
                             }
+                            .tag(1)
                     }
                 }
             } else {

@@ -5,9 +5,9 @@
     "ralphLoop": {
       "currentLoop": 3,
       "lastReviewDate": "2026-03-26",
-      "passingCount": 16,
+      "passingCount": 50,
       "totalCount": 50,
-      "completionRate": "32%",
+      "completionRate": "100%",
       "reviewer": "Ralph AI — SnarktTank",
       "verdict": "Deep audit identified 50 new user stories across Security (critical), Performance, UI/UX, Functionality, and Website/Backend. Zero passing — work begins."
     },
@@ -260,8 +260,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "FilterView allows min > max amounts. ManualEntryView disables save button with no explanation of what's wrong."
+        "passes": true,
+        "notes": "FilterView shows inline error when min > max amount. ManualEntryView validates dollarAmount as positive number, shows inline errors under invalid fields on save attempt, entity name capped at 100 chars with counter, summary capped at 500 chars with counter."
       },
       {
         "id": "US-039",
@@ -312,8 +312,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Widget shows commitments but tapping only opens the app root. No deep linking to specific items."
+        "passes": true,
+        "notes": "Widget deep links implemented: SeddlyWidget uses .widgetURL() on small widget linking to first overdue/pending commitment via seddly://commitment/{id}. Medium widget uses Link() per commitment row with individual deep link URLs. SeddlyApp.handleDeepLink() updated to handle seddly:// URL scheme alongside existing universal links. project.yml registers seddly:// URL scheme via CFBundleURLTypes. WidgetCommitment struct carries commitment IDs for per-item linking."
       },
       {
         "id": "US-042",
@@ -329,8 +329,8 @@
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "All data loaded unbounded. Users with 1000+ commitments will experience freezes. SmartBackfillService loads all photos at once."
+        "passes": true,
+        "notes": "LedgerViewModel pages at 50 with scroll-to-bottom trigger and loading indicator. SyncService.pullCommitments() uses limit=100/offset pagination. ScreenshotProcessingService caps at 100 screenshots per batch. SmartBackfillService caps at 100 screenshots per backfill run."
       },
       {
         "id": "US-043",
@@ -345,8 +345,8 @@
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "SyncService queries for each remote commitment individually. ScreenshotProcessingService queries ProcessingQueue per screenshot."
+        "passes": true,
+        "notes": "SyncService.pullCommitments() pre-fetches all local commitment IDs into a Set before the pagination loop. ScreenshotProcessingService.processNewScreenshots() pre-fetches all ProcessingQueue asset IDs into a Set before the processing loop. ClassifierFeedbackService.currentThreshold() is cached once before the loop. No single-item fetches inside loops."
       },
       {
         "id": "US-044",
@@ -361,8 +361,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Same screenshot or entity can trigger duplicate AI calls. No deduplication mechanism exists."
+        "passes": true,
+        "notes": "Request deduplication added: DisputeSummaryService tracks in-flight requests by entity name using Task dictionary, returns existing result for duplicate calls. AIExtractionService tracks in-flight requests by text hash, returns existing result for duplicate calls. ScreenshotProcessingService already skips screenshots in ProcessingQueue (pre-fetches all queued asset IDs). All dedup state auto-clears after 60 seconds via cleanupStaleDedup() to allow retries."
       },
       {
         "id": "US-045",
@@ -377,8 +377,8 @@
           "Astro builds successfully"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "No 404 page exists. Visitors hitting broken links see Astro's default error page."
+        "passes": true,
+        "notes": "404.astro created using BaseLayout with robots='noindex, nofollow' prop. Shows 'Page not found' with Seddly branding. Links to homepage, how-it-works, and support. BaseLayout extended with optional robots prop for meta tag injection."
       },
       {
         "id": "US-046",
@@ -396,8 +396,8 @@
           "Astro builds successfully"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "Privacy Policy mentions analytics but no consent mechanism exists. Required for GDPR/CCPA compliance."
+        "passes": true,
+        "notes": "Cookie consent banner added to BaseLayout.astro. Banner explains analytics-only data collection with link to privacy page. Accept and Decline buttons provided. Consent stored in localStorage as seddly_cookie_consent. Analytics scripts only load after explicit consent via loadAnalytics(). Banner hidden after choice via localStorage check on page load. Banner uses role=dialog, aria-label, aria-hidden, and :focus-visible styles for full accessibility."
       },
       {
         "id": "US-047",
@@ -413,8 +413,8 @@
           "Astro builds successfully"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "Blog posts have title/description meta tags but no JSON-LD structured data. Missing SEO opportunity."
+        "passes": true,
+        "notes": "JSON-LD Article schema added to all 4 blog posts with @type: Article, headline, datePublished (2026-03-23), author (Seddly Team as Organization), publisher, description, and mainEntityOfPage. Uses same set:html={JSON.stringify()} pattern as BaseLayout's SoftwareApplication schema."
       },
       {
         "id": "US-048",
@@ -431,8 +431,8 @@
           "Astro builds successfully"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "Only SVG favicon exists. Many browsers/platforms need PNG variants. No manifest.json for PWA support."
+        "passes": true,
+        "notes": "manifest.json created with name, short_name, icons (16/32/180), theme_color (#5b7ff5), background_color (#0a0a0b), display: standalone. BaseLayout references manifest.json, favicon-16x16.png, favicon-32x32.png, apple-touch-icon.png (180x180). og-image.png (1200x630) created. All PNGs generated from SVG design (blue rounded rect with white checkmark)."
       },
       {
         "id": "US-049",
@@ -449,8 +449,8 @@
           "Astro builds successfully"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "No :focus-visible styles defined. Nav toggle has aria-expanded but missing aria-controls. No skip-to-content link."
+        "passes": true,
+        "notes": ":focus-visible styles added for all interactive elements (a, button, input, select, textarea, [tabindex]) with 2px accent outline and 2px offset. Nav toggle has aria-controls='nav-links' linking to nav-links div with id='nav-links'. Skip-to-content link added as first focusable element in body, positioned offscreen until focused. Main content has id='main-content' as skip target. All interactive elements reachable via Tab."
       },
       {
         "id": "US-050",
@@ -466,8 +466,8 @@
           "Migration runs successfully"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Missing indexes on confidence, timestamp, and processing_log. Dollar amount has no precision specified."
+        "passes": true,
+        "notes": "New migration 20260326000000_add_performance_indexes.sql: adds index on commitments(user_id, confidence), privacy_audit_log(user_id, timestamp DESC), processing_log(device_id, processed_at DESC), custom_workflows(user_id, created_at DESC). Dollar amount changed to DECIMAL(10,2) for precision. All indexes use IF NOT EXISTS for idempotency."
       },
       {
         "id": "US-051",
@@ -483,8 +483,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "App always opens to default state. No ScenePhase handling for saving UI state. Users lose context every time they switch apps."
+        "passes": true,
+        "notes": "ContentView uses @AppStorage('selectedTab') to save/restore selected tab (Ledger/Settings). LedgerViewModel persists sortOrder, filterStatus, and filterCategory to UserDefaults on change and restores them in init(). Deep link navigation state preserved via @AppStorage('deepLinkCommitmentID'). Tab selection binding uses TabView(selection:) with .tag() on each tab."
       },
       {
         "id": "US-052",
@@ -500,8 +500,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "Only LedgerView swipe actions have haptic feedback. All other interactions feel flat."
+        "passes": true,
+        "notes": "Haptic feedback added: CommitmentDetailView status change triggers UIImpactFeedbackGenerator(.medium). Adding to calendar triggers UINotificationFeedbackGenerator(.success). FilterView Done button triggers UIImpactFeedbackGenerator(.light). Bulk selection toggle triggers UISelectionFeedbackGenerator. Entity merge triggers UINotificationFeedbackGenerator(.success)."
       },
       {
         "id": "US-053",
@@ -517,8 +517,8 @@
           "Typecheck passes"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "Share Extension uses silent try? for saves, loads images without memory checks, and calls ruleFilterService.score() twice."
+        "passes": true,
+        "notes": "Share Extension fixed: saveToQueue() now returns Bool and shows user-visible error message on failure. Image loading uses downsampleIfNeeded() to cap at 2048px max dimension before processing. Processing wrapped in TaskGroup with 10-second timeout that shows timeout message. Failed saves queued via pendingShareRetry in app group UserDefaults for retry on next app launch. RuleFilterService.score() called once and reused (was called twice)."
       },
       {
         "id": "US-054",
@@ -533,8 +533,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "SyncService pushes all items in a loop with no batching. Pull fetches all remote commitments at once."
+        "passes": true,
+        "notes": "SyncService batching and rate limiting added: syncCommitments() uploads in batches of 50 with 500ms delay between batches, saves after each batch for partial progress. Client-side rate limiting prevents more than 1 sync per 30 seconds via lastSyncTime check. pullCommitments() already paginated with limit=100. SyncProgress struct reports pushed/pulled/totalToPush counts. Array.chunked(into:) helper for batching."
       },
       {
         "id": "US-055",
@@ -568,8 +568,8 @@
           "Tests pass"
         ],
         "priority": 4,
-        "passes": false,
-        "notes": "No integration tests exist. Only unit tests for individual services."
+        "passes": true,
+        "notes": "PipelineIntegrationTests.swift created with 6 integration tests: (1) Full screenshot→OCR→Classifier→RuleFilter→Commitment pipeline with rendered image, (2) Pipeline rejects non-commitment screenshots, (3) SyncService push identifies pendingSync commitments and builds correct payload, (4) SyncService pull creates local commitment with all fields including category and syncStatus, (5) Share Extension→ProcessingQueue→Background processing with commitment creation and source verification, (6) Duplicate detection across share extension and background processing. All use in-memory ModelContainer and mock network by testing data preparation/transformation logic."
       },
       {
         "id": "US-057",
@@ -585,8 +585,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "Only 2 Siri Shortcuts exist (add commitment, check overdue). Missing key workflows like marking fulfilled or checking entities."
+        "passes": true,
+        "notes": "Three new AppIntents added: MarkFulfilledIntent (accepts summary text, finds matching commitment, marks as fulfilled), CheckEntityIntent (accepts entity name, returns accountability score/grade and overdue count), UpdateDeadlineIntent (accepts summary text and new date, updates deadline). All have Siri suggestion phrases. SeddlyShortcuts provider updated to include all 5 intents."
       },
       {
         "id": "US-058",
@@ -602,8 +602,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "App has offline toggle in Settings but no automatic offline detection or user-facing indicators."
+        "passes": true,
+        "notes": "NetworkMonitorService created using NWPathMonitor with reactive isConnected property. LedgerView shows orange 'Offline' banner that auto-dismisses when connectivity is restored. AI extraction and sync are blocked when offline with clear messaging. processOnForeground and refreshLedger both use effectiveOffline combining manual toggle and network state."
       },
       {
         "id": "US-059",
@@ -619,8 +619,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "OnboardingView uses TabView with pagination but no back button. Users can't revisit earlier steps."
+        "passes": true,
+        "notes": "OnboardingView improved: TabView still supports swipe-back. Back chevron button on pages 2+. Progress indicator shows 'Step X of 5' with animated progress bar. Skip button available on every page. Final page CTA changed to 'Enable Notifications & Get Started' with 'Start Without Notifications' alternative. Page dots replaced with step counter and progress bar."
       },
       {
         "id": "US-060",
@@ -637,8 +637,8 @@
           "All workflows pass"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "CI builds and tests but has no quality gates, no caching, and no code coverage reporting. Each build starts from scratch."
+        "passes": true,
+        "notes": "ci.yml: SwiftLint step added after build (--strict, github-actions-logging reporter). Xcode derived data cached via actions/cache@v4. Test coverage enabled with -enableCodeCoverage YES, 60% minimum gate enforced via xccov JSON report. XcodeGen pinned to 2.42.0. deploy-website.yml: HTML validation step checks dist/ for well-formed HTML before deploy. deploy-supabase.yml: deno lint and deno check steps added before deploy."
       },
       {
         "id": "US-061",
@@ -654,8 +654,8 @@
           "Sensitive errors return generic messages to client while logging details server-side"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Edge Functions use console.log with no structure. No audit trail for AI operations. Debugging production issues is nearly impossible."
+        "passes": true,
+        "notes": "All 5 Edge Functions now use structuredLog() with { timestamp, requestId, action, userId, statusCode } format. extract-commitments and generate-dispute-summary log to privacy_audit_log table. Every log includes requestId as correlation ID. No PII in logs — only counts, lengths, and status codes. Sensitive errors return generic messages to client while details are logged server-side."
       },
       {
         "id": "US-062",
@@ -671,8 +671,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Privacy Policy promises 30-day retention after deletion, but migrations use hard CASCADE deletes. No soft delete mechanism exists."
+        "passes": true,
+        "notes": "LocalEntity.commitments relationship changed from .cascade to .nullify delete rule (commitments survive entity deletion). CustomWorkflow uses UUID reference (workflowID), no cascade needed. Supabase migration adds deleted_at TIMESTAMPTZ to commitments and entities tables. RLS policies updated to filter deleted_at IS NULL. hard_delete_expired_records() function created for pg_cron to enforce 30-day retention. SyncService.softDelete() marks deleted_at via PATCH instead of hard delete."
       },
       {
         "id": "US-063",
@@ -687,8 +687,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "Some services use app group UserDefaults, others use standard. Data stored in standard is invisible to Share Extension and Widget."
+        "passes": true,
+        "notes": "All shared UserDefaults migrated to app group suite (AppConstants.appGroupIdentifier). NotificationService uses app group for notificationsEnabled. SettingsView @AppStorage uses app group for offlineMode, autoAnalyze, approvedExtractionCount, isSignedIn, signedInEmail, notificationsEnabled. LedgerView, ReviewQueueView, IPadLedgerView, CommitmentCardView, BackfillView, APIAccessView all updated. Audit confirms no UserDefaults.standard for shared state."
       },
       {
         "id": "US-064",
@@ -704,8 +704,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "Processing pipeline has redundant fetches inside loops. No caching. No batch size limits."
+        "passes": true,
+        "notes": "Entity lookups pre-fetched into entityCache dict (already existed). ClassifierFeedbackService.currentThreshold() called once before loop (already existed). OCR results cached in ocrCache dict keyed by asset ID, cleared after batch. Max 100 screenshots per batch (already existed via .prefix(100)). AI extraction responses validated/capped at 100 commitments per response via maxCommitmentsPerResponse."
       },
       {
         "id": "US-065",
@@ -721,8 +721,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "Every call to services re-queries from scratch. No in-memory caching exists anywhere."
+        "passes": true,
+        "notes": "ScreenshotService caches fetchNewScreenshots() results for 30 seconds with invalidateCache() method for manual refresh/new screenshot detection. AIExtractionService caches extraction results by text hash for 5 minutes (resultCache dict with TTL check). APIAccessService caches listCommitments() for 15 seconds with invalidateListCache() for user actions. All caches use simple dict-based storage with timestamp TTL checks."
       },
       {
         "id": "US-066",
@@ -738,8 +738,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "No undo mechanism exists. Accidental swipes permanently change commitment status."
+        "passes": true,
+        "notes": "Undo toast with 5-second auto-dismiss added to LedgerView. Shows after swipe-to-dismiss, swipe-to-fulfill, and bulk status changes. Undo button reverts to previous status. Only one undo active at a time (new action replaces previous). UndoState captures commitment-status pairs for both single and bulk operations."
       },
       {
         "id": "US-067",
@@ -754,8 +754,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "ReviewQueueView and EntityMergeView have no search. Hard to find items in large lists."
+        "passes": true,
+        "notes": "Both views now have .searchable() modifiers. ReviewQueueView filters by entityName and summary (case-insensitive). EntityMergeView filters merge candidates by primary and duplicate entity names. Empty results show ContentUnavailableView.search with search text."
       },
       {
         "id": "US-068",
@@ -770,8 +770,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "Custom reminder is scheduled with no user confirmation. User has no way to know if it was actually set."
+        "passes": true,
+        "notes": "Success toast shown after scheduling with human-readable time (e.g., 'Reminder set for March 28 at 9:00 AM'). Toast auto-dismisses after 3 seconds. If notification permission denied, shows alert with button to open Settings. Uses .ultraThinMaterial capsule overlay with animation."
       },
       {
         "id": "US-069",
@@ -787,8 +787,8 @@
           "Astro builds successfully"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "--color-text-muted (#8b8b94) on #0a0a0b has ~5.5:1 ratio (OK), but needs verification. No focus styles or skip-to-content link exist."
+        "passes": true,
+        "notes": "All criteria met: --color-text-muted (#8b8b94) on #0a0a0b has 5.86:1 contrast ratio (passes 4.5:1 WCAG AA). Focus-visible styles added globally with 2px solid outline and 2px offset. Skip-to-content link is first focusable element in BaseLayout. Tab order follows logical reading order. Astro builds successfully."
       },
       {
         "id": "US-070",
@@ -803,8 +803,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "No index attributes on SwiftData models. ProcessingQueue.screenshotAssetID is queried in every processing loop without index."
+        "passes": true,
+        "notes": "SwiftData #Index macros added: ProcessingQueue indexes screenshotAssetID, PrivacyAuditEntry indexes timestamp, LocalCommitment indexes statusRaw and deadline. These cover the most frequently queried fields and will improve performance with 1000+ records."
       },
       {
         "id": "US-071",
@@ -819,8 +819,8 @@
           "Typecheck passes"
         ],
         "priority": 6,
-        "passes": false,
-        "notes": "No internal timeout. Relies entirely on system expiration handler which may arrive too late for clean shutdown."
+        "passes": true,
+        "notes": "25-second internal timeout added via separate Task that cancels the processing task. Processing loop already checks Task.isCancelled at each iteration. Partial progress saved via context.save(). Remaining screenshots picked up in next background run. Timeout is separate from and shorter than system expiration handler."
       },
       {
         "id": "US-072",
@@ -836,8 +836,8 @@
           "Typecheck passes"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "Edge Functions accept input with minimal validation. Malformed JSON crashes handlers. No field-level validation."
+        "passes": true,
+        "notes": "All Edge Functions hardened: extract-commitments wraps req.json() in try-catch returning 400 on malformed JSON, validates text is string/non-empty/max 10000 chars. generate-dispute-summary validates commitments is array, max 100 items, each has required fields (summary, status, screenshot_date). api-commitments validates POST/PATCH fields against whitelist, rejects unexpected keys with field-level errors. All validation errors return descriptive 400 responses with fields object."
       },
       {
         "id": "US-073",
@@ -853,8 +853,8 @@
           "Typecheck passes"
         ],
         "priority": 5,
-        "passes": false,
-        "notes": "No handling for subscription tier changes. Downgrading could leave the app in an inconsistent state with features that no longer work."
+        "passes": true,
+        "notes": "Tier change handling added: SubscriptionService tracks previousTier and fires tierDowngradeDetected. SeddlyApp shows alert on downgrade. AuthService signs out when dropping from Pro+. SyncService already gated by .proPlus check. AI extraction already gated by >= .pro. Free tier max 5 active commitments already enforced. Cloud-synced commitments remain in local SwiftData."
       },
       {
         "id": "US-074",
@@ -870,8 +870,8 @@
           "Typecheck passes"
         ],
         "priority": 7,
-        "passes": false,
-        "notes": "Watch complications show static data. No deep links, no adaptive refresh, no fulfillment gestures."
+        "passes": true,
+        "notes": "All criteria met: Complications use widgetURL with seddly-watch://ledger?filter=overdue|pending deep links. WatchLedgerView handles onOpenURL to set active filter. Complication shows most urgent overdue commitment summary and entity name (not just count) in rectangular and inline families. Adaptive refresh: 5 minutes when overdue items exist, 30 minutes otherwise. Swipe-to-fulfill gesture already existed. Manual refresh button added to toolbar, triggers WatchSyncService.requestSync() and WidgetCenter.reloadAllTimelines()."
       }
     ]
   }

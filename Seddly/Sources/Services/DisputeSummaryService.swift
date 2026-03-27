@@ -6,6 +6,11 @@ actor DisputeSummaryService {
     private let authToken: String?
     private let privacyAuditService = PrivacyAuditService()
 
+    /// In-flight request deduplication: keyed by entity name, value is the pending Task.
+    private var inFlightRequests: [String: Task<String, Error>] = [:]
+    /// Timestamps for when each dedup entry was created, cleared after 60 seconds to allow retries.
+    private var inFlightTimestamps: [String: Date] = [:]
+
     init(endpointURL: URL, authToken: String? = nil) {
         self.endpointURL = endpointURL
         self.authToken = authToken
@@ -16,6 +21,36 @@ actor DisputeSummaryService {
     }
 
     func generateSummary(
+        entityName: String,
+        commitments: [LocalCommitment],
+        context: ModelContext
+    ) async throws -> String {
+        // Deduplication: return existing in-flight request for same entity
+        cleanupStaleDedup()
+
+        if let existing = inFlightRequests[entityName] {
+            return try await existing.value
+        }
+
+        let task = Task<String, Error> { [self] in
+            try await performGenerateSummary(entityName: entityName, commitments: commitments, context: context)
+        }
+        inFlightRequests[entityName] = task
+        inFlightTimestamps[entityName] = Date()
+
+        do {
+            let result = try await task.value
+            inFlightRequests.removeValue(forKey: entityName)
+            inFlightTimestamps.removeValue(forKey: entityName)
+            return result
+        } catch {
+            inFlightRequests.removeValue(forKey: entityName)
+            inFlightTimestamps.removeValue(forKey: entityName)
+            throw error
+        }
+    }
+
+    private func performGenerateSummary(
         entityName: String,
         commitments: [LocalCommitment],
         context: ModelContext
@@ -102,6 +137,16 @@ actor DisputeSummaryService {
         summary += "Summary: \(fulfilled) of \(commitments.count) commitments fulfilled. \(overdue) overdue."
 
         return summary
+    }
+
+    /// Removes deduplication entries older than 60 seconds to allow retries.
+    private func cleanupStaleDedup() {
+        let cutoff = Date().addingTimeInterval(-60)
+        for (key, timestamp) in inFlightTimestamps where timestamp < cutoff {
+            inFlightRequests[key]?.cancel()
+            inFlightRequests.removeValue(forKey: key)
+            inFlightTimestamps.removeValue(forKey: key)
+        }
     }
 
     enum DisputeSummaryError: LocalizedError {

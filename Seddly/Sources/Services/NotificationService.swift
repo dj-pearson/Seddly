@@ -7,7 +7,7 @@ actor NotificationService {
     }
 
     func scheduleDeadlineApproaching(for commitment: LocalCommitment) async {
-        guard UserDefaults.standard.bool(forKey: "notificationsEnabled") != false else { return }
+        guard (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).bool(forKey: "notificationsEnabled") != false else { return }
         guard let deadline = commitment.deadline else { return }
 
         let triggerDate = Calendar.current.date(byAdding: .hour, value: -24, to: deadline) ?? deadline
@@ -34,7 +34,7 @@ actor NotificationService {
     }
 
     func scheduleDeadlinePassed(for commitment: LocalCommitment) async {
-        guard UserDefaults.standard.bool(forKey: "notificationsEnabled") != false else { return }
+        guard (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).bool(forKey: "notificationsEnabled") != false else { return }
         guard let deadline = commitment.deadline else { return }
 
         let triggerDate = Calendar.current.date(byAdding: .day, value: 1, to: deadline) ?? deadline

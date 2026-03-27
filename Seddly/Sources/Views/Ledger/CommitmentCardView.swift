@@ -5,7 +5,7 @@ struct CommitmentCardView: View {
     @ScaledMetric(relativeTo: .caption2) private var badgePadding: CGFloat = 6
 
     private var isNew: Bool {
-        let lastViewed = UserDefaults.standard.object(forKey: "lastViewedDate") as? Date ?? .distantPast
+        let lastViewed = (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).object(forKey: "lastViewedDate") as? Date ?? .distantPast
         return commitment.createdAt > lastViewed
     }
 

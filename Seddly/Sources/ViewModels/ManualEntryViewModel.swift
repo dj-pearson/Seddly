@@ -11,9 +11,33 @@ final class ManualEntryViewModel {
     var notes = ""
     var category: CommitmentCategory = .uncategorized
 
+    static let entityNameMaxLength = 100
+    static let summaryMaxLength = 500
+
+    var entityNameError: String? {
+        let trimmed = entityName.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return "Entity name is required" }
+        if trimmed.count > Self.entityNameMaxLength { return "Entity name must be \(Self.entityNameMaxLength) characters or fewer" }
+        return nil
+    }
+
+    var summaryError: String? {
+        let trimmed = summary.trimmingCharacters(in: .whitespaces)
+        if trimmed.isEmpty { return "Summary is required" }
+        if trimmed.count > Self.summaryMaxLength { return "Summary must be \(Self.summaryMaxLength) characters or fewer" }
+        return nil
+    }
+
+    var dollarAmountError: String? {
+        guard !dollarAmount.isEmpty else { return nil }
+        let cleaned = dollarAmount.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "")
+        guard let value = Decimal(string: cleaned) else { return "Enter a valid dollar amount" }
+        if value < 0 { return "Amount must be a positive number" }
+        return nil
+    }
+
     var isValid: Bool {
-        !entityName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !summary.trimmingCharacters(in: .whitespaces).isEmpty
+        entityNameError == nil && summaryError == nil && dollarAmountError == nil
     }
 
     func createCommitment(in context: ModelContext) -> LocalCommitment {

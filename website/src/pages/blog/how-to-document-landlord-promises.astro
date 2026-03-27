@@ -3,6 +3,26 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="How to Document Landlord Promises — Seddly Blog" description="Your landlord says they'll fix the AC 'by next Friday.' Here's how to turn that screenshot into accountability.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "How to Document Landlord Promises (So They Can't Deny Them Later)",
+    "description": "Your landlord says they'll fix the AC 'by next Friday.' Here's how to turn that screenshot into accountability.",
+    "datePublished": "2026-03-23",
+    "author": {
+      "@type": "Organization",
+      "name": "Seddly Team"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Seddly",
+      "url": "https://seddly.com"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://seddly.com/blog/how-to-document-landlord-promises"
+    }
+  })} />
   <article class="blog-post">
     <header>
       <span class="category">Renters</span>

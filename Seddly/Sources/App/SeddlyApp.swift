@@ -24,9 +24,10 @@ struct SeddlyApp: App {
     @State private var subscriptionService = SubscriptionService()
     @State private var calendarService = CalendarService()
     private let authService: AuthService
-    @State private var deepLinkCommitmentID: String?
+    @AppStorage("deepLinkCommitmentID") private var deepLinkCommitmentID: String?
     @State private var showDeepLinkNotFound = false
     @State private var showMigrationError = false
+    @State private var showDowngradeAlert = false
     private let migrationErrorMessage: String?
 
     init() {
@@ -95,20 +96,57 @@ struct SeddlyApp: App {
                         showMigrationError = true
                     }
                 }
+                .onChange(of: subscriptionService.tierDowngradeDetected) { _, detected in
+                    if detected {
+                        handleTierDowngrade()
+                        showDowngradeAlert = true
+                    }
+                }
+                .alert("Subscription Changed", isPresented: $showDowngradeAlert) {
+                    Button("OK", role: .cancel) {
+                        subscriptionService.dismissDowngradeAlert()
+                    }
+                } message: {
+                    Text(subscriptionService.downgradeMessage)
+                }
         }
         .modelContainer(modelContainer)
     }
 
+    private func handleTierDowngrade() {
+        let newTier = subscriptionService.currentTier
+        let oldTier = subscriptionService.previousTier
+
+        // Sign out of Supabase when downgrading from Pro+
+        if oldTier == .proPlus && newTier < .proPlus {
+            Task {
+                await authService.signOut()
+            }
+            let defaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard
+            defaults.set(false, forKey: "isSignedIn")
+        }
+    }
+
     private func handleDeepLink(_ url: URL) {
-        // Handle seddly.com/c/{id} universal links
-        guard url.host == "seddly.com" || url.host == "www.seddly.com",
-              url.pathComponents.count >= 3,
-              url.pathComponents[1] == "c" else { return }
+        let commitmentID: String?
 
-        let commitmentShortID = url.pathComponents[2]
-        deepLinkCommitmentID = commitmentShortID
+        if url.scheme == "seddly" {
+            // Handle seddly://commitment/{id} widget deep links
+            guard url.host == "commitment",
+                  let id = url.pathComponents.dropFirst().first else { return }
+            commitmentID = id
+        } else {
+            // Handle seddly.com/c/{id} universal links
+            guard url.host == "seddly.com" || url.host == "www.seddly.com",
+                  url.pathComponents.count >= 3,
+                  url.pathComponents[1] == "c" else { return }
+            commitmentID = url.pathComponents[2]
+        }
 
-        // Search for matching commitment by ID prefix
+        guard let commitmentID else { return }
+        deepLinkCommitmentID = commitmentID
+
+        // Search for matching commitment by ID or ID prefix
         let context = modelContainer.mainContext
         let descriptor = FetchDescriptor<LocalCommitment>()
         guard let commitments = try? context.fetch(descriptor) else {
@@ -117,7 +155,8 @@ struct SeddlyApp: App {
         }
 
         let match = commitments.first { commitment in
-            commitment.id.uuidString.lowercased().hasPrefix(commitmentShortID.lowercased())
+            commitment.id.uuidString.lowercased() == commitmentID.lowercased()
+            || commitment.id.uuidString.lowercased().hasPrefix(commitmentID.lowercased())
         }
 
         if match == nil {

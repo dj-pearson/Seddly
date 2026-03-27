@@ -10,7 +10,7 @@ final class LocalEntity {
     var createdAt: Date
     var updatedAt: Date
 
-    @Relationship(deleteRule: .cascade)
+    @Relationship(deleteRule: .nullify)
     var commitments: [LocalCommitment]
 
     var totalCommitments: Int {

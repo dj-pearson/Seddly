@@ -11,6 +11,10 @@ actor ScreenshotProcessingService {
     private let notificationService = NotificationService()
     private let privacyAuditService = PrivacyAuditService()
 
+    /// OCR text cache keyed by screenshot asset ID to avoid re-processing.
+    private var ocrCache: [String: String] = []
+    private static let maxCommitmentsPerResponse = 100
+
     struct ProcessingResult {
         var screenshotsFound: Int = 0
         var screenshotsProcessed: Int = 0
@@ -28,22 +32,33 @@ actor ScreenshotProcessingService {
     ) async -> ProcessingResult {
         var result = ProcessingResult()
 
-        let assets = screenshotService.fetchNewScreenshots(since: date)
-        result.screenshotsFound = assets.count
+        let allAssets = screenshotService.fetchNewScreenshots(since: date)
+        let assets = Array(allAssets.prefix(100))
+        result.screenshotsFound = allAssets.count
+
+        // Pre-fetch all ProcessingQueue asset IDs to avoid N+1 queries
+        let allQueueDescriptor = FetchDescriptor<ProcessingQueue>()
+        let queuedAssetIDs = Set((try? context.fetch(allQueueDescriptor))?.map(\.screenshotAssetID) ?? [])
+
+        // Cache threshold once per batch instead of per screenshot
+        let adjustedThreshold = ClassifierFeedbackService.currentThreshold()
 
         for asset in assets {
             let assetID = asset.localIdentifier
 
             // Skip already-queued screenshots
-            let descriptor = FetchDescriptor<ProcessingQueue>(
-                predicate: #Predicate { $0.screenshotAssetID == assetID }
-            )
-            if (try? context.fetchCount(descriptor)) ?? 0 > 0 { continue }
+            if queuedAssetIDs.contains(assetID) { continue }
 
-            guard let image = await loadImage(from: asset) else { continue }
-
-            // Layer 1: OCR
-            guard let ocrText = try? await ocrService.recognizeText(in: image) else { continue }
+            // Layer 1: OCR (check cache first to avoid re-processing)
+            let ocrText: String
+            if let cached = ocrCache[assetID] {
+                ocrText = cached
+            } else {
+                guard let image = await loadImage(from: asset) else { continue }
+                guard let recognized = try? await ocrService.recognizeText(in: image) else { continue }
+                ocrText = recognized
+                ocrCache[assetID] = recognized
+            }
 
             // Layer 2: Classification
             let category = await classifierService.classify(image, ocrText: ocrText)
@@ -56,8 +71,7 @@ actor ScreenshotProcessingService {
                 continue
             }
 
-            // Layer 3: Rule-based filter (use feedback-adjusted threshold)
-            let adjustedThreshold = ClassifierFeedbackService.currentThreshold()
+            // Layer 3: Rule-based filter (use feedback-adjusted threshold cached above)
             let ruleScore = RuleFilterService.score(text: ocrText)
 
             let queueItem = ProcessingQueue(screenshotAssetID: assetID)
@@ -119,6 +133,9 @@ actor ScreenshotProcessingService {
 
         try? context.save()
 
+        // Clear OCR cache after batch completes
+        ocrCache.removeAll()
+
         UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
             .set(Date.now, forKey: "lastProcessedDate")
 
@@ -149,8 +166,11 @@ actor ScreenshotProcessingService {
 
         var count = 0
 
+        // Validate AI response: cap at maxCommitmentsPerResponse to prevent abuse
+        let validatedCommitments = Array(response.commitments.prefix(Self.maxCommitmentsPerResponse))
+
         // Pre-fetch entities to avoid N+1 queries
-        let uniqueEntityNames = Set(response.commitments.filter { $0.confidence >= 4 }.map(\.madeBy))
+        let uniqueEntityNames = Set(validatedCommitments.filter { $0.confidence >= 4 }.map(\.madeBy))
         var entityCache: [String: LocalEntity] = [:]
         for name in uniqueEntityNames {
             let entityDescriptor = FetchDescriptor<LocalEntity>(
@@ -161,7 +181,7 @@ actor ScreenshotProcessingService {
             }
         }
 
-        for extracted in response.commitments {
+        for extracted in validatedCommitments {
             guard extracted.confidence >= 4 else { continue }
 
             let deadline: Date? = if let dateStr = extracted.deadline {

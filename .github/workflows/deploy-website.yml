@@ -31,6 +31,28 @@ jobs:
         working-directory: website
         run: npm run build
 
+      - name: Validate HTML output
+        working-directory: website
+        run: |
+          echo "Checking HTML output files..."
+          file_count=$(find dist -name "*.html" | wc -l)
+          echo "Found ${file_count} HTML files"
+          if [ "$file_count" -eq 0 ]; then
+            echo "::error::No HTML files found in dist/ — build may have failed silently"
+            exit 1
+          fi
+          # Check each HTML file is well-formed (has doctype and closing tags)
+          for f in $(find dist -name "*.html"); do
+            if ! head -5 "$f" | grep -qi "doctype\|<!DOCTYPE"; then
+              echo "::warning::${f} may be missing DOCTYPE declaration"
+            fi
+            if ! grep -q "</html>" "$f"; then
+              echo "::error::${f} is missing closing </html> tag"
+              exit 1
+            fi
+          done
+          echo "All HTML files validated successfully"
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:

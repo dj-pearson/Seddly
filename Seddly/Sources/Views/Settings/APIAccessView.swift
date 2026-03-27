@@ -7,7 +7,7 @@ struct APIAccessView: View {
     @State private var copiedEndpoint = false
     @State private var copiedToken = false
 
-    @AppStorage("isSignedIn") private var isSignedIn = false
+    @AppStorage("isSignedIn", store: UserDefaults(suiteName: AppConstants.appGroupIdentifier)) private var isSignedIn = false
 
     private var apiToken: String {
         // Read JWT from Keychain if signed in

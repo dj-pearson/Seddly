@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 final class PrivacyAuditEntry {
+    #Index<PrivacyAuditEntry>([\.timestamp])
+
     @Attribute(.unique) var id: UUID
     var timestamp: Date
     var eventTypeRaw: String

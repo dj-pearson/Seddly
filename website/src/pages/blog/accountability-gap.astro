@@ -3,6 +3,26 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="The Accountability Gap: Why People Break Promises and How to Close It — Seddly Blog" description="Most broken promises aren't malicious — they're forgotten. Here's how to close the accountability gap.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "The Accountability Gap: Why People Break Promises and How to Close It",
+    "description": "Most broken promises aren't malicious — they're forgotten. Here's how to close the accountability gap.",
+    "datePublished": "2026-03-23",
+    "author": {
+      "@type": "Organization",
+      "name": "Seddly Team"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Seddly",
+      "url": "https://seddly.com"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://seddly.com/blog/accountability-gap"
+    }
+  })} />
   <article class="blog-post">
     <header>
       <span class="category">Product</span>

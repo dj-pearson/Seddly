@@ -1,0 +1,77 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+---
+
+<BaseLayout title="Page Not Found — Seddly" robots="noindex, nofollow">
+  <section class="not-found">
+    <h1>404</h1>
+    <p class="subtitle">Page not found</p>
+    <p class="description">The page you're looking for doesn't exist or has been moved.</p>
+    <div class="links">
+      <a href="/" class="cta-button">Go to Homepage</a>
+      <a href="/how-it-works">How It Works</a>
+      <a href="/support">Support</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .not-found {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 6rem 2rem;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 6rem;
+    font-weight: 800;
+    color: var(--color-accent);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--color-text);
+    margin-bottom: 1rem;
+  }
+
+  .description {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 2.5rem;
+  }
+
+  .links {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .cta-button {
+    background: var(--color-accent);
+    color: white !important;
+    padding: 0.75rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    transition: background 0.2s;
+  }
+
+  .cta-button:hover {
+    background: var(--color-accent-hover);
+  }
+
+  .links a:not(.cta-button) {
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+  }
+
+  .links a:not(.cta-button):hover {
+    color: var(--color-accent);
+  }
+</style>

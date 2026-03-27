@@ -22,15 +22,61 @@ struct OnboardingView: View {
                 hasCompletedOnboarding = true
             }
         } else {
-            TabView(selection: $viewModel.currentPage) {
-                welcomePage.tag(0)
-                howItWorksPage.tag(1)
-                privacyPage.tag(2)
-                permissionPage.tag(3)
-                notificationPage.tag(4)
+            VStack(spacing: 0) {
+                // Progress indicator
+                HStack(spacing: 0) {
+                    if viewModel.currentPage > 0 {
+                        Button {
+                            withAnimation { viewModel.currentPage -= 1 }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.body.weight(.semibold))
+                        }
+                    } else {
+                        Color.clear.frame(width: 24)
+                    }
+
+                    Spacer()
+
+                    Text("Step \(viewModel.currentPage + 1) of 5")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.secondary)
+
+                    Spacer()
+
+                    Button("Skip") {
+                        finishOnboarding()
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+
+                // Step progress bar
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.secondary.opacity(0.2))
+                            .frame(height: 4)
+                        Capsule()
+                            .fill(Color.accentColor)
+                            .frame(width: geo.size.width * CGFloat(viewModel.currentPage + 1) / 5.0, height: 4)
+                            .animation(.easeInOut, value: viewModel.currentPage)
+                    }
+                }
+                .frame(height: 4)
+                .padding(.horizontal)
+
+                TabView(selection: $viewModel.currentPage) {
+                    welcomePage.tag(0)
+                    howItWorksPage.tag(1)
+                    privacyPage.tag(2)
+                    permissionPage.tag(3)
+                    notificationPage.tag(4)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
             }
-            .tabViewStyle(.page)
-            .indexViewStyle(.page(backgroundDisplayMode: .always))
         }
     }
 
@@ -144,13 +190,13 @@ struct OnboardingView: View {
                     finishOnboarding()
                 }
             } label: {
-                Text("Enable Notifications")
+                Text("Enable Notifications & Get Started")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
 
-            Button("Skip") {
+            Button("Start Without Notifications") {
                 finishOnboarding()
             }
             .foregroundStyle(.secondary)

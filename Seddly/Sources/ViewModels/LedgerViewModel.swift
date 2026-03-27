@@ -3,16 +3,41 @@ import SwiftData
 
 @Observable
 final class LedgerViewModel {
-    var sortOrder: SortOrder = .deadline
-    var filterStatus: CommitmentStatus?
+    private static let sortOrderKey = "ledger_sortOrder"
+    private static let filterStatusKey = "ledger_filterStatus"
+    private static let filterCategoryKey = "ledger_filterCategory"
+
+    var sortOrder: SortOrder = .deadline {
+        didSet { UserDefaults.standard.set(sortOrder.rawValue, forKey: Self.sortOrderKey) }
+    }
+    var filterStatus: CommitmentStatus? {
+        didSet { UserDefaults.standard.set(filterStatus?.rawValue, forKey: Self.filterStatusKey) }
+    }
     var filterEntityName: String?
     var filterHasDeadlineOnly = false
     var filterDateStart: Date?
     var filterDateEnd: Date?
-    var filterCategory: CommitmentCategory?
+    var filterCategory: CommitmentCategory? {
+        didSet { UserDefaults.standard.set(filterCategory?.rawValue, forKey: Self.filterCategoryKey) }
+    }
     var filterAmountMin: Double?
     var filterAmountMax: Double?
     var searchText = ""
+
+    init() {
+        if let savedSort = UserDefaults.standard.string(forKey: Self.sortOrderKey),
+           let sort = SortOrder(rawValue: savedSort) {
+            sortOrder = sort
+        }
+        if let savedStatus = UserDefaults.standard.string(forKey: Self.filterStatusKey),
+           let status = CommitmentStatus(rawValue: savedStatus) {
+            filterStatus = status
+        }
+        if let savedCategory = UserDefaults.standard.string(forKey: Self.filterCategoryKey),
+           let category = CommitmentCategory(rawValue: savedCategory) {
+            filterCategory = category
+        }
+    }
 
     // MARK: - Pagination
 

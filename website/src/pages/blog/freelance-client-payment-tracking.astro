@@ -3,6 +3,26 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout title="Stop Chasing Invoices: How Freelancers Can Track Client Payment Promises — Seddly Blog" description="When a client says 'we'll pay Net 30' in a text and it's now Net 60, you need more than a screenshot buried in your camera roll.">
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Stop Chasing Invoices: How Freelancers Can Track Client Payment Promises",
+    "description": "When a client says 'we'll pay Net 30' in a text and it's now Net 60, you need more than a screenshot buried in your camera roll.",
+    "datePublished": "2026-03-23",
+    "author": {
+      "@type": "Organization",
+      "name": "Seddly Team"
+    },
+    "publisher": {
+      "@type": "Organization",
+      "name": "Seddly",
+      "url": "https://seddly.com"
+    },
+    "mainEntityOfPage": {
+      "@type": "WebPage",
+      "@id": "https://seddly.com/blog/freelance-client-payment-tracking"
+    }
+  })} />
   <article class="blog-post">
     <header>
       <span class="category">Freelancers</span>

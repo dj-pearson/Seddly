@@ -13,6 +13,7 @@ struct ManualEntryView: View {
     @State private var showingTemplates = false
     @State private var showingSaveError = false
     @State private var isSaving = false
+    @State private var hasAttemptedSave = false
 
     private var filteredEntities: [LocalEntity] {
         guard !viewModel.entityName.isEmpty else { return [] }
@@ -31,11 +32,23 @@ struct ManualEntryView: View {
                     }
                 }
 
-                Section("Who made the commitment?") {
+                Section {
                     TextField("Person or company name", text: $viewModel.entityName)
                         .onChange(of: viewModel.entityName) {
                             showingSuggestions = !filteredEntities.isEmpty && !viewModel.entityName.isEmpty
                         }
+
+                    HStack {
+                        if hasAttemptedSave, let error = viewModel.entityNameError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        Spacer()
+                        Text("\(viewModel.entityName.count)/\(ManualEntryViewModel.entityNameMaxLength)")
+                            .font(.caption)
+                            .foregroundStyle(viewModel.entityName.count > ManualEntryViewModel.entityNameMaxLength ? .red : .secondary)
+                    }
 
                     if showingSuggestions {
                         ForEach(filteredEntities) { entity in
@@ -56,11 +69,27 @@ struct ManualEntryView: View {
                             .foregroundStyle(.primary)
                         }
                     }
+                } header: {
+                    Text("Who made the commitment?")
                 }
 
-                Section("What did they promise?") {
+                Section {
                     TextField("Describe the commitment", text: $viewModel.summary, axis: .vertical)
                         .lineLimit(2...4)
+
+                    HStack {
+                        if hasAttemptedSave, let error = viewModel.summaryError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                        Spacer()
+                        Text("\(viewModel.summary.count)/\(ManualEntryViewModel.summaryMaxLength)")
+                            .font(.caption)
+                            .foregroundStyle(viewModel.summary.count > ManualEntryViewModel.summaryMaxLength ? .red : .secondary)
+                    }
+                } header: {
+                    Text("What did they promise?")
                 }
 
                 Section("Deadline") {
@@ -80,6 +109,12 @@ struct ManualEntryView: View {
                 Section("Amount (optional)") {
                     TextField("$0.00", text: $viewModel.dollarAmount)
                         .keyboardType(.decimalPad)
+
+                    if hasAttemptedSave, let error = viewModel.dollarAmountError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
                 }
 
                 Section("Category") {
@@ -125,7 +160,10 @@ struct ManualEntryView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button {
-                        saveCommitment()
+                        hasAttemptedSave = true
+                        if viewModel.isValid {
+                            saveCommitment()
+                        }
                     } label: {
                         if isSaving {
                             ProgressView()
@@ -133,7 +171,7 @@ struct ManualEntryView: View {
                             Text("Save")
                         }
                     }
-                    .disabled(!viewModel.isValid || isSaving)
+                    .disabled(isSaving)
                 }
             }
             .onChange(of: selectedPhoto) {

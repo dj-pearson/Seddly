@@ -6,6 +6,15 @@ struct EntityMergeView: View {
     @Query(sort: \LocalEntity.name) private var entities: [LocalEntity]
     @State private var suggestions: [EntityMergingService.MergeSuggestion] = []
     @State private var hasScanned = false
+    @State private var searchText = ""
+
+    private var filteredSuggestions: [EntityMergingService.MergeSuggestion] {
+        guard !searchText.isEmpty else { return suggestions }
+        return suggestions.filter { suggestion in
+            suggestion.primary.name.localizedCaseInsensitiveContains(searchText) ||
+            suggestion.duplicates.contains { $0.name.localizedCaseInsensitiveContains(searchText) }
+        }
+    }
 
     var body: some View {
         List {
@@ -26,8 +35,12 @@ struct EntityMergeView: View {
                         Text("No duplicate entities found.")
                     }
                 }
+            } else if hasScanned && filteredSuggestions.isEmpty && !searchText.isEmpty {
+                Section {
+                    ContentUnavailableView.search(text: searchText)
+                }
             } else {
-                ForEach(suggestions) { suggestion in
+                ForEach(filteredSuggestions) { suggestion in
                     Section {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Keep: \(suggestion.primary.name)")
@@ -54,6 +67,7 @@ struct EntityMergeView: View {
                                         duplicates: suggestion.duplicates,
                                         context: modelContext
                                     )
+                                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                                     suggestions.removeAll { $0.id == suggestion.id }
                                 } label: {
                                     Label("Merge", systemImage: "arrow.triangle.merge")
@@ -76,5 +90,6 @@ struct EntityMergeView: View {
         }
         .navigationTitle("Merge Entities")
         .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: $searchText, prompt: "Search entities")
     }
 }

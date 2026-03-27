@@ -3,10 +3,32 @@ import StoreKit
 @Observable
 final class SubscriptionService {
     private(set) var currentTier: SubscriptionTier = .free
+    private(set) var previousTier: SubscriptionTier = .free
+    private(set) var tierDowngradeDetected = false
     private var updateListenerTask: Task<Void, Never>?
 
     enum SubscriptionTier: Comparable {
         case free, pro, proPlus
+
+        var displayName: String {
+            switch self {
+            case .free: "Free"
+            case .pro: "Pro"
+            case .proPlus: "Pro+"
+            }
+        }
+    }
+
+    var downgradeMessage: String {
+        "Your subscription changed from \(previousTier.displayName) to \(currentTier.displayName). Some features have been adjusted."
+    }
+
+    var isSyncEnabled: Bool {
+        currentTier == .proPlus
+    }
+
+    var isAIExtractionEnabled: Bool {
+        currentTier >= .pro
     }
 
     init() {
@@ -16,6 +38,10 @@ final class SubscriptionService {
 
     deinit {
         updateListenerTask?.cancel()
+    }
+
+    func dismissDowngradeAlert() {
+        tierDowngradeDetected = false
     }
 
     func refreshSubscriptionStatus() async {
@@ -31,7 +57,13 @@ final class SubscriptionService {
             }
         }
 
+        let oldTier = currentTier
         currentTier = highestTier
+
+        if highestTier < oldTier {
+            previousTier = oldTier
+            tierDowngradeDetected = true
+        }
     }
 
     func purchase(_ productID: String) async throws -> Transaction? {

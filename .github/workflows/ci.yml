@@ -30,7 +30,15 @@ jobs:
           swift --version
 
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: brew install xcodegen@2.42.0 || brew install xcodegen
+
+      - name: Cache Xcode derived data
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('project.yml', '**/*.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -61,7 +69,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             | xcbeautify --quiet
 
-      - name: Run unit tests
+      - name: SwiftLint
+        run: |
+          brew install swiftlint || true
+          swiftlint lint --strict --reporter github-actions-logging Seddly/Sources/
+
+      - name: Run unit tests with coverage
         run: |
           set -o pipefail
           xcodebuild test-without-building \
@@ -70,7 +83,22 @@ jobs:
             -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
             -configuration Debug \
             -resultBundlePath TestResults.xcresult \
+            -enableCodeCoverage YES \
             | xcbeautify --quiet
+
+      - name: Check test coverage
+        run: |
+          COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"lineCoverage\"]*100:.1f}')")
+          echo "Code coverage: ${COVERAGE}%"
+          python3 -c "
+          coverage = float('${COVERAGE}')
+          if coverage < 60:
+              print(f'::error::Code coverage {coverage}% is below the 60% minimum threshold')
+              exit(1)
+          else:
+              print(f'Coverage {coverage}% meets the 60% minimum threshold')
+          "
 
       - name: Upload test results
         if: always()

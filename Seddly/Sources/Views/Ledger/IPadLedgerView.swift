@@ -14,7 +14,8 @@ struct IPadLedgerView: View {
     @State private var showingFulfillConfirm = false
     @State private var pendingSwipeCommitment: LocalCommitment?
     @State private var columnVisibility = NavigationSplitViewVisibility.all
-    @AppStorage("isSignedIn") private var isSignedIn = false
+    private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
+    @AppStorage("isSignedIn", store: appGroupDefaults) private var isSignedIn = false
 
     private var visibleCommitments: [LocalCommitment] {
         viewModel.applyHistoryLimit(Array(commitments), tier: subscriptionService.currentTier)

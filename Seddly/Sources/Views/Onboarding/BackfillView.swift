@@ -195,7 +195,7 @@ struct BackfillView: View {
             isProcessing = false
 
             if progress.commitmentsDetected > 0 {
-                UserDefaults.standard.set(true, forKey: "showBackfillReviewBanner")
+                (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(true, forKey: "showBackfillReviewBanner")
             }
         }
     }

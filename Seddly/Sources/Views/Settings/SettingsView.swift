@@ -6,13 +6,14 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SubscriptionService.self) private var subscriptionService
     @Environment(\.authService) private var authService
-    @AppStorage("offlineMode") private var offlineMode = false
-    @AppStorage("autoAnalyze") private var autoAnalyze = false
-    @AppStorage("approvedExtractionCount") private var approvedExtractionCount = 0
-    @AppStorage("isSignedIn") private var isSignedIn = false
-    @AppStorage("signedInEmail") private var signedInEmail = ""
+    private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
+    @AppStorage("offlineMode", store: appGroupDefaults) private var offlineMode = false
+    @AppStorage("autoAnalyze", store: appGroupDefaults) private var autoAnalyze = false
+    @AppStorage("approvedExtractionCount", store: appGroupDefaults) private var approvedExtractionCount = 0
+    @AppStorage("isSignedIn", store: appGroupDefaults) private var isSignedIn = false
+    @AppStorage("signedInEmail", store: appGroupDefaults) private var signedInEmail = ""
     @State private var showDeleteConfirmation = false
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
+    @AppStorage("notificationsEnabled", store: appGroupDefaults) private var notificationsEnabled = true
     @State private var dailyDigestTime = DateComponents(hour: 20, minute: 0)
     @State private var signInError: String?
 
@@ -75,7 +76,7 @@ struct SettingsView: View {
                                     dailyDigestTime = Calendar.current.dateComponents([.hour, .minute], from: $0)
                                     // Persist for background/foreground digest scheduling
                                     let components = Calendar.current.dateComponents([.hour, .minute], from: $0)
-                                    UserDefaults.standard.set(
+                                    (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(
                                         ["hour": components.hour ?? 20, "minute": components.minute ?? 0],
                                         forKey: "dailyDigestTime"
                                     )

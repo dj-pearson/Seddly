@@ -28,6 +28,10 @@ actor BackgroundTaskService {
         }
     }
 
+    /// Internal timeout (25 seconds) — shorter than the system expiration handler.
+    /// Ensures graceful shutdown with time to save partial progress.
+    private static let internalTimeoutSeconds: UInt64 = 25
+
     private func handleScreenshotRefresh(_ task: BGAppRefreshTask) async {
         // Schedule next refresh immediately to maintain frequency
         scheduleNextRefresh()
@@ -36,11 +40,19 @@ actor BackgroundTaskService {
             await processNewScreenshotsInBackground()
         }
 
+        // System expiration handler cancels the task if iOS needs the time back
         task.expirationHandler = {
             processingTask.cancel()
         }
 
+        // Internal timeout: cancel before the system does, leaving time for cleanup
+        let timeoutTask = Task {
+            try? await Task.sleep(for: .seconds(Self.internalTimeoutSeconds))
+            processingTask.cancel()
+        }
+
         await processingTask.value
+        timeoutTask.cancel()
         task.setTaskCompleted(success: true)
     }
 

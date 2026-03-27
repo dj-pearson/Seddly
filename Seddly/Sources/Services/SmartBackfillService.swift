@@ -18,10 +18,13 @@ actor SmartBackfillService {
 
     /// Groups screenshots taken within a short time window with similar content.
     func groupRelatedScreenshots(assets: [PHAsset]) async -> [ScreenshotGroup] {
+        // Limit to 100 screenshots per backfill run to avoid memory pressure
+        let limitedAssets = Array(assets.prefix(100))
+
         // First pass: extract text from all assets
         var assetTexts: [(asset: PHAsset, text: String)] = []
 
-        for asset in assets {
+        for asset in limitedAssets {
             guard let image = await loadImage(from: asset),
                   let text = try? await ocrService.recognizeText(in: image) else { continue }
 

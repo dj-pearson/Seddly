@@ -11,8 +11,9 @@ struct LedgerView: View {
     @State private var showingFilter = false
     @State private var showingUpgrade = false
     @State private var showingReviewQueue = false
-    @AppStorage("autoAnalyze") private var autoAnalyze = false
-    @AppStorage("offlineMode") private var offlineMode = false
+    private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
+    @AppStorage("autoAnalyze", store: appGroupDefaults) private var autoAnalyze = false
+    @AppStorage("offlineMode", store: appGroupDefaults) private var offlineMode = false
     @State private var isProcessing = false
     @State private var newCommitmentsCount = 0
     @State private var showingBulkAction = false
@@ -22,6 +23,10 @@ struct LedgerView: View {
     @State private var showingAIReview = false
     @State private var pendingAIText: String?
     @State private var pendingAICallback: ((String?) -> Void)?
+    @State private var undoState: UndoState?
+    @State private var undoDismissTask: Task<Void, Never>?
+
+    private var networkMonitor: NetworkMonitorService { NetworkMonitorService.shared }
 
     private var visibleCommitments: [LocalCommitment] {
         viewModel.applyHistoryLimit(Array(commitments), tier: subscriptionService.currentTier)
@@ -42,8 +47,8 @@ struct LedgerView: View {
     }
 
     @State private var showingBackfill = false
-    @AppStorage("showBackfillReviewBanner") private var showBackfillReviewBanner = false
-    @AppStorage("isSignedIn") private var isSignedIn = false
+    @AppStorage("showBackfillReviewBanner", store: appGroupDefaults) private var showBackfillReviewBanner = false
+    @AppStorage("isSignedIn", store: appGroupDefaults) private var isSignedIn = false
 
     var body: some View {
         NavigationStack {
@@ -80,6 +85,7 @@ struct LedgerView: View {
                 ToolbarItem(placement: .secondaryAction) {
                     if !visibleCommitments.isEmpty {
                         Button(viewModel.isSelecting ? "Cancel" : "Select") {
+                            UISelectionFeedbackGenerator().selectionChanged()
                             if viewModel.isSelecting {
                                 viewModel.clearSelection()
                             } else {
@@ -108,7 +114,12 @@ struct LedgerView: View {
             }
             .searchable(text: $viewModel.searchText, prompt: "Search commitments")
             .overlay(alignment: .top) {
-                if isProcessing {
+                if !networkMonitor.isConnected {
+                    offlineBanner
+                }
+            }
+            .overlay(alignment: .top) {
+                if isProcessing && networkMonitor.isConnected {
                     processingBanner
                 }
             }
@@ -135,11 +146,16 @@ struct LedgerView: View {
                     bulkActionBar
                 }
             }
+            .overlay(alignment: .bottom) {
+                if undoState != nil {
+                    undoToast
+                }
+            }
             .confirmationDialog("Bulk Action", isPresented: $showingBulkAction) {
                 Menu("Set Status") {
                     ForEach(CommitmentStatus.allCases) { status in
                         Button(status.label) {
-                            viewModel.bulkUpdateStatus(status, in: visibleCommitments)
+                            performBulkWithUndo(status: status)
                         }
                     }
                 }
@@ -156,7 +172,7 @@ struct LedgerView: View {
                 Button("Dismiss", role: .destructive) {
                     if let commitment = pendingSwipeCommitment {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                        viewModel.dismiss(commitment)
+                        performWithUndo(commitment: commitment, newStatus: .dismissed)
                     }
                     pendingSwipeCommitment = nil
                 }
@@ -165,14 +181,14 @@ struct LedgerView: View {
                 }
             } message: {
                 if let commitment = pendingSwipeCommitment {
-                    Text("\"\(commitment.summary)\" will be dismissed. You can undo this from the commitment detail view.")
+                    Text("\"\(commitment.summary)\" will be dismissed. You can undo this action for 5 seconds.")
                 }
             }
             .alert("Mark as Fulfilled?", isPresented: $showingFulfillConfirm) {
                 Button("Fulfill") {
                     if let commitment = pendingSwipeCommitment {
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        viewModel.fulfill(commitment)
+                        performWithUndo(commitment: commitment, newStatus: .fulfilled)
                     }
                     pendingSwipeCommitment = nil
                 }
@@ -181,7 +197,7 @@ struct LedgerView: View {
                 }
             } message: {
                 if let commitment = pendingSwipeCommitment {
-                    Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this from the commitment detail view.")
+                    Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this action for 5 seconds.")
                 }
             }
             .sheet(isPresented: $showingAIReview) {
@@ -254,7 +270,7 @@ struct LedgerView: View {
                     PhotoCleanupService.cleanupStaleReferences(in: modelContext)
                 } else if newPhase == .background {
                     // Mark current time so "New" badges clear next session
-                    UserDefaults.standard.set(Date.now, forKey: "lastViewedDate")
+                    (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(Date.now, forKey: "lastViewedDate")
                 }
             }
         }
@@ -324,6 +340,26 @@ struct LedgerView: View {
                     }
                 }
             }
+
+            if viewModel.hasMoreItems {
+                Section {
+                    HStack {
+                        Spacer()
+                        if viewModel.isLoadingMore {
+                            ProgressView()
+                        } else {
+                            Button("Load More") {
+                                viewModel.loadNextPage()
+                            }
+                            .font(.subheadline)
+                        }
+                        Spacer()
+                    }
+                    .onAppear {
+                        viewModel.loadNextPage()
+                    }
+                }
+            }
         }
         .refreshable {
             await refreshLedger()
@@ -341,13 +377,15 @@ struct LedgerView: View {
             let lastProcessed = UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
                 .object(forKey: "lastProcessedDate") as? Date
 
+            let effectiveOffline = offlineMode || !networkMonitor.isConnected
+
             let result = await processingService.processNewScreenshots(
                 since: lastProcessed,
                 context: modelContext,
                 aiEndpoint: nil,
                 subscriptionTier: subscriptionService.currentTier,
                 autoAnalyze: autoAnalyze,
-                offlineMode: offlineMode
+                offlineMode: effectiveOffline
             )
 
             withAnimation {
@@ -360,7 +398,7 @@ struct LedgerView: View {
             }
         }
 
-        if subscriptionService.currentTier == .proPlus, isSignedIn {
+        if subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected {
             if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
                let supabaseURL = URL(string: supabaseURLString),
                let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
@@ -395,6 +433,27 @@ struct LedgerView: View {
         .padding(.horizontal)
         .padding(.top, 4)
         .transition(.move(edge: .top).combined(with: .opacity))
+    }
+
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .foregroundStyle(.white)
+            Text("Offline")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.white)
+            Text("— AI extraction and sync require internet")
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.85))
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(.orange)
+        .clipShape(Capsule())
+        .padding(.top, 4)
+        .transition(.move(edge: .top).combined(with: .opacity))
+        .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 
     private var processingBanner: some View {
@@ -450,7 +509,7 @@ struct LedgerView: View {
                     item.processingStatus = .completed
                     try? modelContext.save()
 
-                    @AppStorage("approvedExtractionCount") var count = 0
+                    @AppStorage("approvedExtractionCount", store: LedgerView.appGroupDefaults) var count = 0
                     count += 1
                 } else {
                     // User skipped — mark as completed without AI
@@ -585,13 +644,15 @@ struct LedgerView: View {
             let lastProcessed = UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
                 .object(forKey: "lastProcessedDate") as? Date
 
+            let effectiveOffline = offlineMode || !networkMonitor.isConnected
+
             let result = await processingService.processNewScreenshots(
                 since: lastProcessed,
                 context: modelContext,
                 aiEndpoint: nil,
                 subscriptionTier: subscriptionService.currentTier,
                 autoAnalyze: autoAnalyze,
-                offlineMode: offlineMode
+                offlineMode: effectiveOffline
             )
 
             withAnimation {
@@ -613,7 +674,7 @@ struct LedgerView: View {
     }
 
     private func syncIfProPlus() {
-        guard subscriptionService.currentTier == .proPlus, isSignedIn else { return }
+        guard subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected else { return }
 
         Task {
             guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
@@ -636,7 +697,7 @@ struct LedgerView: View {
         }.count
 
         // Get user-configured digest time
-        let digestTime = UserDefaults.standard.object(forKey: "dailyDigestTime") as? [String: Int]
+        let digestTime = (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).object(forKey: "dailyDigestTime") as? [String: Int]
         let hour = digestTime?["hour"] ?? 20
         let minute = digestTime?["minute"] ?? 0
 
@@ -647,6 +708,92 @@ struct LedgerView: View {
             commitmentsDetected: commitmentsDetected,
             upcomingDeadlines: upcomingDeadlines
         )
+    }
+
+    // MARK: - Undo Support
+
+    private struct UndoState {
+        let commitments: [(LocalCommitment, CommitmentStatus)]
+        let label: String
+    }
+
+    private func performWithUndo(commitment: LocalCommitment, newStatus: CommitmentStatus) {
+        let previousStatus = commitment.status
+        if newStatus == .fulfilled {
+            viewModel.fulfill(commitment)
+        } else if newStatus == .dismissed {
+            viewModel.dismiss(commitment)
+        } else {
+            commitment.status = newStatus
+            commitment.updatedAt = .now
+        }
+        showUndo(
+            commitments: [(commitment, previousStatus)],
+            label: "\(newStatus.label): \(commitment.summary)"
+        )
+    }
+
+    private func performBulkWithUndo(status: CommitmentStatus) {
+        let affected = visibleCommitments.filter { viewModel.selectedCommitments.contains($0.id) }
+        let previousStates = affected.map { ($0, $0.status) }
+        viewModel.bulkUpdateStatus(status, in: visibleCommitments)
+        showUndo(
+            commitments: previousStates,
+            label: "Bulk \(status.label) (\(affected.count) items)"
+        )
+    }
+
+    private func showUndo(commitments: [(LocalCommitment, CommitmentStatus)], label: String) {
+        // Cancel any existing undo timer
+        undoDismissTask?.cancel()
+
+        withAnimation {
+            undoState = UndoState(commitments: commitments, label: label)
+        }
+
+        // Auto-dismiss after 5 seconds
+        undoDismissTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            withAnimation { undoState = nil }
+        }
+    }
+
+    private func performUndo() {
+        guard let state = undoState else { return }
+        undoDismissTask?.cancel()
+
+        for (commitment, previousStatus) in state.commitments {
+            commitment.status = previousStatus
+            commitment.updatedAt = .now
+        }
+
+        withAnimation { undoState = nil }
+    }
+
+    private var undoToast: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "arrow.uturn.backward.circle.fill")
+                .foregroundStyle(.white)
+            Text(undoState?.label ?? "")
+                .font(.subheadline)
+                .foregroundStyle(.white)
+                .lineLimit(1)
+            Spacer()
+            Button("Undo") {
+                performUndo()
+            }
+            .font(.subheadline.bold())
+            .foregroundStyle(.yellow)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.ultraThinMaterial.opacity(0.9))
+        .background(Color.accentColor.opacity(0.8))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+        .transition(.move(edge: .bottom).combined(with: .opacity))
     }
 }
 

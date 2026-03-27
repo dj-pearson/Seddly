@@ -4,6 +4,16 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+function structuredLog(
+  level: "info" | "warn" | "error",
+  fields: { requestId: string; action: string; userId?: string; statusCode?: number; [key: string]: unknown },
+) {
+  const entry = { timestamp: new Date().toISOString(), ...fields };
+  if (level === "error") console.error(JSON.stringify(entry));
+  else if (level === "warn") console.warn(JSON.stringify(entry));
+  else console.log(JSON.stringify(entry));
+}
+
 // ──────────────────────────────────────────────────────────────
 // Apple Root CA - G3 (base64 DER)
 // Trust anchor for App Store Server Notifications V2
@@ -319,7 +329,10 @@ async function verifyAppleJWS<T>(jws: string): Promise<T> {
 // ──────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID();
+
   if (req.method !== "POST") {
+    structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
       headers: { "Content-Type": "application/json" },
@@ -330,6 +343,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
 
     if (!body.signedPayload) {
+      structuredLog("warn", { requestId, action: "missing_payload", statusCode: 400 });
       return new Response(
         JSON.stringify({ error: "Missing signed notification payload" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -343,10 +357,7 @@ Deno.serve(async (req) => {
         body.signedPayload,
       );
     } catch (verifyError) {
-      console.error("JWS verification failed:", {
-        error: String(verifyError),
-        timestamp: new Date().toISOString(),
-      });
+      structuredLog("error", { requestId, action: "jws_verification_failed", statusCode: 400, detail: String(verifyError) });
       return new Response(
         JSON.stringify({ error: "Invalid JWS signature" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -356,6 +367,7 @@ Deno.serve(async (req) => {
     const { notificationType } = notification;
 
     if (!notification.data?.signedTransactionInfo) {
+      structuredLog("warn", { requestId, action: "missing_transaction_info", statusCode: 400 });
       return new Response(
         JSON.stringify({ error: "Missing transaction info" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -369,10 +381,7 @@ Deno.serve(async (req) => {
         notification.data.signedTransactionInfo,
       );
     } catch (verifyError) {
-      console.error("Transaction JWS verification failed:", {
-        error: String(verifyError),
-        timestamp: new Date().toISOString(),
-      });
+      structuredLog("error", { requestId, action: "transaction_jws_failed", statusCode: 400, detail: String(verifyError) });
       return new Response(
         JSON.stringify({ error: "Invalid transaction signature" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -384,11 +393,7 @@ Deno.serve(async (req) => {
       transactionPayload.bundleId &&
       transactionPayload.bundleId !== EXPECTED_BUNDLE_ID
     ) {
-      console.error("Bundle ID mismatch:", {
-        received: transactionPayload.bundleId,
-        expected: EXPECTED_BUNDLE_ID,
-        timestamp: new Date().toISOString(),
-      });
+      structuredLog("error", { requestId, action: "bundle_id_mismatch", statusCode: 403, receivedBundleId: transactionPayload.bundleId });
       return new Response(
         JSON.stringify({ error: "Invalid bundle ID" }),
         { status: 403, headers: { "Content-Type": "application/json" } },
@@ -399,6 +404,7 @@ Deno.serve(async (req) => {
       transactionPayload;
 
     if (!originalTransactionId || !productId) {
+      structuredLog("warn", { requestId, action: "missing_transaction_fields", statusCode: 400 });
       return new Response(
         JSON.stringify({ error: "Missing required transaction fields" }),
         { status: 400, headers: { "Content-Type": "application/json" } },
@@ -451,7 +457,7 @@ Deno.serve(async (req) => {
       .eq("apple_transaction_id", originalTransactionId);
 
     if (error) {
-      console.error("Database update error:", error);
+      structuredLog("error", { requestId, action: "db_update_failed", statusCode: 500, notificationType, detail: String(error) });
       return new Response(
         JSON.stringify({ error: "Database update failed" }),
         {
@@ -461,11 +467,13 @@ Deno.serve(async (req) => {
       );
     }
 
+    structuredLog("info", { requestId, action: "webhook_processed", statusCode: 200, notificationType, tier, subscriptionStatus: status });
+
     return new Response(JSON.stringify({ ok: true }), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Webhook error:", error);
+    structuredLog("error", { requestId, action: "unhandled_error", statusCode: 500, detail: String(error) });
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
       {

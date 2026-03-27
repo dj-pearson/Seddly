@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class ProcessingQueue {
     #Unique<ProcessingQueue>([\.id])
+    #Index<ProcessingQueue>([\.screenshotAssetID])
 
     @Attribute(.unique) var id: UUID
     var screenshotAssetID: String

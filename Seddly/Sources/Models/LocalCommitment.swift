@@ -4,6 +4,7 @@ import SwiftData
 @Model
 final class LocalCommitment {
     #Unique<LocalCommitment>([\.id])
+    #Index<LocalCommitment>([\.statusRaw], [\.deadline])
 
     @Attribute(.unique) var id: UUID
     var entityName: String
