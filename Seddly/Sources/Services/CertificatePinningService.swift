@@ -17,15 +17,18 @@ final class CertificatePinningService: NSObject, URLSessionDelegate, Sendable {
     }()
 
     /// SHA-256 hashes of the Subject Public Key Info (SPKI) for pinned certificates.
-    /// Primary: current Supabase/Cloudflare intermediate CA public key.
-    /// Backup: alternate CA public key used by Supabase for key rotation.
+    /// Pins intermediate CAs only — root CA pins are too broad and defeat pinning.
+    ///
+    /// PIN ROTATION: When Supabase rotates certificates, add the new intermediate
+    /// CA SPKI hash here BEFORE the old one expires, then remove the old hash in
+    /// a subsequent release. Always maintain at least 2 pins for rotation safety.
     private static let pinnedSPKIHashes: Set<String> = [
-        // Primary: Cloudflare Inc ECC CA-3 (used by supabase.co)
+        // Primary: Cloudflare Inc ECC CA-3 (intermediate CA used by supabase.co)
         "Lgav0MmkCnG0hpEjGFCnSPq3RE45GdVUqz2dQJfUKOk=",
-        // Backup: Google Trust Services GTS CA 1P5 (rotation resilience)
+        // Backup: Google Trust Services GTS CA 1P5 (intermediate CA, rotation resilience)
         "hxqRlPTu1bMS/0DITB1SSu0vd4u/8l8TjPgfaAp63Gc=",
-        // Backup: ISRG Root X1 (Let's Encrypt, broad coverage)
-        "C5+lpZ7tcVwmwQIMcRtPbsQtWLABXhQzejna0wHFr8M=",
+        // Backup: Cloudflare Inc ECC CA-2 (previous intermediate, rotation safety)
+        "h6801m+z8v3zbgkRHpq6L29Esgfzhj89C1SyUCOQmqU=",
     ]
 
     /// The domain to apply pinning to.

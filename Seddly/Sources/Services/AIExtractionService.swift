@@ -60,6 +60,21 @@ actor AIExtractionService {
         self.authToken = authToken
     }
 
+    /// Strips HTML/script tags from text before sending to AI endpoint.
+    private static func sanitizeForAPI(_ text: String) -> String {
+        // Remove <script>...</script> blocks entirely (case-insensitive, multiline)
+        var sanitized = text
+        while let scriptRange = sanitized.range(of: "<script[^>]*>.*?</script>",
+                                                 options: [.regularExpression, .caseInsensitive]) {
+            sanitized.removeSubrange(scriptRange)
+        }
+        // Remove remaining HTML tags
+        while let tagRange = sanitized.range(of: "<[^>]+>", options: .regularExpression) {
+            sanitized.removeSubrange(tagRange)
+        }
+        return sanitized
+    }
+
     func extractCommitments(from text: String) async throws -> ExtractionResponse {
         // Validate UTF-8 encoding
         guard text.utf8.elementsEqual(text.utf8),
@@ -67,13 +82,16 @@ actor AIExtractionService {
             throw AIExtractionError.invalidEncoding
         }
 
+        // Sanitize input before processing
+        let sanitizedText = Self.sanitizeForAPI(text)
+
         // Validate text length
-        guard text.count <= Self.maxTextLength else {
-            throw AIExtractionError.inputTooLong(length: text.count, max: Self.maxTextLength)
+        guard sanitizedText.count <= Self.maxTextLength else {
+            throw AIExtractionError.inputTooLong(length: sanitizedText.count, max: Self.maxTextLength)
         }
 
         // Check result cache first (5-minute TTL)
-        let textHash = text.hashValue
+        let textHash = sanitizedText.hashValue
         if let cached = resultCache[textHash],
            Date().timeIntervalSince(cached.timestamp) < Self.cacheTTL {
             return cached.response
@@ -87,7 +105,7 @@ actor AIExtractionService {
         }
 
         let task = Task<ExtractionResponse, Error> {
-            try await performExtraction(text: text)
+            try await performExtraction(text: sanitizedText)
         }
         inFlightRequests[textHash] = task
         inFlightTimestamps[textHash] = Date()

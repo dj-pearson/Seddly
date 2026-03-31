@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import WidgetKit
+import os
 
 enum WatchLedgerFilter: String {
     case all
@@ -143,7 +144,11 @@ struct WatchLedgerView: View {
     private func fulfillCommitment(_ commitment: LocalCommitment) {
         commitment.statusRaw = "completed"
         commitment.updatedAt = Date()
-        try? modelContext.save()
+        do {
+            try modelContext.save()
+        } catch {
+            Logger(subsystem: "com.pearsonmedia.Seddly", category: "watch").error("Failed to save fulfillment for \(commitment.id): \(error.localizedDescription)")
+        }
 
         WatchSyncService.shared.sendFulfillment(commitmentID: commitment.id)
     }

@@ -49,7 +49,8 @@ struct ClipboardCommitmentView: View {
                     Button("Add") {
                         saveCommitment()
                     }
-                    .disabled(entityName.isEmpty || summary.isEmpty)
+                    .disabled(entityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                             summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .alert("Couldn't Save Commitment", isPresented: $showingError) {
@@ -61,7 +62,10 @@ struct ClipboardCommitmentView: View {
     }
 
     private func saveCommitment() {
-        let entityNameValue = entityName
+        let trimmedEntity = entityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let entityNameValue = trimmedEntity
         let entityDescriptor = FetchDescriptor<LocalEntity>(
             predicate: #Predicate { $0.name == entityNameValue }
         )
@@ -69,13 +73,13 @@ struct ClipboardCommitmentView: View {
         if let existing = try? modelContext.fetch(entityDescriptor).first {
             entity = existing
         } else {
-            entity = LocalEntity(name: entityName)
+            entity = LocalEntity(name: trimmedEntity)
             modelContext.insert(entity)
         }
 
         let commitment = LocalCommitment(
-            entityName: entityName,
-            summary: summary,
+            entityName: trimmedEntity,
+            summary: trimmedSummary,
             fullText: text,
             deadline: hasDeadline ? deadline : nil,
             status: .pending,

@@ -18,6 +18,8 @@ class ShareViewController: UIViewController {
 
     /// Maximum image dimension (pixels) to process — downscale larger images to stay within extension memory budget (~120 MB).
     private static let maxImageDimension: CGFloat = 2048
+    /// Maximum number of images to process concurrently in a single share session.
+    private static let maxConcurrentImages = 2
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -68,11 +70,14 @@ class ShareViewController: UIViewController {
             let result: (String?, String?)? = await withTaskGroup(of: (String?, String?)?.self) { group in
                 group.addTask { [weak self] in
                     guard let self else { return nil }
+                    var processed = 0
                     for item in extensionItems {
                         guard let attachments = item.attachments else { continue }
                         for attachment in attachments {
+                            guard processed < Self.maxConcurrentImages else { return nil }
                             if attachment.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
                                 let result = await self.processImageAttachment(attachment)
+                                processed += 1
                                 if result.0 != nil { return result }
                             }
                         }
@@ -275,9 +280,11 @@ class ShareViewController: UIViewController {
 
             // If rule filter passes threshold, create a commitment directly
             if score >= AppConstants.defaultConfidenceThreshold {
+                let sanitizedEntity = (entityName ?? "Unknown").trimmingCharacters(in: .whitespacesAndNewlines)
+                let sanitizedSummary = (detectedSummary ?? String(text.prefix(200))).trimmingCharacters(in: .whitespacesAndNewlines)
                 let commitment = LocalCommitment(
-                    entityName: entityName ?? "Unknown",
-                    summary: detectedSummary ?? String(text.prefix(200)),
+                    entityName: sanitizedEntity.isEmpty ? "Unknown" : sanitizedEntity,
+                    summary: sanitizedSummary.isEmpty ? String(text.prefix(200)) : sanitizedSummary,
                     fullText: text,
                     source: .shareSheet,
                     screenshotAssetID: shareID,

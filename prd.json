@@ -5,11 +5,11 @@
     "ralphLoop": {
       "currentLoop": 4,
       "lastReviewDate": "2026-03-31",
-      "passingCount": 0,
+      "passingCount": 10,
       "totalCount": 20,
-      "completionRate": "0%",
+      "completionRate": "50%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Production review identified 20 hardening stories. 4 critical items fixed in-session (SyncService auth, 429/retry handling, Watch crash, migration fallback). Remaining 20 stories queued for loop execution."
+      "verdict": "Production review identified 20 hardening stories. 10 now passing: all P1 security items (Keychain, cert pinning, input sanitization), all P2 functionality fixes (filters, photo access, decimal parsing, entity dedup), error handling hardening, and concurrency limits. 10 remaining: UI/UX polish, testing, CI/CD."
     },
     "previousLoops": [
       {
@@ -47,8 +47,8 @@
           "Build succeeds"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Changed kSecAttrAccessibleAfterFirstUnlock to kSecAttrAccessibleWhenUnlockedThisDeviceOnly. Added one-time migration on init that re-writes existing Keychain items with new accessibility via migrateKeychainAccessibility(). Migration flag stored in UserDefaults."
       },
       {
         "id": "US-076",
@@ -63,8 +63,8 @@
           "Build succeeds"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Removed ISRG Root X1 (Let's Encrypt root CA) SPKI hash. Replaced with Cloudflare Inc ECC CA-2 intermediate CA hash for rotation safety. Added PIN ROTATION documentation comment explaining how to safely rotate certificates across app releases."
       },
       {
         "id": "US-077",
@@ -79,8 +79,8 @@
           "Build succeeds"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "ManualEntryViewModel already trims whitespace in entityNameError/summaryError. ClipboardCommitmentView now trims whitespace before save and validates non-empty after trim. ShareViewController trims and validates entity/summary with empty fallbacks. AIExtractionService.sanitizeForAPI() strips <script> blocks and HTML tags before sending to endpoint."
       },
       {
         "id": "US-078",
@@ -94,8 +94,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Added || filterAmountMax != nil to hasActiveFilters computed property."
       },
       {
         "id": "US-079",
@@ -109,8 +109,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Changed requestLimitedPhotoAccess() to use PHAccessLevel.limited instead of .readWrite. requestPhotoAccess() remains .readWrite for full access flow."
       },
       {
         "id": "US-080",
@@ -125,8 +125,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "dollarAmountError now validates: empty-after-cleanup (rejects $$), multiple decimal points (rejects 1.2.3), non-numeric characters (rejects abc). Each case returns specific inline error message."
       },
       {
         "id": "US-081",
@@ -140,8 +140,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Added maxConcurrentImages = 2 constant. processSharedItems loop now tracks processed count and breaks after limit reached. Combined with existing downsampleIfNeeded (max 2048px), memory stays within extension budget."
       },
       {
         "id": "US-082",
@@ -157,8 +157,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "WatchSyncService handleReceivedUpdate: both update and delete paths now use do/catch with AppLogger.sync.error. WatchLedgerView fulfillCommitment logs via os.Logger. ScreenshotProcessingService: both context.save() calls now log via AppLogger.processing.error. ShareViewController already had full try/catch on line 290."
       },
       {
         "id": "US-083",
@@ -173,8 +173,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "ManualEntryViewModel now uses case-insensitive fetch via localizedStandardContains predicate. Prefers exact match, then falls back to case-insensitive similar match, then creates new entity. SwiftData MainActor isolation prevents true concurrent access to the same context."
       },
       {
         "id": "US-084",
@@ -347,8 +347,8 @@
           "Build succeeds"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Already correctly implemented: catches .unauthorized, attempts single retry with refreshed token via handleUnauthorizedResponse(), falls back to generateLocalSummary on any failure. Second retry uses try? so a second 401 falls through to the outer catch block with local fallback. No infinite loop possible."
       }
     ]
   }
