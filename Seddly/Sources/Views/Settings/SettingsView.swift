@@ -13,6 +13,9 @@ struct SettingsView: View {
     @AppStorage("isSignedIn", store: appGroupDefaults) private var isSignedIn = false
     @AppStorage("signedInEmail", store: appGroupDefaults) private var signedInEmail = ""
     @State private var showDeleteConfirmation = false
+    @State private var isDeletingAccount = false
+    @State private var showDeleteError = false
+    @State private var deleteErrorMessage = ""
     @AppStorage("notificationsEnabled", store: appGroupDefaults) private var notificationsEnabled = true
     @State private var dailyDigestTime = DateComponents(hour: 20, minute: 0)
     @State private var signInError: String?
@@ -151,11 +154,22 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .alert("Delete All Data?", isPresented: $showDeleteConfirmation) {
                 Button("Delete Everything", role: .destructive) {
-                    deleteAllData()
+                    Task {
+                        await deleteAllData()
+                    }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will permanently delete all commitments, entities, and processing history. This cannot be undone.")
+                if isSignedIn {
+                    Text("This will permanently delete all local data AND your server-side account, commitments, and sync history. This cannot be undone.")
+                } else {
+                    Text("This will permanently delete all commitments, entities, and processing history. This cannot be undone.")
+                }
+            }
+            .alert("Deletion Error", isPresented: $showDeleteError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(deleteErrorMessage)
             }
         }
     }
@@ -181,7 +195,22 @@ struct SettingsView: View {
         }
     }
 
-    private func deleteAllData() {
+    private func deleteAllData() async {
+        // For Pro+ signed-in users, delete server-side data first
+        if isSignedIn {
+            isDeletingAccount = true
+            do {
+                try await deleteServerAccount()
+            } catch {
+                isDeletingAccount = false
+                deleteErrorMessage = "Failed to delete server data: \(error.localizedDescription). Local data was not deleted."
+                showDeleteError = true
+                return
+            }
+            isDeletingAccount = false
+        }
+
+        // Delete local data
         do {
             try modelContext.delete(model: LocalCommitment.self)
             try modelContext.delete(model: LocalEntity.self)
@@ -190,12 +219,48 @@ struct SettingsView: View {
             try modelContext.delete(model: CustomWorkflow.self)
             try modelContext.save()
         } catch {
-            // Deletion failed — SwiftData will retry on next save
+            AppLogger.general.error("Local data deletion failed: \(error.localizedDescription)")
         }
 
         UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         approvedExtractionCount = 0
         autoAnalyze = false
+
+        // Sign out after deletion
+        if isSignedIn {
+            await authService.signOut()
+            isSignedIn = false
+            signedInEmail = ""
+        }
+    }
+
+    private func deleteServerAccount() async throws {
+        guard let token = await authService.validAccessToken() else {
+            throw URLError(.userAuthenticationRequired)
+        }
+
+        let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
+        guard let url = URL(string: "\(supabaseURLString)/functions/v1/delete-account") else {
+            throw URLError(.badURL)
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = 30
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(data: data, encoding: .utf8) ?? ""
+            AppLogger.auth.error("Server account deletion failed: status \(statusCode), body: \(body)")
+            throw URLError(.cannotConnectToHost)
+        }
+
+        AppLogger.auth.info("Auth event: account_deleted — server data removed")
     }
 }
 

@@ -14,6 +14,13 @@ function structuredLog(
   else console.log(JSON.stringify(entry));
 }
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Cache-Control": "no-store",
+};
+
 // ──────────────────────────────────────────────────────────────
 // Apple Root CA - G3 (base64 DER)
 // Trust anchor for App Store Server Notifications V2
@@ -335,7 +342,7 @@ Deno.serve(async (req) => {
     structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
     });
   }
 
@@ -462,7 +469,7 @@ Deno.serve(async (req) => {
         JSON.stringify({ error: "Database update failed" }),
         {
           status: 500,
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
         },
       );
     }
@@ -470,7 +477,7 @@ Deno.serve(async (req) => {
     structuredLog("info", { requestId, action: "webhook_processed", statusCode: 200, notificationType, tier, subscriptionStatus: status });
 
     return new Response(JSON.stringify({ ok: true }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
     });
   } catch (error) {
     structuredLog("error", { requestId, action: "unhandled_error", statusCode: 500, detail: String(error) });
@@ -478,7 +485,7 @@ Deno.serve(async (req) => {
       JSON.stringify({ error: "Internal server error" }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
       },
     );
   }

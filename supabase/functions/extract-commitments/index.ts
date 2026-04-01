@@ -82,6 +82,14 @@ function detectSuspiciousPatterns(text: string): boolean {
 }
 
 const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
+
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Cache-Control": "no-store",
+};
+
 const MAX_TEXT_LENGTH = 10000; // 10K char limit
 const RATE_LIMIT_MAX = 10; // 10 requests per window
 const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
@@ -117,6 +125,26 @@ function corsHeaders(req: Request) {
   };
 }
 
+async function logAuthEvent(
+  supabase: ReturnType<typeof createClient>,
+  eventType: string,
+  req: Request,
+  userId?: string,
+  details?: string,
+) {
+  try {
+    await supabase.from("auth_events").insert({
+      user_id: userId ?? null,
+      event_type: eventType,
+      ip_address: req.headers.get("X-Forwarded-For") ?? req.headers.get("CF-Connecting-IP") ?? null,
+      user_agent: req.headers.get("User-Agent") ?? null,
+      details,
+    });
+  } catch {
+    // Auth event logging is non-critical
+  }
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
 
@@ -128,14 +156,17 @@ Deno.serve(async (req) => {
     structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json", ...corsHeaders(req) },
+      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS, ...corsHeaders(req) },
     });
   }
 
   // Auth: require Bearer token (Supabase JWT)
   const authHeader = req.headers.get("Authorization");
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
   if (!authHeader?.startsWith("Bearer ")) {
     structuredLog("warn", { requestId, action: "auth_missing", statusCode: 401 });
+    await logAuthEvent(supabase, "auth_missing", req, undefined, "extract-commitments");
     return new Response(
       JSON.stringify({ error: "Authentication required. Provide a valid Bearer token." }),
       { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
@@ -143,10 +174,10 @@ Deno.serve(async (req) => {
   }
 
   const token = authHeader.replace("Bearer ", "");
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const { data: { user }, error: authError } = await supabase.auth.getUser(token);
   if (authError || !user) {
     structuredLog("warn", { requestId, action: "auth_failed", statusCode: 401 });
+    await logAuthEvent(supabase, "auth_failed", req, undefined, "extract-commitments: invalid JWT");
     return new Response(
       JSON.stringify({ error: "Invalid or expired token" }),
       { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders(req) } },
@@ -290,7 +321,7 @@ Deno.serve(async (req) => {
     });
 
     return new Response(JSON.stringify(extraction), {
-      headers: { "Content-Type": "application/json", ...corsHeaders(req) },
+      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS, ...corsHeaders(req) },
     });
   } catch (error) {
     structuredLog("error", { requestId, action: "unhandled_error", userId, statusCode: 500, detail: String(error) });
