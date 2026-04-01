@@ -52,9 +52,27 @@ actor AIExtractionService {
 
     static let maxTextLength = 10_000
 
+    /// Maximum retry attempts for retriable HTTP errors (429, 5xx).
+    private static let maxRetryAttempts = 3
+
     init(endpointURL: URL, authToken: String? = nil) {
         self.endpointURL = endpointURL
         self.authToken = authToken
+    }
+
+    /// Strips HTML/script tags from text before sending to AI endpoint.
+    private static func sanitizeForAPI(_ text: String) -> String {
+        // Remove <script>...</script> blocks entirely (case-insensitive, multiline)
+        var sanitized = text
+        while let scriptRange = sanitized.range(of: "<script[^>]*>.*?</script>",
+                                                 options: [.regularExpression, .caseInsensitive]) {
+            sanitized.removeSubrange(scriptRange)
+        }
+        // Remove remaining HTML tags
+        while let tagRange = sanitized.range(of: "<[^>]+>", options: .regularExpression) {
+            sanitized.removeSubrange(tagRange)
+        }
+        return sanitized
     }
 
     func extractCommitments(from text: String) async throws -> ExtractionResponse {
@@ -64,13 +82,16 @@ actor AIExtractionService {
             throw AIExtractionError.invalidEncoding
         }
 
+        // Sanitize input before processing
+        let sanitizedText = Self.sanitizeForAPI(text)
+
         // Validate text length
-        guard text.count <= Self.maxTextLength else {
-            throw AIExtractionError.inputTooLong(length: text.count, max: Self.maxTextLength)
+        guard sanitizedText.count <= Self.maxTextLength else {
+            throw AIExtractionError.inputTooLong(length: sanitizedText.count, max: Self.maxTextLength)
         }
 
         // Check result cache first (5-minute TTL)
-        let textHash = text.hashValue
+        let textHash = sanitizedText.hashValue
         if let cached = resultCache[textHash],
            Date().timeIntervalSince(cached.timestamp) < Self.cacheTTL {
             return cached.response
@@ -84,7 +105,7 @@ actor AIExtractionService {
         }
 
         let task = Task<ExtractionResponse, Error> {
-            try await performExtraction(text: text)
+            try await performExtraction(text: sanitizedText)
         }
         inFlightRequests[textHash] = task
         inFlightTimestamps[textHash] = Date()
@@ -114,24 +135,43 @@ actor AIExtractionService {
         let payload = ["text": text]
         request.httpBody = try JSONEncoder().encode(payload)
 
-        let (data, response) = try await CertificatePinningService.session.data(for: request)
+        for attempt in 0...Self.maxRetryAttempts {
+            let (data, response) = try await CertificatePinningService.session.data(for: request)
+            let httpResponse = response as? HTTPURLResponse
+            let statusCode = httpResponse?.statusCode ?? -1
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            AppLogger.ai.error("AI extraction failed with status \(statusCode)")
+            if (200...299).contains(statusCode) {
+                do {
+                    return try JSONDecoder().decode(ExtractionResponse.self, from: data)
+                } catch {
+                    AppLogger.ai.error("Failed to decode AI extraction response: \(error.localizedDescription)")
+                    throw error
+                }
+            }
+
             if statusCode == 401 {
                 throw AIExtractionError.unauthorized
+            }
+
+            // Retry on 429 (rate limited) or 5xx (server error)
+            let isRetriable = statusCode == 429 || (500...599).contains(statusCode)
+            if isRetriable && attempt < Self.maxRetryAttempts {
+                let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
+                    .flatMap(Double.init)
+                let delay = retryAfter ?? pow(2.0, Double(attempt + 1))
+                AppLogger.ai.warning("AI extraction got \(statusCode), retrying in \(delay)s (attempt \(attempt + 1)/\(Self.maxRetryAttempts))")
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                continue
+            }
+
+            AppLogger.ai.error("AI extraction failed with status \(statusCode)")
+            if statusCode == 429 {
+                throw AIExtractionError.rateLimited
             }
             throw AIExtractionError.serverError
         }
 
-        do {
-            return try JSONDecoder().decode(ExtractionResponse.self, from: data)
-        } catch {
-            AppLogger.ai.error("Failed to decode AI extraction response: \(error.localizedDescription)")
-            throw error
-        }
+        throw AIExtractionError.serverError
     }
 
     /// Removes deduplication entries older than 60 seconds to allow retries.
@@ -147,6 +187,7 @@ actor AIExtractionService {
     enum AIExtractionError: LocalizedError {
         case serverError
         case unauthorized
+        case rateLimited
         case inputTooLong(length: Int, max: Int)
         case invalidEncoding
 
@@ -154,6 +195,7 @@ actor AIExtractionService {
             switch self {
             case .serverError: "Failed to connect to the analysis service. Your screenshot has been queued for later processing."
             case .unauthorized: "Authentication expired. Please sign in again."
+            case .rateLimited: "Too many requests. Please wait a moment and try again."
             case .inputTooLong(let length, let max): "Text too long for analysis (\(length) characters, maximum \(max)). Try a smaller screenshot."
             case .invalidEncoding: "Text contains invalid characters and cannot be analyzed."
             }

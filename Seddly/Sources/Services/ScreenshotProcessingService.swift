@@ -131,7 +131,11 @@ actor ScreenshotProcessingService {
             }
         }
 
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            AppLogger.processing.error("Failed to save processing context: \(error.localizedDescription)")
+        }
 
         // Clear OCR cache after batch completes
         ocrCache.removeAll()
@@ -259,7 +263,11 @@ actor ScreenshotProcessingService {
             autoAnalyze: false
         )
         queueItem.processingStatus = .completed
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            AppLogger.processing.error("Failed to save processing context: \(error.localizedDescription)")
+        }
         return commitments
     }
 

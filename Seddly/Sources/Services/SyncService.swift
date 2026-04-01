@@ -6,11 +6,15 @@ import os
 actor SyncService {
     private let supabaseURL: URL
     private let supabaseKey: String
+    private let authService: AuthService
 
     private static let pushBatchSize = 50
     private static let pushBatchDelayMs: UInt64 = 500_000_000 // 500ms in nanoseconds
     private static let pullPageSize = 100
     private static let minSyncIntervalSeconds: TimeInterval = 30
+
+    /// Maximum retry attempts for retriable HTTP errors (429, 5xx).
+    private static let maxRetryAttempts = 3
 
     /// Tracks the last sync time to enforce client-side rate limiting.
     private var lastSyncTime: Date?
@@ -22,9 +26,33 @@ actor SyncService {
         var totalToPush: Int = 0
     }
 
-    init(supabaseURL: URL, supabaseKey: String) {
+    init(supabaseURL: URL, supabaseKey: String, authService: AuthService) {
         self.supabaseURL = supabaseURL
         self.supabaseKey = supabaseKey
+        self.authService = authService
+    }
+
+    /// Returns a valid Bearer token from AuthService, throwing if not authenticated.
+    private func bearerToken() async throws -> String {
+        guard let token = await authService.validAccessToken() else {
+            throw SyncError.notAuthenticated
+        }
+        return token
+    }
+
+    /// Determines if an HTTP status code is retriable (429 or 5xx).
+    private func isRetriableStatus(_ statusCode: Int) -> Bool {
+        statusCode == 429 || (500...599).contains(statusCode)
+    }
+
+    /// Calculates retry delay, respecting Retry-After header if present.
+    private func retryDelay(attempt: Int, response: HTTPURLResponse?) -> UInt64 {
+        if let retryAfter = response?.value(forHTTPHeaderField: "Retry-After"),
+           let seconds = Double(retryAfter) {
+            return UInt64(seconds * 1_000_000_000)
+        }
+        // Exponential backoff: 2s, 4s, 8s
+        return UInt64(pow(2.0, Double(attempt + 1))) * 1_000_000_000
     }
 
     func syncCommitments(context: ModelContext) async throws {
@@ -48,13 +76,14 @@ actor SyncService {
         // Upload to Supabase in batches of 50
         let endpoint = supabaseURL.appendingPathComponent("rest/v1/commitments")
         var progress = SyncProgress(totalToPush: pendingSync.count)
+        let token = try await bearerToken()
 
         for batch in pendingSync.chunked(into: Self.pushBatchSize) {
             for commitment in batch {
                 var request = URLRequest(url: endpoint)
                 request.httpMethod = "POST"
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                request.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
                 request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
 
@@ -81,16 +110,42 @@ actor SyncService {
                     withJSONObject: payload.compactMapValues { $0 }
                 )
 
-                let (_, response) = try await CertificatePinningService.session.data(for: request)
+                var lastStatusCode = -1
+                var succeeded = false
 
-                if let httpResponse = response as? HTTPURLResponse,
-                   (200...299).contains(httpResponse.statusCode) {
-                    commitment.syncStatus = .synced
-                    commitment.updatedAt = .now
-                    progress.pushed += 1
-                } else {
-                    let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-                    AppLogger.sync.error("Sync push failed for commitment \(commitment.id) with status \(statusCode)")
+                for attempt in 0...Self.maxRetryAttempts {
+                    let (_, response) = try await CertificatePinningService.session.data(for: request)
+                    let httpResponse = response as? HTTPURLResponse
+                    let statusCode = httpResponse?.statusCode ?? -1
+                    lastStatusCode = statusCode
+
+                    if (200...299).contains(statusCode) {
+                        commitment.syncStatus = .synced
+                        commitment.updatedAt = .now
+                        progress.pushed += 1
+                        succeeded = true
+                        break
+                    } else if statusCode == 401 {
+                        // Token expired during sync — refresh and retry once
+                        if let newToken = await authService.handleUnauthorizedResponse() {
+                            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                            continue
+                        } else {
+                            AppLogger.sync.error("Sync auth failed — user signed out")
+                            throw SyncError.notAuthenticated
+                        }
+                    } else if isRetriableStatus(statusCode) && attempt < Self.maxRetryAttempts {
+                        let delay = retryDelay(attempt: attempt, response: httpResponse)
+                        AppLogger.sync.warning("Sync push got \(statusCode), retrying in \(delay / 1_000_000_000)s (attempt \(attempt + 1)/\(Self.maxRetryAttempts))")
+                        try? await Task.sleep(nanoseconds: delay)
+                        continue
+                    } else {
+                        break
+                    }
+                }
+
+                if !succeeded {
+                    AppLogger.sync.error("Sync push failed for commitment \(commitment.id) with status \(lastStatusCode)")
                 }
             }
 
@@ -135,6 +190,8 @@ actor SyncService {
         let allLocalDescriptor = FetchDescriptor<LocalCommitment>()
         let localIDs = Set((try context.fetch(allLocalDescriptor)).map(\.id))
 
+        var currentToken = try await bearerToken()
+
         while hasMore {
             var components = URLComponents(url: supabaseURL.appendingPathComponent("rest/v1/commitments"), resolvingAgainstBaseURL: false)!
             components.queryItems = [
@@ -144,11 +201,48 @@ actor SyncService {
             ]
 
             var request = URLRequest(url: components.url!)
-            request.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+            request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
             request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
 
-            let (data, _) = try await CertificatePinningService.session.data(for: request)
-            let remoteCommitments = try JSONDecoder().decode([RemoteCommitment].self, from: data)
+            var fetchedData = Data()
+            var lastStatusCode = -1
+
+            // Retry loop for pull requests
+            var fetchSucceeded = false
+            for attempt in 0...Self.maxRetryAttempts {
+                let (responseData, response) = try await CertificatePinningService.session.data(for: request)
+                let httpResponse = response as? HTTPURLResponse
+                let statusCode = httpResponse?.statusCode ?? -1
+                lastStatusCode = statusCode
+
+                if (200...299).contains(statusCode) {
+                    fetchedData = responseData
+                    fetchSucceeded = true
+                    break
+                } else if statusCode == 401 {
+                    if let newToken = await authService.handleUnauthorizedResponse() {
+                        currentToken = newToken
+                        request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                        continue
+                    } else {
+                        throw SyncError.notAuthenticated
+                    }
+                } else if isRetriableStatus(statusCode) && attempt < Self.maxRetryAttempts {
+                    let delay = retryDelay(attempt: attempt, response: httpResponse)
+                    AppLogger.sync.warning("Sync pull got \(statusCode), retrying in \(delay / 1_000_000_000)s (attempt \(attempt + 1)/\(Self.maxRetryAttempts))")
+                    try? await Task.sleep(nanoseconds: delay)
+                    continue
+                } else {
+                    break
+                }
+            }
+
+            guard fetchSucceeded else {
+                AppLogger.sync.error("Sync pull failed with status \(lastStatusCode)")
+                throw SyncError.pullFailed(statusCode: lastStatusCode)
+            }
+
+            let remoteCommitments = try JSONDecoder().decode([RemoteCommitment].self, from: fetchedData)
 
             for remote in remoteCommitments {
                 guard let uuid = UUID(uuidString: remote.id) else { continue }
@@ -201,20 +295,43 @@ actor SyncService {
             .appendingPathComponent("rest/v1/commitments")
             .appending(queryItems: [URLQueryItem(name: "id", value: "eq.\(commitment.id.uuidString)")])
 
+        let token = try await bearerToken()
+
         var request = URLRequest(url: endpoint)
         request.httpMethod = "PATCH"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(supabaseKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
 
         let payload: [String: Any] = ["deleted_at": ISO8601DateFormatter().string(from: now)]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (_, _) = try await CertificatePinningService.session.data(for: request)
+        let (_, response) = try await CertificatePinningService.session.data(for: request)
+
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200...299).contains(httpResponse.statusCode) {
+            let statusCode = httpResponse.statusCode
+            AppLogger.sync.error("Soft delete failed with status \(statusCode)")
+            if statusCode == 401 {
+                throw SyncError.notAuthenticated
+            }
+        }
 
         // Remove from local store (remote retains for 30 days)
         context.delete(commitment)
         try context.save()
+    }
+
+    enum SyncError: LocalizedError {
+        case notAuthenticated
+        case pullFailed(statusCode: Int)
+
+        var errorDescription: String? {
+            switch self {
+            case .notAuthenticated: "Please sign in to sync your data."
+            case .pullFailed(let code): "Failed to download data (status \(code)). Please try again later."
+            }
+        }
     }
 }
 

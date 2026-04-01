@@ -60,7 +60,7 @@ final class LedgerViewModel {
     }
 
     var hasActiveFilters: Bool {
-        filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil || filterCategory != nil || filterAmountMin != nil
+        filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil || filterCategory != nil || filterAmountMin != nil || filterAmountMax != nil
     }
 
     enum SortOrder: String, CaseIterable {

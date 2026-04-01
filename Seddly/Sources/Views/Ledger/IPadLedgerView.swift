@@ -5,6 +5,7 @@ struct IPadLedgerView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
     @Environment(SubscriptionService.self) private var subscriptionService
+    @Environment(\.authService) private var authService
     @Query(sort: \LocalCommitment.createdAt, order: .reverse) private var commitments: [LocalCommitment]
     @State private var viewModel = LedgerViewModel()
     @State private var selectedCommitment: LocalCommitment?
@@ -196,7 +197,7 @@ struct IPadLedgerView: View {
             if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
                let supabaseURL = URL(string: supabaseURLString),
                let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
-                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
                 try? await syncService.pullCommitments(context: modelContext)
                 try? await syncService.syncCommitments(context: modelContext)
             }

@@ -31,6 +31,15 @@ final class ManualEntryViewModel {
     var dollarAmountError: String? {
         guard !dollarAmount.isEmpty else { return nil }
         let cleaned = dollarAmount.replacingOccurrences(of: "$", with: "").replacingOccurrences(of: ",", with: "")
+        // Reject empty after cleanup (e.g. "$" or "$$")
+        guard !cleaned.isEmpty else { return "Enter a valid dollar amount" }
+        // Reject multiple decimal points (e.g. "1.2.3")
+        if cleaned.filter({ $0 == "." }).count > 1 { return "Invalid format — too many decimal points" }
+        // Reject non-numeric characters after cleanup
+        let validChars = CharacterSet.decimalDigits.union(CharacterSet(charactersIn: "."))
+        if cleaned.unicodeScalars.contains(where: { !validChars.contains($0) }) {
+            return "Amount contains invalid characters"
+        }
         guard let value = Decimal(string: cleaned) else { return "Enter a valid dollar amount" }
         if value < 0 { return "Amount must be a positive number" }
         return nil
@@ -58,11 +67,17 @@ final class ManualEntryViewModel {
         )
         commitment.category = category
 
-        // Find or create entity
+        // Find or create entity using case-insensitive match to prevent duplicates
         let name = commitment.entityName
-        let descriptor = FetchDescriptor<LocalEntity>(predicate: #Predicate { $0.name == name })
-        if let existing = try? context.fetch(descriptor).first {
-            commitment.entity = existing
+        let descriptor = FetchDescriptor<LocalEntity>(predicate: #Predicate {
+            $0.name.localizedStandardContains(name) || $0.name == name
+        })
+        let existingEntities = (try? context.fetch(descriptor)) ?? []
+        // Prefer exact match, then case-insensitive match
+        if let exact = existingEntities.first(where: { $0.name == name }) {
+            commitment.entity = exact
+        } else if let similar = existingEntities.first {
+            commitment.entity = similar
         } else {
             let entity = LocalEntity(name: name)
             context.insert(entity)

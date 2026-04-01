@@ -24,6 +24,8 @@ actor AuthService {
     /// Buffer before actual expiry to refresh proactively (60 seconds).
     private static let expirationBuffer: TimeInterval = 60
 
+    private static let keychainMigrationKey = "keychainMigratedToWhenUnlocked"
+
     init(supabaseURL: URL, supabaseKey: String) {
         self.supabaseURL = supabaseURL
         self.supabaseKey = supabaseKey
@@ -35,6 +37,22 @@ actor AuthService {
         if let expiresString = Self.readKeychain(key: Self.keychainExpiresAtKey),
            let interval = TimeInterval(expiresString) {
             self.tokenExpiresAt = Date(timeIntervalSince1970: interval)
+        }
+
+        // Migrate existing Keychain items to stricter accessibility (one-time)
+        if !UserDefaults.standard.bool(forKey: Self.keychainMigrationKey) {
+            Self.migrateKeychainAccessibility()
+            UserDefaults.standard.set(true, forKey: Self.keychainMigrationKey)
+        }
+    }
+
+    /// Re-writes all Keychain items with kSecAttrAccessibleWhenUnlockedThisDeviceOnly.
+    private static func migrateKeychainAccessibility() {
+        let keys = [keychainTokenKey, keychainRefreshTokenKey, keychainUserIDKey, keychainExpiresAtKey]
+        for key in keys {
+            if let value = readKeychain(key: key) {
+                writeKeychain(key: key, value: value)
+            }
         }
     }
 
@@ -207,7 +225,7 @@ actor AuthService {
         SecItemDelete(query as CFDictionary) // Remove existing
         var addQuery = query
         addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
         SecItemAdd(addQuery as CFDictionary, nil)
     }
 

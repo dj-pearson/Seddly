@@ -13,6 +13,7 @@ struct ClipboardCommitmentView: View {
     @State private var deadline: Date?
     @State private var hasDeadline = false
     @State private var showingError = false
+    @State private var showingDiscardConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -41,15 +42,20 @@ struct ClipboardCommitmentView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Skip") {
-                        onDismiss()
-                        dismiss()
+                        if hasUnsavedChanges {
+                            showingDiscardConfirmation = true
+                        } else {
+                            onDismiss()
+                            dismiss()
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add") {
                         saveCommitment()
                     }
-                    .disabled(entityName.isEmpty || summary.isEmpty)
+                    .disabled(entityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                             summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
             .alert("Couldn't Save Commitment", isPresented: $showingError) {
@@ -57,11 +63,29 @@ struct ClipboardCommitmentView: View {
             } message: {
                 Text("Something went wrong while saving. Please try again.")
             }
+            .confirmationDialog("Discard Changes?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
+                Button("Discard", role: .destructive) {
+                    onDismiss()
+                    dismiss()
+                }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("You have unsaved changes. Are you sure you want to skip?")
+            }
         }
     }
 
+    private var hasUnsavedChanges: Bool {
+        !entityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        hasDeadline
+    }
+
     private func saveCommitment() {
-        let entityNameValue = entityName
+        let trimmedEntity = entityName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let entityNameValue = trimmedEntity
         let entityDescriptor = FetchDescriptor<LocalEntity>(
             predicate: #Predicate { $0.name == entityNameValue }
         )
@@ -69,13 +93,13 @@ struct ClipboardCommitmentView: View {
         if let existing = try? modelContext.fetch(entityDescriptor).first {
             entity = existing
         } else {
-            entity = LocalEntity(name: entityName)
+            entity = LocalEntity(name: trimmedEntity)
             modelContext.insert(entity)
         }
 
         let commitment = LocalCommitment(
-            entityName: entityName,
-            summary: summary,
+            entityName: trimmedEntity,
+            summary: trimmedSummary,
             fullText: text,
             deadline: hasDeadline ? deadline : nil,
             status: .pending,

@@ -11,6 +11,9 @@ actor DisputeSummaryService {
     /// Timestamps for when each dedup entry was created, cleared after 60 seconds to allow retries.
     private var inFlightTimestamps: [String: Date] = [:]
 
+    /// Maximum retry attempts for retriable HTTP errors (429, 5xx).
+    private static let maxRetryAttempts = 3
+
     init(endpointURL: URL, authToken: String? = nil) {
         self.endpointURL = endpointURL
         self.authToken = authToken
@@ -79,18 +82,44 @@ actor DisputeSummaryService {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
 
-        let (data, response) = try await CertificatePinningService.session.data(for: request)
+        var responseData: Data?
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+        for attempt in 0...Self.maxRetryAttempts {
+            let (data, response) = try await CertificatePinningService.session.data(for: request)
+            let httpResponse = response as? HTTPURLResponse
+            let statusCode = httpResponse?.statusCode ?? -1
+
+            if (200...299).contains(statusCode) {
+                responseData = data
+                break
+            }
+
             if statusCode == 401 {
                 throw DisputeSummaryError.unauthorized
+            }
+
+            // Retry on 429 (rate limited) or 5xx (server error)
+            let isRetriable = statusCode == 429 || (500...599).contains(statusCode)
+            if isRetriable && attempt < Self.maxRetryAttempts {
+                let retryAfter = httpResponse?.value(forHTTPHeaderField: "Retry-After")
+                    .flatMap(Double.init)
+                let delay = retryAfter ?? pow(2.0, Double(attempt + 1))
+                AppLogger.ai.warning("Dispute summary got \(statusCode), retrying in \(delay)s (attempt \(attempt + 1)/\(Self.maxRetryAttempts))")
+                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                continue
+            }
+
+            if statusCode == 429 {
+                throw DisputeSummaryError.rateLimited
             }
             throw DisputeSummaryError.serverError
         }
 
-        let summaryResponse = try JSONDecoder().decode(SummaryResponse.self, from: data)
+        guard let finalData = responseData else {
+            throw DisputeSummaryError.serverError
+        }
+
+        let summaryResponse = try JSONDecoder().decode(SummaryResponse.self, from: finalData)
 
         // Record in privacy audit
         let textLength = commitments.reduce(0) { $0 + $1.summary.count + $1.fullText.count }
@@ -152,11 +181,13 @@ actor DisputeSummaryService {
     enum DisputeSummaryError: LocalizedError {
         case serverError
         case unauthorized
+        case rateLimited
 
         var errorDescription: String? {
             switch self {
             case .serverError: "Failed to generate dispute summary. A local summary will be used instead."
             case .unauthorized: "Authentication expired. Please sign in again."
+            case .rateLimited: "Too many requests. Please wait a moment and try again."
             }
         }
     }

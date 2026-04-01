@@ -5,6 +5,7 @@ struct EscalationLetterView: View {
     @State private var selectedCategory: CommitmentCategory = .uncategorized
     @State private var senderName = ""
     @State private var generatedLetter: String?
+    @State private var showNameWarning = false
 
     private var outstandingCount: Int {
         entity.commitments.filter {
@@ -22,8 +23,15 @@ struct EscalationLetterView: View {
                 }
             }
 
-            Section("Your Name") {
+            Section {
                 TextField("Enter your name", text: $senderName)
+                if senderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Label("Your name will appear as the sender. Leave blank and \"[Your Name]\" will be used as a placeholder.", systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } header: {
+                Text("Your Name")
             }
 
             Section {
@@ -36,15 +44,23 @@ struct EscalationLetterView: View {
                 }
 
                 Button {
-                    generatedLetter = EscalationTemplateService.generateLetter(
-                        for: entity,
-                        category: selectedCategory,
-                        senderName: senderName.isEmpty ? "[Your Name]" : senderName
-                    )
+                    if senderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        showNameWarning = true
+                    } else {
+                        generateLetter()
+                    }
                 } label: {
                     Label("Generate Letter", systemImage: "doc.text")
                 }
                 .disabled(outstandingCount == 0)
+                .confirmationDialog("Missing Sender Name", isPresented: $showNameWarning, titleVisibility: .visible) {
+                    Button("Generate Anyway") {
+                        generateLetter()
+                    }
+                    Button("Enter Name", role: .cancel) {}
+                } message: {
+                    Text("Your letter will contain \"[Your Name]\" as a placeholder. Would you like to enter your name first?")
+                }
             }
 
             if let letter = generatedLetter {
@@ -80,8 +96,16 @@ struct EscalationLetterView: View {
                mostCommon != .uncategorized {
                 selectedCategory = mostCommon
             } else {
-                selectedCategory = .housing // Default
+                selectedCategory = .housing
             }
         }
+    }
+
+    private func generateLetter() {
+        generatedLetter = EscalationTemplateService.generateLetter(
+            for: entity,
+            category: selectedCategory,
+            senderName: senderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "[Your Name]" : senderName
+        )
     }
 }

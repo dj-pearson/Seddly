@@ -29,6 +29,8 @@ struct SeddlyApp: App {
     @State private var showMigrationError = false
     @State private var showDowngradeAlert = false
     private let migrationErrorMessage: String?
+    /// True when running on a fallback in-memory container due to migration failure.
+    private let isRunningInMemory: Bool
 
     init() {
         var migrationError: String?
@@ -55,6 +57,7 @@ struct SeddlyApp: App {
             }
         }
         self.migrationErrorMessage = migrationError
+        self.isRunningInMemory = migrationError != nil
 
         // Read Supabase credentials from Info.plist
         let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
@@ -74,28 +77,34 @@ struct SeddlyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(subscriptionService)
-                .environment(calendarService)
-                .environment(\.authService, authService)
-                .onOpenURL { url in
-                    handleDeepLink(url)
+            ZStack(alignment: .top) {
+                ContentView()
+                    .environment(subscriptionService)
+                    .environment(calendarService)
+                    .environment(\.authService, authService)
+
+                if isRunningInMemory {
+                    migrationWarningBanner
                 }
-                .alert("Commitment Not Found", isPresented: $showDeepLinkNotFound) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text("This commitment is not on this device.")
+            }
+            .onOpenURL { url in
+                handleDeepLink(url)
+            }
+            .alert("Commitment Not Found", isPresented: $showDeepLinkNotFound) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This commitment is not on this device.")
+            }
+            .alert("Data Migration Issue", isPresented: $showMigrationError) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Your data could not be migrated. The app is running with temporary storage — any changes will be lost when you close the app.\n\nPlease reinstall the app or contact support at seddly.com/help to restore your data.")
+            }
+            .onAppear {
+                if migrationErrorMessage != nil {
+                    showMigrationError = true
                 }
-                .alert("Data Migration Issue", isPresented: $showMigrationError) {
-                    Button("OK", role: .cancel) {}
-                } message: {
-                    Text("Your data could not be migrated. The app is running with temporary storage. Please reinstall the app or contact support to restore your data.")
-                }
-                .onAppear {
-                    if migrationErrorMessage != nil {
-                        showMigrationError = true
-                    }
-                }
+            }
                 .onChange(of: subscriptionService.tierDowngradeDetected) { _, detected in
                     if detected {
                         handleTierDowngrade()
@@ -111,6 +120,20 @@ struct SeddlyApp: App {
                 }
         }
         .modelContainer(modelContainer)
+    }
+
+    private var migrationWarningBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundStyle(.white)
+            Text("Temporary storage — data will not persist. Reinstall to fix.")
+                .font(.caption)
+                .foregroundStyle(.white)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .background(.red.gradient)
     }
 
     private func handleTierDowngrade() {

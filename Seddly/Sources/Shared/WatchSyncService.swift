@@ -167,13 +167,16 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
             let descriptor = FetchDescriptor<LocalCommitment>(
                 predicate: #Predicate { $0.id == commitmentID }
             )
-            guard let commitment = try? context.fetch(descriptor).first else { return }
-
-            if let statusRaw = userInfo["statusRaw"] as? String {
-                commitment.statusRaw = statusRaw
+            do {
+                guard let commitment = try context.fetch(descriptor).first else { return }
+                if let statusRaw = userInfo["statusRaw"] as? String {
+                    commitment.statusRaw = statusRaw
+                }
+                commitment.updatedAt = Date()
+                try context.save()
+            } catch {
+                AppLogger.sync.error("WatchSync: failed to update commitment \(commitmentID): \(error.localizedDescription)")
             }
-            commitment.updatedAt = Date()
-            try? context.save()
 
         case "created":
             // New commitments are created through the shared SwiftData container.
@@ -184,9 +187,13 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
             let descriptor = FetchDescriptor<LocalCommitment>(
                 predicate: #Predicate { $0.id == commitmentID }
             )
-            if let commitment = try? context.fetch(descriptor).first {
-                context.delete(commitment)
-                try? context.save()
+            do {
+                if let commitment = try context.fetch(descriptor).first {
+                    context.delete(commitment)
+                    try context.save()
+                }
+            } catch {
+                AppLogger.sync.error("WatchSync: failed to delete commitment \(commitmentID): \(error.localizedDescription)")
             }
 
         default:

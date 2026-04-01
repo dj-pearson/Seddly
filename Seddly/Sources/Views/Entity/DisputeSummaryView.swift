@@ -7,6 +7,8 @@ struct DisputeSummaryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var pdfURL: URL?
     @State private var showShareSheet = false
+    @State private var showPDFError = false
+    @State private var pdfErrorMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -55,6 +57,14 @@ struct DisputeSummaryView: View {
                     PDFShareSheet(url: pdfURL)
                 }
             }
+            .alert("PDF Export Failed", isPresented: $showPDFError) {
+                Button("Try Again") {
+                    generateAndSharePDF()
+                }
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(pdfErrorMessage)
+            }
         }
     }
 
@@ -68,7 +78,8 @@ struct DisputeSummaryView: View {
             pdfURL = tempURL
             showShareSheet = true
         } catch {
-            // PDF write failed
+            pdfErrorMessage = "Failed to create PDF: \(error.localizedDescription)"
+            showPDFError = true
         }
     }
 
