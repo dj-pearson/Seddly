@@ -103,6 +103,12 @@ struct ManualEntryView: View {
                             ),
                             displayedComponents: .date
                         )
+                        if let deadline = viewModel.deadline,
+                           Calendar.current.startOfDay(for: deadline) < Calendar.current.startOfDay(for: .now) {
+                            Label("This date is in the past — the commitment will be immediately overdue.", systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
                     }
                 }
 

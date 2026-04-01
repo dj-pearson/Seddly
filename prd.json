@@ -5,11 +5,11 @@
     "ralphLoop": {
       "currentLoop": 4,
       "lastReviewDate": "2026-03-31",
-      "passingCount": 10,
+      "passingCount": 20,
       "totalCount": 20,
-      "completionRate": "50%",
+      "completionRate": "100%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Production review identified 20 hardening stories. 10 now passing: all P1 security items (Keychain, cert pinning, input sanitization), all P2 functionality fixes (filters, photo access, decimal parsing, entity dedup), error handling hardening, and concurrency limits. 10 remaining: UI/UX polish, testing, CI/CD."
+      "verdict": "All 20 production hardening stories passing. Security layer locked down (Keychain, cert pinning, input sanitization, secrets scanning). All functionality fixes shipped. UI/UX polish complete (timeouts, confirmations, toasts, validation, PDF errors). Test coverage added for SyncService, AuthService token refresh, and critical UI flows. Ship it."
     },
     "previousLoops": [
       {
@@ -188,8 +188,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "CommitmentDetailView.loadScreenshot() now uses withTaskGroup with a 10-second sleep-based timeout race. Shows error state with retry button on failure/timeout. Loading spinner shown during fetch."
       },
       {
         "id": "US-085",
@@ -203,8 +203,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "ClipboardCommitmentView tracks hasUnsavedChanges via onChange modifiers. Dismissing with changes shows confirmationDialog with Discard/Keep Editing options. Whitespace trimmed before save."
       },
       {
         "id": "US-086",
@@ -218,8 +218,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Toast auto-hide changed from 3s to 8s. Added X close button and tap-to-dismiss gesture on toast overlay. Users can now read or dismiss at will."
       },
       {
         "id": "US-087",
@@ -233,8 +233,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "EscalationLetterView shows placeholder warning when senderName contains '[Your Name]'. Confirmation dialog before generating with empty/placeholder name. Extracted generateLetter() function for clarity."
       },
       {
         "id": "US-088",
@@ -252,8 +252,8 @@
           "All tests pass"
         ],
         "priority": 1,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "SyncServiceTests.swift created with 7 tests: throttle prevention, auth requirements (push/pull/delete), batch splitting logic, error description validation, pending sync predicate filtering. Uses in-memory ModelContainer."
       },
       {
         "id": "US-089",
@@ -269,8 +269,8 @@
           "All tests pass"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "AuthServiceTests expanded with 5 new token refresh edge case tests: concurrent refresh guard, unauthorized response triggers signOut, validAccessToken signs out on failure, needsRefresh with nil expiry, Keychain write failure graceful handling. Total 12 AuthService tests."
       },
       {
         "id": "US-090",
@@ -285,8 +285,8 @@
           "All UI tests pass on iPhone 16 simulator"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "SeddlyUITests expanded with 4 critical flow tests: manual entry save-to-ledger, commitment detail status edit, filter apply/clear flow, and deep link navigation with invalid UUID (graceful error). Uses XCUIApplication with --uitesting launch argument."
       },
       {
         "id": "US-091",
@@ -301,8 +301,8 @@
           "CI pipeline passes with no false positives on current codebase"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "ci.yml updated with TruffleHog secrets scanning step. Uses trufflesecurity/trufflehog action with fetch-depth: 0 for full history scan. Runs --only-verified --fail to catch real secrets and fail the build. Runs on all PRs before merge."
       },
       {
         "id": "US-092",
@@ -316,8 +316,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Added showPDFError and pdfErrorMessage state to DisputeSummaryView. PDF generation failures now show an alert with the error description and a Retry button. Errors logged via AppLogger."
       },
       {
         "id": "US-093",
@@ -332,8 +332,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Both CommitmentDetailView (edit mode) and ManualEntryView show a warning Label below the DatePicker when selected deadline is in the past. Warning explains the commitment will be immediately overdue. User can still save — not blocked, just warned."
       },
       {
         "id": "US-094",

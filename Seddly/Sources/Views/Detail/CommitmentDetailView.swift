@@ -49,6 +49,12 @@ struct CommitmentDetailView: View {
                         Text("Screenshot couldn't be loaded")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Retry") {
+                            screenshotLoadFailed = false
+                            Task { await loadScreenshot() }
+                        }
+                        .font(.subheadline)
                     }
                 }
             } else if commitment.source == .manual {
@@ -101,6 +107,12 @@ struct CommitmentDetailView: View {
                         ),
                         displayedComponents: .date
                     )
+                    if let deadline = commitment.deadline,
+                       Calendar.current.startOfDay(for: deadline) < Calendar.current.startOfDay(for: .now) {
+                        Label("This date is in the past — the commitment will be immediately overdue.", systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
 
                     LabeledContent("Amount") {
                         TextField("$0.00", value: $commitment.dollarAmount, format: .currency(code: "USD"))
@@ -395,15 +407,27 @@ struct CommitmentDetailView: View {
         }
         .overlay(alignment: .bottom) {
             if showReminderToast {
-                Text(reminderToastMessage)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .shadow(radius: 4)
-                    .padding(.bottom, 32)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                HStack(spacing: 8) {
+                    Text(reminderToastMessage)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Button {
+                        withAnimation { showReminderToast = false }
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.ultraThinMaterial, in: Capsule())
+                .shadow(radius: 4)
+                .padding(.bottom, 32)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .onTapGesture {
+                    withAnimation { showReminderToast = false }
+                }
             }
         }
         .animation(.easeInOut, value: showReminderToast)
@@ -506,7 +530,7 @@ struct CommitmentDetailView: View {
             withAnimation {
                 showReminderToast = true
             }
-            try? await Task.sleep(for: .seconds(3))
+            try? await Task.sleep(for: .seconds(8))
             withAnimation {
                 showReminderToast = false
             }
@@ -530,18 +554,33 @@ struct CommitmentDetailView: View {
         options.deliveryMode = .highQualityFormat
         options.isSynchronous = false
 
-        let image: UIImage? = await withCheckedContinuation { continuation in
-            PHImageManager.default().requestImage(
-                for: asset,
-                targetSize: CGSize(width: 600, height: 600),
-                contentMode: .aspectFit,
-                options: options
-            ) { image, _ in
-                continuation.resume(returning: image)
+        // 10-second timeout for screenshot loading
+        let image: UIImage? = await withTaskGroup(of: UIImage?.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    PHImageManager.default().requestImage(
+                        for: asset,
+                        targetSize: CGSize(width: 600, height: 600),
+                        contentMode: .aspectFit,
+                        options: options
+                    ) { image, _ in
+                        continuation.resume(returning: image)
+                    }
+                }
             }
+            group.addTask {
+                try? await Task.sleep(for: .seconds(10))
+                return nil
+            }
+
+            // Return whichever finishes first
+            for await result in group {
+                group.cancelAll()
+                return result
+            }
+            return nil
         }
 
-        // Timeout: if we got here within 15s, just check result
         isLoadingScreenshot = false
         if let image {
             screenshotImage = image

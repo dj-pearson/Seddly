@@ -13,6 +13,7 @@ struct ClipboardCommitmentView: View {
     @State private var deadline: Date?
     @State private var hasDeadline = false
     @State private var showingError = false
+    @State private var showingDiscardConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -41,8 +42,12 @@ struct ClipboardCommitmentView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Skip") {
-                        onDismiss()
-                        dismiss()
+                        if hasUnsavedChanges {
+                            showingDiscardConfirmation = true
+                        } else {
+                            onDismiss()
+                            dismiss()
+                        }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -58,7 +63,22 @@ struct ClipboardCommitmentView: View {
             } message: {
                 Text("Something went wrong while saving. Please try again.")
             }
+            .confirmationDialog("Discard Changes?", isPresented: $showingDiscardConfirmation, titleVisibility: .visible) {
+                Button("Discard", role: .destructive) {
+                    onDismiss()
+                    dismiss()
+                }
+                Button("Keep Editing", role: .cancel) {}
+            } message: {
+                Text("You have unsaved changes. Are you sure you want to skip?")
+            }
         }
+    }
+
+    private var hasUnsavedChanges: Bool {
+        !entityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !summary.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        hasDeadline
     }
 
     private func saveCommitment() {
