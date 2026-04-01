@@ -534,3 +534,98 @@ Ship it. For real this time.
 
 — Ralph, SnarktTank
 ================================================================================
+
+
+================================================================================
+  SNARKTANK — RALPH'S PRD LOOP REVIEW
+  Project: Seddly (iOS Screenshot Accountability Engine)
+  Date: 2026-04-01
+  Loop: 5 (Security Audit, Auth Hardening, UI/UX & Mobile Readiness)
+  Reviewer: Ralph AI — SnarktTank
+================================================================================
+
+OVERALL VERDICT: 4 / 20 USER STORIES PASSING (TOP 4 PRIORITIES COMPLETED)
+COMPLETION RATE: 20%
+
+Ralph says: "Four critical security holes closed in one session. The push
+endpoint isn't a public doorbell anymore, the API has brakes, your AI
+functions can't be sweet-talked into lying, and sessions don't live forever.
+Sixteen stories left. Keep going."
+
+================================================================================
+COMPLETED STORIES
+================================================================================
+
+[SECURITY — CRITICAL] — 4/4 Priority 1 stories passing
+──────────────────────────────────────
+
+  US-095  PASS  Secure send-silent-push endpoint with authentication
+    → Added CRON_SECRET env var validation via X-Cron-Secret header.
+      Returns 403 with structured log distinguishing missing vs invalid secret.
+      External callers can no longer spam push notifications to all Pro+ users.
+      File: supabase/functions/send-silent-push/index.ts
+
+  US-096  PASS  Add server-side rate limiting to api-commitments endpoint
+    → 60 req/min/user via Deno KV sliding window. Rate limit check after auth
+      but before any DB queries. Returns 429 with Retry-After header. All HTTP
+      methods count toward same window. Matches pattern from extract-commitments.
+      File: supabase/functions/api-commitments/index.ts
+
+  US-097  PASS  Add prompt injection protection to AI edge functions
+    → User input wrapped in XML boundaries (<user_text>/<user_data>). System
+      prompts explicitly instruct Claude to treat boundary content as data only.
+      sanitizeUserInput() strips XML-like tags to prevent boundary escape.
+      detectSuspiciousPatterns() logs warnings for injection attempts.
+      Files: supabase/functions/extract-commitments/index.ts,
+             supabase/functions/generate-dispute-summary/index.ts
+
+  US-098  PASS  Add client-side session timeout and auth event logging
+    → AuthService.lastActivityTimestamp tracks session activity. Inactivity >15min
+      triggers automatic signOut with sessionTimeout log. All auth events logged
+      via AppLogger.auth (signIn, signOut, tokenRefresh, sessionTimeout, refreshFailed).
+      SessionTimeoutService actor monitors background duration on foreground return.
+      Files: Seddly/Sources/Services/AuthService.swift,
+             Seddly/Sources/Services/SessionTimeoutService.swift (new)
+
+================================================================================
+REMAINING STORIES (16 pending)
+================================================================================
+
+Priority 2 (8 stories):
+  US-099  PENDING  Fix soft delete RLS policies
+  US-100  PENDING  Add database constraints for data integrity
+  US-101  PENDING  Enable pg_cron hard delete job for GDPR compliance
+  US-102  PENDING  Fix processing_log INSERT policy
+  US-105  PENDING  Add server-side auth event logging table
+  US-112  PENDING  Add security headers to all Edge Function responses
+  US-113  PENDING  Add account deletion endpoint and wire to Settings
+
+Priority 3 (8 stories):
+  US-103  PENDING  Create centralized design system with semantic tokens
+  US-104  PENDING  Add accessibility hints for swipe actions
+  US-106  PENDING  Add interactive widget support for iOS 17+
+  US-107  PENDING  Add large widget variant with commitment timeline
+  US-108  PENDING  Add CORS headers to internal endpoints
+  US-109  PENDING  Add request ID correlation across client and server
+  US-110  PENDING  Add custom button styles and view modifiers
+  US-111  PENDING  Add Dark Mode color verification and semantic colors
+  US-114  PENDING  Add composite database indexes
+
+================================================================================
+NEW LOOP 5 PRD SUMMARY
+================================================================================
+
+20 new user stories created covering:
+  - Security (12 stories): Endpoint auth, rate limiting, prompt injection,
+    session timeout, RLS fixes, DB constraints, GDPR compliance, security headers,
+    auth event logging, account deletion, CORS hardening, request correlation
+  - UI/UX (6 stories): Design system, accessibility, interactive widgets,
+    large widget, button styles, dark mode verification
+  - Performance (1 story): Composite database indexes
+
+Android assessment: No Android app exists in the codebase. Would require
+a complete parallel development effort (6-12+ months for feature parity).
+Recommendation: Solidify iOS first, then evaluate cross-platform options.
+
+— Ralph, SnarktTank
+================================================================================

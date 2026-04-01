@@ -14,6 +14,7 @@ actor AuthService {
     private var refreshToken: String?
     private var tokenExpiresAt: Date?
     private var isRefreshing = false
+    private var lastActivityTimestamp: Date?
 
     private static let keychainServiceName = "com.pearsonmedia.Seddly.auth"
     private static let keychainTokenKey = "accessToken"
@@ -23,6 +24,10 @@ actor AuthService {
 
     /// Buffer before actual expiry to refresh proactively (60 seconds).
     private static let expirationBuffer: TimeInterval = 60
+
+    /// Session inactivity timeout (15 minutes). After this period without
+    /// any validAccessToken() calls, the next call triggers automatic sign-out.
+    static let sessionInactivityTimeout: TimeInterval = 15 * 60
 
     private static let keychainMigrationKey = "keychainMigratedToWhenUnlocked"
 
@@ -95,23 +100,35 @@ actor AuthService {
 
         let authResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
         storeTokens(authResponse)
+        lastActivityTimestamp = .now
+        AppLogger.auth.info("Auth event: signIn succeeded for user \(authResponse.user.id, privacy: .private)")
     }
 
     /// Returns a valid access token, refreshing automatically if expired.
     /// Returns nil if not authenticated or refresh fails.
+    /// Also enforces session inactivity timeout — if no calls for 15 minutes, signs out.
     func validAccessToken() async -> String? {
         guard accessToken != nil else { return nil }
+
+        // Check inactivity timeout
+        if let lastActivity = lastActivityTimestamp,
+           Date.now.timeIntervalSince(lastActivity) > Self.sessionInactivityTimeout {
+            AppLogger.auth.warning("Auth event: sessionTimeout — inactive for >\(Int(Self.sessionInactivityTimeout))s")
+            signOut()
+            return nil
+        }
 
         if isTokenExpired {
             do {
                 try await refreshAccessToken()
             } catch {
-                AppLogger.auth.error("Token refresh failed: \(error.localizedDescription)")
+                AppLogger.auth.error("Auth event: refreshFailed — \(error.localizedDescription)")
                 signOut()
                 return nil
             }
         }
 
+        lastActivityTimestamp = .now
         return accessToken
     }
 
@@ -129,11 +146,13 @@ actor AuthService {
     }
 
     func signOut() {
+        AppLogger.auth.info("Auth event: signOut")
         currentUserID = nil
         accessToken = nil
         refreshToken = nil
         tokenExpiresAt = nil
         isRefreshing = false
+        lastActivityTimestamp = nil
         Self.deleteKeychain(key: Self.keychainTokenKey)
         Self.deleteKeychain(key: Self.keychainRefreshTokenKey)
         Self.deleteKeychain(key: Self.keychainUserIDKey)
@@ -196,7 +215,7 @@ actor AuthService {
 
         let tokenResponse = try JSONDecoder().decode(TokenResponse.self, from: data)
         storeTokens(tokenResponse)
-        AppLogger.auth.info("Access token refreshed successfully")
+        AppLogger.auth.info("Auth event: tokenRefresh succeeded")
     }
 
     private func storeTokens(_ response: TokenResponse) {

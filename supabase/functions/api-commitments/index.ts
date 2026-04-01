@@ -22,6 +22,29 @@ function structuredLog(
 // DELETE /api-commitments?id=<uuid> — delete commitment
 
 const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
+const RATE_LIMIT_MAX = 60; // 60 requests per window
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
+
+const kv = await Deno.openKv();
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const key = ["rate_limit", "api-commitments", userId];
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  const entry = await kv.get<{ timestamps: number[] }>(key);
+  const timestamps = (entry.value?.timestamps ?? []).filter((t) => t > windowStart);
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    const oldestInWindow = Math.min(...timestamps);
+    const retryAfterSeconds = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSeconds: Math.max(1, retryAfterSeconds) };
+  }
+
+  timestamps.push(now);
+  await kv.set(key, { timestamps }, { expireIn: RATE_LIMIT_WINDOW_MS });
+  return { allowed: true, retryAfterSeconds: 0 };
+}
 
 function corsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
@@ -78,6 +101,23 @@ Deno.serve(async (req) => {
   } else {
     structuredLog("warn", { requestId, action: "auth_missing", statusCode: 401 });
     return jsonResponse({ error: "Bearer token required" }, 401);
+  }
+
+  // Rate limiting: 60 requests per minute per user
+  const rateLimit = await checkRateLimit(userId);
+  if (!rateLimit.allowed) {
+    structuredLog("warn", { requestId, action: "rate_limited", userId, statusCode: 429 });
+    return new Response(
+      JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+          ...corsHeaders(req),
+        },
+      },
+    );
   }
 
   const url = new URL(req.url);

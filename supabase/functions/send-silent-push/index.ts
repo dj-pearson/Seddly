@@ -71,6 +71,8 @@ async function sendSilentPush(
   }
 }
 
+const CRON_SECRET = Deno.env.get("CRON_SECRET")!;
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID();
 
@@ -79,6 +81,21 @@ Deno.serve(async (req) => {
     structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  // Authenticate: require X-Cron-Secret header matching CRON_SECRET env var
+  const cronSecret = req.headers.get("X-Cron-Secret");
+  if (!cronSecret || cronSecret !== CRON_SECRET) {
+    structuredLog("warn", {
+      requestId,
+      action: "auth_rejected",
+      statusCode: 403,
+      reason: cronSecret ? "invalid_secret" : "missing_secret",
+    });
+    return new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
       headers: { "Content-Type": "application/json" },
     });
   }
