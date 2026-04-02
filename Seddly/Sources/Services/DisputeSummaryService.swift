@@ -77,6 +77,7 @@ actor DisputeSummaryService {
         request.httpMethod = "POST"
         request.timeoutInterval = 30
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
         if let authToken {
             request.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         }

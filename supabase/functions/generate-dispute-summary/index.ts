@@ -126,7 +126,7 @@ async function logAuthEvent(
 }
 
 Deno.serve(async (req) => {
-  const requestId = crypto.randomUUID();
+  const requestId = req.headers.get("X-Request-ID") || crypto.randomUUID();
 
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders(req) });

@@ -76,11 +76,11 @@ struct CommitmentCardView: View {
 
                 if let customStatus = commitment.customStatusLabel {
                     Text(customStatus)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(.purple.opacity(0.1))
-                        .foregroundStyle(.purple)
+                        .font(SeddlyFont.badge)
+                        .padding(.horizontal, SeddlySpacing.sm)
+                        .padding(.vertical, SeddlySpacing.xxs)
+                        .background(SeddlyColors.customWorkflow.opacity(0.1))
+                        .foregroundStyle(SeddlyColors.customWorkflow)
                         .clipShape(Capsule())
                 }
 
@@ -146,12 +146,6 @@ struct CommitmentCardView: View {
     }
 
     private var statusColor: Color {
-        switch commitment.status {
-        case .pending: .blue
-        case .fulfilled: .green
-        case .overdue: .red
-        case .disputed: .orange
-        case .dismissed: .gray
-        }
+        SeddlyColors.status(commitment.status)
     }
 }

@@ -5,11 +5,11 @@
     "ralphLoop": {
       "currentLoop": 5,
       "lastReviewDate": "2026-04-01",
-      "passingCount": 11,
+      "passingCount": 20,
       "totalCount": 20,
-      "completionRate": "55%",
+      "completionRate": "100%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Loop 5 initiated — 20 new stories covering critical security gaps (unauthenticated endpoints, missing rate limits, prompt injection), auth hardening (session timeout, event logging, brute force mitigation), UI/UX improvements (design system, accessibility), and data practice improvements."
+      "verdict": "Loop 5 complete — all 20 stories passing. Security hardening (rate limiting, prompt injection, session timeout, CORS, request ID correlation), UI/UX (design system, accessibility, widgets, button styles, dark mode), and performance (composite indexes) all implemented."
     },
     "previousLoops": [
       {
@@ -189,8 +189,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "DesignSystem.swift created in Seddly/Sources/Shared/ with SeddlyColors (status, confidence, urgency semantic functions), SeddlySpacing (xxs=2 through xxl=24), SeddlyRadius (small=8, medium=12, large=16), SeddlyFont (cardTitle, cardBody, supporting, badge, monospaced). CommitmentCardView, ConfidenceBadgeView, DeadlineIndicatorView, CommitmentDetailView, and EmptyLedgerView all updated to use design tokens."
       },
       {
         "id": "US-104",
@@ -205,8 +205,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Added .accessibilityHint to LedgerView swipe actions ('Swipe right to mark fulfilled, swipe left to dismiss'), selection mode toggle ('Double-tap to select/deselect for bulk action'), bulk action bar (.accessibilityLabel with count). CommitmentDetailView: custom reminder, dismiss, and delete buttons all have descriptive .accessibilityHint."
       },
       {
         "id": "US-105",
@@ -238,8 +238,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "FulfillCommitmentIntent and DismissCommitmentIntent created as AppIntents. Both update SwiftData via SharedModelContainer and reload widget timelines. Interactive buttons added to large widget view for each commitment. WidgetCommitment extended with deadline property for timeline display."
       },
       {
         "id": "US-107",
@@ -255,8 +255,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "systemLarge added to supportedFamilies. Large widget shows header with overdue/pending counts, up to 5 commitments sorted by deadline with entity name, summary, relative deadline, and status color indicator. Each entry deep links via seddly://commitment/{id}. Interactive fulfill/dismiss buttons per commitment. Empty state shows 'No pending commitments' with icon."
       },
       {
         "id": "US-108",
@@ -271,8 +271,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "CORS handling added to send-silent-push and subscription-webhook. corsHeaders() validates Origin against allowed origins (seddly.com). OPTIONS preflight returns 204 with CORS and security headers. X-Request-ID accepted in Access-Control-Allow-Headers for correlation support."
       },
       {
         "id": "US-109",
@@ -287,8 +287,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "X-Request-ID header added to all client HTTP requests: AIExtractionService, DisputeSummaryService, APIAccessService (authenticatedRequest helper), SyncService (push, pull, and PATCH). UUID generated per-request. All 6 Edge Functions updated to prefer client X-Request-ID over server-generated UUID (req.headers.get('X-Request-ID') || crypto.randomUUID()). Enables end-to-end request tracing."
       },
       {
         "id": "US-110",
@@ -303,8 +303,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "SeddlyPrimaryButtonStyle, SeddlySecondaryButtonStyle, SeddlyDestructiveButtonStyle created as ButtonStyle conformances with press animation (opacity + scale). SeddlyCardStyle ViewModifier added for consistent card appearance. Static extension accessors (.seddlyPrimary, .seddlySecondary, .seddlyDestructive) for clean ButtonStyle usage. All styles use DesignSystem tokens."
       },
       {
         "id": "US-111",
@@ -319,8 +319,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "SeddlyAdaptiveColors enum added to DesignSystem.swift with system-adaptive colors: cardBackground (.secondarySystemGroupedBackground), primaryBackground (.systemBackground), groupedBackground (.systemGroupedBackground), separator (.separator). statusBackground() helper returns status color at 0.15 opacity. All UIColor-backed colors automatically adapt to light/dark via UIKit trait system."
       },
       {
         "id": "US-112",
@@ -367,8 +367,8 @@
           "Build succeeds"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": ""
+        "passes": true,
+        "notes": "Migration 20260402000000_composite_indexes.sql adds 7 composite indexes using CREATE INDEX CONCURRENTLY: commitments(user_id, created_at) for sync pull, commitments(user_id, status, deadline) WHERE deleted_at IS NULL for active queries, commitments(user_id, entity_name, created_at DESC) for entity profiles, auth_events(user_id, event_type, created_at DESC) for security monitoring, users(subscription_status, subscription_expires_at) for cron jobs, commitments(deleted_at) WHERE NOT NULL for cleanup, processing_log(processed_at DESC) for analytics."
       }
     ]
   }

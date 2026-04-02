@@ -1,6 +1,9 @@
 import WidgetKit
 import SwiftUI
 import SwiftData
+import AppIntents
+
+// MARK: - Widget Entry
 
 struct SeddlyWidgetEntry: TimelineEntry {
     let date: Date
@@ -15,8 +18,83 @@ struct WidgetCommitment: Identifiable {
     let id: String
     let entityName: String
     let summary: String
+    let deadline: Date?
     let isOverdue: Bool
 }
+
+// MARK: - Interactive Widget Intents (iOS 17+)
+
+struct FulfillCommitmentIntent: AppIntent {
+    static var title: LocalizedStringResource = "Mark Fulfilled"
+    static var description = IntentDescription("Mark a commitment as fulfilled")
+
+    @Parameter(title: "Commitment ID")
+    var commitmentID: String
+
+    init() {}
+
+    init(commitmentID: String) {
+        self.commitmentID = commitmentID
+    }
+
+    func perform() async throws -> some IntentResult {
+        guard let container = try? SharedModelContainer.create() else {
+            return .result()
+        }
+        let context = ModelContext(container)
+        guard let uuid = UUID(uuidString: commitmentID) else { return .result() }
+
+        let descriptor = FetchDescriptor<LocalCommitment>(
+            predicate: #Predicate { $0.id == uuid }
+        )
+
+        if let commitment = try? context.fetch(descriptor).first {
+            commitment.statusRaw = "fulfilled"
+            commitment.updatedAt = .now
+            try? context.save()
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
+struct DismissCommitmentIntent: AppIntent {
+    static var title: LocalizedStringResource = "Dismiss Commitment"
+    static var description = IntentDescription("Dismiss a commitment")
+
+    @Parameter(title: "Commitment ID")
+    var commitmentID: String
+
+    init() {}
+
+    init(commitmentID: String) {
+        self.commitmentID = commitmentID
+    }
+
+    func perform() async throws -> some IntentResult {
+        guard let container = try? SharedModelContainer.create() else {
+            return .result()
+        }
+        let context = ModelContext(container)
+        guard let uuid = UUID(uuidString: commitmentID) else { return .result() }
+
+        let descriptor = FetchDescriptor<LocalCommitment>(
+            predicate: #Predicate { $0.id == uuid }
+        )
+
+        if let commitment = try? context.fetch(descriptor).first {
+            commitment.statusRaw = "dismissed"
+            commitment.updatedAt = .now
+            try? context.save()
+        }
+
+        WidgetCenter.shared.reloadAllTimelines()
+        return .result()
+    }
+}
+
+// MARK: - Timeline Provider
 
 struct SeddlyWidgetProvider: TimelineProvider {
     func placeholder(in context: Context) -> SeddlyWidgetEntry {
@@ -69,11 +147,12 @@ struct SeddlyWidgetProvider: TimelineProvider {
             return aDeadline < bDeadline
         }
 
-        let topCommitments = sortedCommitments.prefix(3).map { commitment in
+        let topCommitments = sortedCommitments.prefix(5).map { commitment in
             WidgetCommitment(
                 id: commitment.id.uuidString,
                 entityName: commitment.entityName,
                 summary: commitment.summary,
+                deadline: commitment.deadline,
                 isOverdue: commitment.deadline.map { $0 < .now } ?? false
             )
         }
@@ -89,6 +168,8 @@ struct SeddlyWidgetProvider: TimelineProvider {
     }
 }
 
+// MARK: - Widget Views
+
 struct SeddlyWidgetEntryView: View {
     var entry: SeddlyWidgetEntry
     @Environment(\.widgetFamily) var family
@@ -99,10 +180,14 @@ struct SeddlyWidgetEntryView: View {
             smallWidget
         case .systemMedium:
             mediumWidget
+        case .systemLarge:
+            largeWidget
         default:
             smallWidget
         }
     }
+
+    // MARK: Small Widget
 
     private var smallWidget: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -141,6 +226,8 @@ struct SeddlyWidgetEntryView: View {
         guard let first = entry.topCommitments.first else { return nil }
         return URL(string: "seddly://commitment/\(first.id)")
     }
+
+    // MARK: Medium Widget
 
     private var mediumWidget: some View {
         HStack {
@@ -214,7 +301,125 @@ struct SeddlyWidgetEntryView: View {
         }
         .padding()
     }
+
+    // MARK: Large Widget — Commitment Timeline with Interactive Buttons
+
+    private var largeWidget: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Header
+            HStack {
+                Image(systemName: "checkmark.shield.fill")
+                    .foregroundStyle(.accent)
+                Text("Seddly")
+                    .font(.headline)
+                    .fontWeight(.bold)
+
+                Spacer()
+
+                HStack(spacing: 12) {
+                    VStack(spacing: 0) {
+                        Text("\(entry.overdueCount)")
+                            .font(.title3.bold())
+                            .foregroundStyle(entry.overdueCount > 0 ? .red : .primary)
+                        Text("Overdue")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    VStack(spacing: 0) {
+                        Text("\(entry.pendingCount)")
+                            .font(.title3.bold())
+                        Text("Pending")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(.bottom, 4)
+
+            Divider()
+
+            if entry.topCommitments.isEmpty {
+                Spacer()
+                HStack {
+                    Spacer()
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.title)
+                            .foregroundStyle(.secondary)
+                        Text("No pending commitments")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                Spacer()
+            } else {
+                // Commitment timeline list with interactive buttons
+                ForEach(entry.topCommitments.prefix(5)) { commitment in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(commitment.isOverdue ? .red : .orange)
+                                .frame(width: 8, height: 8)
+
+                            Text(commitment.entityName)
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                                .lineLimit(1)
+
+                            Spacer()
+
+                            if let deadline = commitment.deadline {
+                                Text(deadline, style: .relative)
+                                    .font(.caption2)
+                                    .foregroundStyle(commitment.isOverdue ? .red : .secondary)
+                            }
+                        }
+
+                        HStack {
+                            Link(destination: URL(string: "seddly://commitment/\(commitment.id)")!) {
+                                Text(commitment.summary)
+                                    .font(.caption)
+                                    .foregroundStyle(.primary)
+                                    .lineLimit(2)
+                                    .multilineTextAlignment(.leading)
+                            }
+
+                            Spacer()
+
+                            // Interactive buttons (iOS 17+)
+                            HStack(spacing: 8) {
+                                Button(intent: FulfillCommitmentIntent(commitmentID: commitment.id)) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                }
+                                .buttonStyle(.plain)
+
+                                Button(intent: DismissCommitmentIntent(commitmentID: commitment.id)) {
+                                    Image(systemName: "xmark.circle")
+                                        .font(.caption)
+                                        .foregroundStyle(.gray)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+
+                    if commitment.id != entry.topCommitments.prefix(5).last?.id {
+                        Divider()
+                    }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding()
+    }
 }
+
+// MARK: - Widget Configuration
 
 @main
 struct SeddlyWidget: Widget {
@@ -227,15 +432,17 @@ struct SeddlyWidget: Widget {
         }
         .configurationDisplayName("Commitments")
         .description("See overdue and pending commitments at a glance.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
+
+// MARK: - Previews
 
 #Preview(as: .systemSmall) {
     SeddlyWidget()
 } timeline: {
     SeddlyWidgetEntry(date: .now, overdueCount: 3, pendingCount: 8, nextDeadline: nil, nextDeadlineEntity: nil, topCommitments: [
-        WidgetCommitment(id: "abc-123", entityName: "Landlord", summary: "Fix plumbing", isOverdue: true)
+        WidgetCommitment(id: "abc-123", entityName: "Landlord", summary: "Fix plumbing", deadline: Calendar.current.date(byAdding: .day, value: -2, to: .now), isOverdue: true)
     ])
 }
 
@@ -243,7 +450,19 @@ struct SeddlyWidget: Widget {
     SeddlyWidget()
 } timeline: {
     SeddlyWidgetEntry(date: .now, overdueCount: 1, pendingCount: 5, nextDeadline: Calendar.current.date(byAdding: .day, value: 2, to: .now), nextDeadlineEntity: "Acme Property Mgmt", topCommitments: [
-        WidgetCommitment(id: "abc-123", entityName: "Landlord", summary: "Fix plumbing", isOverdue: true),
-        WidgetCommitment(id: "def-456", entityName: "Acme Corp", summary: "Invoice payment", isOverdue: false),
+        WidgetCommitment(id: "abc-123", entityName: "Landlord", summary: "Fix plumbing", deadline: Calendar.current.date(byAdding: .day, value: -2, to: .now), isOverdue: true),
+        WidgetCommitment(id: "def-456", entityName: "Acme Corp", summary: "Invoice payment", deadline: Calendar.current.date(byAdding: .day, value: 3, to: .now), isOverdue: false),
+    ])
+}
+
+#Preview(as: .systemLarge) {
+    SeddlyWidget()
+} timeline: {
+    SeddlyWidgetEntry(date: .now, overdueCount: 2, pendingCount: 7, nextDeadline: Calendar.current.date(byAdding: .day, value: 1, to: .now), nextDeadlineEntity: "Cable Co", topCommitments: [
+        WidgetCommitment(id: "1", entityName: "Landlord", summary: "Fix plumbing by end of week", deadline: Calendar.current.date(byAdding: .day, value: -2, to: .now), isOverdue: true),
+        WidgetCommitment(id: "2", entityName: "Cable Co", summary: "Refund $45 for outage", deadline: Calendar.current.date(byAdding: .day, value: -1, to: .now), isOverdue: true),
+        WidgetCommitment(id: "3", entityName: "Acme Corp", summary: "Send invoice payment", deadline: Calendar.current.date(byAdding: .day, value: 3, to: .now), isOverdue: false),
+        WidgetCommitment(id: "4", entityName: "Dr. Smith", summary: "Follow-up appointment", deadline: Calendar.current.date(byAdding: .day, value: 5, to: .now), isOverdue: false),
+        WidgetCommitment(id: "5", entityName: "Insurance", summary: "Submit claim documents", deadline: Calendar.current.date(byAdding: .day, value: 7, to: .now), isOverdue: false),
     ])
 }

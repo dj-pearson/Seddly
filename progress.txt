@@ -656,8 +656,99 @@ BATCH 2 — PRIORITY 2 STORIES COMPLETED (2026-04-01)
              .github/workflows/deploy-supabase.yml
 
 ================================================================================
-LOOP 5 PROGRESS: 11 / 20 STORIES PASSING (55%)
+BATCH 3 — PRIORITY 3 STORIES COMPLETED (2026-04-02)
 ================================================================================
+
+  US-103  PASS  Create centralized design system with semantic tokens
+    → DesignSystem.swift created in Seddly/Sources/Shared/ with SeddlyColors
+      (status, confidence, urgency semantic functions), SeddlySpacing (xxs=2
+      through xxl=24), SeddlyRadius (small=8, medium=12, large=16), SeddlyFont
+      presets, SeddlyPillStyle and SeddlyBannerStyle view modifiers.
+      5 views updated to use tokens: CommitmentCardView, ConfidenceBadgeView,
+      DeadlineIndicatorView, CommitmentDetailView, EmptyLedgerView.
+      File: Seddly/Sources/Shared/DesignSystem.swift (new)
+
+  US-104  PASS  Add accessibility hints for swipe actions
+    → LedgerView: swipe actions have .accessibilityHint ("Swipe right to
+      mark fulfilled, swipe left to dismiss"). Selection mode toggle has
+      context-aware hint. Bulk action bar has .accessibilityLabel with count.
+      CommitmentDetailView: reminder, dismiss, and delete buttons have hints.
+      Files: LedgerView.swift, CommitmentDetailView.swift
+
+  US-106  PASS  Add interactive widget support for iOS 17+
+    → FulfillCommitmentIntent and DismissCommitmentIntent as AppIntents.
+      Both update SwiftData via SharedModelContainer and reload timelines.
+      Interactive buttons in large widget for each commitment row.
+      File: SeddlyWidget/SeddlyWidget.swift
+
+  US-107  PASS  Add large widget variant with commitment timeline
+    → systemLarge added to supportedFamilies. Shows header with overdue/pending
+      counts, up to 5 commitments with entity, summary, relative deadline, and
+      status color. Deep links per commitment. Interactive fulfill/dismiss
+      buttons. Empty state with icon.
+      File: SeddlyWidget/SeddlyWidget.swift
+
+  US-108  PASS  Add CORS headers to internal endpoints
+    → corsHeaders() with origin validation added to send-silent-push and
+      subscription-webhook. OPTIONS preflight returns 204 with CORS + security
+      headers. X-Request-ID accepted in Allow-Headers.
+      Files: send-silent-push/index.ts, subscription-webhook/index.ts
+
+  US-109  PASS  Add request ID correlation across client and server
+    → X-Request-ID header (UUID per-request) added to AIExtractionService,
+      DisputeSummaryService, APIAccessService, SyncService (push, pull, PATCH).
+      All 6 Edge Functions prefer client X-Request-ID over server-generated UUID.
+      Files: 4 Swift services, 6 Edge Functions
+
+  US-110  PASS  Add custom button styles and view modifiers
+    → SeddlyPrimaryButtonStyle, SeddlySecondaryButtonStyle, SeddlyDestructive-
+      ButtonStyle with press animation (opacity + scale). SeddlyCardStyle
+      ViewModifier. Static extension accessors (.seddlyPrimary, .seddlySecondary,
+      .seddlyDestructive). All use DesignSystem tokens.
+      File: Seddly/Sources/Shared/DesignSystem.swift
+
+  US-111  PASS  Add Dark Mode color verification and semantic colors
+    → SeddlyAdaptiveColors enum with UIColor-backed adaptive colors:
+      cardBackground (.secondarySystemGroupedBackground), primaryBackground
+      (.systemBackground), groupedBackground, separator. statusBackground()
+      returns status color at 0.15 opacity. All auto-adapt to light/dark.
+      File: Seddly/Sources/Shared/DesignSystem.swift
+
+  US-114  PASS  Add composite database indexes for common query patterns
+    → 7 composite indexes via CREATE INDEX CONCURRENTLY: user+created_at (sync),
+      user+status+deadline WHERE not deleted (active queries), user+entity+date
+      (entity profiles), auth events, subscription expiry, soft-deleted cleanup,
+      processing_log date range.
+      File: supabase/migrations/20260402000000_composite_indexes.sql (new)
+
+================================================================================
+LOOP 5 FINAL: 20 / 20 STORIES PASSING (100%)
+================================================================================
+
+Total Loop 5 changes across 3 batches:
+  • 1 new Swift file (DesignSystem.swift)
+  • 1 new service file (SessionTimeoutService.swift)
+  • 1 new Edge Function (delete-account)
+  • 2 new SQL migrations (security_hardening, composite_indexes)
+  • 6 Edge Functions hardened (rate limiting, auth, CORS, request IDs)
+  • 5 Swift views updated (design tokens, accessibility)
+  • 4 Swift services updated (request ID correlation)
+  • 1 widget expanded (interactive + large variant)
+  • 7 composite database indexes added
+  • 3 custom button styles created
+  • Dark mode adaptive color system established
+
+Security posture:
+  • All endpoints authenticated or secret-protected
+  • Rate limiting on all user-facing APIs
+  • Prompt injection protection on AI functions
+  • Session timeout with auth event logging
+  • CORS headers on all endpoints
+  • End-to-end request ID tracing
+  • Account deletion (GDPR right to erasure)
+  • Granular RLS policies with soft-delete protection
+
+Ship it. Again.
 
 — Ralph, SnarktTank
 ================================================================================

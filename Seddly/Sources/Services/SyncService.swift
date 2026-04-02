@@ -86,6 +86,7 @@ actor SyncService {
                 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
                 request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
                 request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+                request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
 
                 let payload: [String: Any?] = [
                     "id": commitment.id.uuidString,
@@ -203,6 +204,7 @@ actor SyncService {
             var request = URLRequest(url: components.url!)
             request.setValue("Bearer \(currentToken)", forHTTPHeaderField: "Authorization")
             request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
 
             var fetchedData = Data()
             var lastStatusCode = -1
@@ -302,6 +304,7 @@ actor SyncService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue(supabaseKey, forHTTPHeaderField: "apikey")
+        request.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-ID")
 
         let payload: [String: Any] = ["deleted_at": ISO8601DateFormatter().string(from: now)]
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)

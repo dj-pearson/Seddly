@@ -20,7 +20,19 @@ const SECURITY_HEADERS = {
   "Cache-Control": "no-store",
 };
 
-const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID")!;
+const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
+
+function corsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Methods": "POST",
+    "Access-Control-Allow-Headers": "Content-Type, X-Cron-Secret, X-Request-ID",
+  };
+}
+
+const APNS_KEY_ID = Deno.env.get("APNS_KEY_ID")!
 const APNS_TEAM_ID = Deno.env.get("APNS_TEAM_ID")!;
 const APNS_PRIVATE_KEY = Deno.env.get("APNS_PRIVATE_KEY")!;
 const APNS_BUNDLE_ID = "com.pearsonmedia.Seddly";
@@ -81,14 +93,19 @@ async function sendSilentPush(
 const CRON_SECRET = Deno.env.get("CRON_SECRET")!;
 
 Deno.serve(async (req) => {
-  const requestId = crypto.randomUUID();
+  const requestId = req.headers.get("X-Request-ID") || crypto.randomUUID();
+
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: { ...corsHeaders(req), ...SECURITY_HEADERS } });
+  }
 
   // This function is triggered by pg_cron, not external requests
   if (req.method !== "POST") {
     structuredLog("warn", { requestId, action: "method_rejected", statusCode: 405 });
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS },
+      headers: { "Content-Type": "application/json", ...SECURITY_HEADERS, ...corsHeaders(req) },
     });
   }
 
