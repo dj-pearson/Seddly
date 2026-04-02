@@ -26,11 +26,7 @@ struct ConfidenceBadgeView: View {
     }
 
     private var badgeColor: Color {
-        switch score {
-        case 8...10: .green
-        case 5...7: .yellow
-        default: .gray
-        }
+        SeddlyColors.confidence(score)
     }
 }
 

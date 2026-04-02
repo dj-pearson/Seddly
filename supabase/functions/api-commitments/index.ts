@@ -23,6 +23,37 @@ function structuredLog(
 
 const ALLOWED_ORIGINS = ["https://seddly.com", "https://www.seddly.com"];
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+  "Cache-Control": "no-store",
+};
+
+const RATE_LIMIT_MAX = 60; // 60 requests per window
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute window
+
+const kv = await Deno.openKv();
+
+async function checkRateLimit(userId: string): Promise<{ allowed: boolean; retryAfterSeconds: number }> {
+  const key = ["rate_limit", "api-commitments", userId];
+  const now = Date.now();
+  const windowStart = now - RATE_LIMIT_WINDOW_MS;
+
+  const entry = await kv.get<{ timestamps: number[] }>(key);
+  const timestamps = (entry.value?.timestamps ?? []).filter((t) => t > windowStart);
+
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    const oldestInWindow = Math.min(...timestamps);
+    const retryAfterSeconds = Math.ceil((oldestInWindow + RATE_LIMIT_WINDOW_MS - now) / 1000);
+    return { allowed: false, retryAfterSeconds: Math.max(1, retryAfterSeconds) };
+  }
+
+  timestamps.push(now);
+  await kv.set(key, { timestamps }, { expireIn: RATE_LIMIT_WINDOW_MS });
+  return { allowed: true, retryAfterSeconds: 0 };
+}
+
 function corsHeaders(req: Request) {
   const origin = req.headers.get("Origin") || "";
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
@@ -33,8 +64,28 @@ function corsHeaders(req: Request) {
   };
 }
 
+async function logAuthEvent(
+  supabase: ReturnType<typeof createClient>,
+  eventType: string,
+  req: Request,
+  userId?: string,
+  details?: string,
+) {
+  try {
+    await supabase.from("auth_events").insert({
+      user_id: userId ?? null,
+      event_type: eventType,
+      ip_address: req.headers.get("X-Forwarded-For") ?? req.headers.get("CF-Connecting-IP") ?? null,
+      user_agent: req.headers.get("User-Agent") ?? null,
+      details,
+    });
+  } catch {
+    // Auth event logging is non-critical — don't fail the request
+  }
+}
+
 Deno.serve(async (req) => {
-  const requestId = crypto.randomUUID();
+  const requestId = req.headers.get("X-Request-ID") || crypto.randomUUID();
 
   // CORS
   if (req.method === "OPTIONS") {
@@ -45,12 +96,13 @@ Deno.serve(async (req) => {
   const authHeader = req.headers.get("Authorization");
   const apiKey = req.headers.get("X-API-Key");
 
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
   if (!authHeader && !apiKey) {
     structuredLog("warn", { requestId, action: "auth_missing", statusCode: 401 });
+    await logAuthEvent(supabase, "auth_missing", req, undefined, "No auth header or API key");
     return jsonResponse({ error: "Authentication required" }, 401);
   }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   // Verify user from JWT
   let userId: string;
@@ -59,6 +111,7 @@ Deno.serve(async (req) => {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) {
       structuredLog("warn", { requestId, action: "auth_failed", statusCode: 401 });
+      await logAuthEvent(supabase, "auth_failed", req, undefined, "Invalid or expired JWT");
       return jsonResponse({ error: "Invalid token" }, 401);
     }
 
@@ -71,13 +124,33 @@ Deno.serve(async (req) => {
 
     if (!userData || userData.subscription_tier !== "pro_plus") {
       structuredLog("warn", { requestId, action: "subscription_required", userId: user.id, statusCode: 403 });
+      await logAuthEvent(supabase, "subscription_check_failed", req, user.id, `tier: ${userData?.subscription_tier ?? "unknown"}`);
       return jsonResponse({ error: "API access requires Pro+ subscription" }, 403);
     }
 
     userId = user.id;
+    await logAuthEvent(supabase, "auth_success", req, userId, `api-commitments ${req.method}`);
   } else {
     structuredLog("warn", { requestId, action: "auth_missing", statusCode: 401 });
+    await logAuthEvent(supabase, "auth_missing", req, undefined, "Bearer token required");
     return jsonResponse({ error: "Bearer token required" }, 401);
+  }
+
+  // Rate limiting: 60 requests per minute per user
+  const rateLimit = await checkRateLimit(userId);
+  if (!rateLimit.allowed) {
+    structuredLog("warn", { requestId, action: "rate_limited", userId, statusCode: 429 });
+    return new Response(
+      JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+          ...corsHeaders(req),
+        },
+      },
+    );
   }
 
   const url = new URL(req.url);
@@ -313,6 +386,7 @@ async function handleDelete(
 function jsonResponse(data: unknown, status = 200, req?: Request) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    ...SECURITY_HEADERS,
   };
   if (req) {
     Object.assign(headers, corsHeaders(req));

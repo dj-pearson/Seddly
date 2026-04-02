@@ -339,18 +339,21 @@ struct CommitmentDetailView: View {
                 } label: {
                     Label("Set Custom Reminder", systemImage: "bell.badge")
                 }
+                .accessibilityHint("Opens a date picker to schedule a notification reminder")
 
                 Button(role: .destructive) {
                     showDismissConfirmation = true
                 } label: {
                     Label("Dismiss Commitment", systemImage: "eye.slash")
                 }
+                .accessibilityHint("Hides this commitment from your active list. Can be changed later.")
 
                 Button(role: .destructive) {
                     showDeleteConfirmation = true
                 } label: {
                     Label("Delete Permanently", systemImage: "trash")
                 }
+                .accessibilityHint("Permanently removes this commitment. This cannot be undone.")
             }
         }
         .navigationTitle("Commitment")
@@ -607,12 +610,7 @@ struct CommitmentDetailView: View {
     }
 
     private var deadlineColor: Color {
-        switch commitment.urgencyLevel {
-        case .overdue: .red
-        case .approaching: .yellow
-        case .safe: .green
-        case .none: .secondary
-        }
+        SeddlyColors.urgency(commitment.urgencyLevel)
     }
 
     private var shareText: String {

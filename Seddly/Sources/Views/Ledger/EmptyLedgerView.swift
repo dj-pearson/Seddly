@@ -81,8 +81,8 @@ struct EmptyLedgerView: View {
                     )
                 }
                 .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .background(SeddlyColors.surfaceSecondary)
+                .clipShape(RoundedRectangle(cornerRadius: SeddlyRadius.medium))
 
                 VStack(spacing: 12) {
                     if let onAddManually {

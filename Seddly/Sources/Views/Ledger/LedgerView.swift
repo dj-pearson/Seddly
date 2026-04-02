@@ -296,13 +296,14 @@ struct LedgerView: View {
                     Button {
                         viewModel.toggleSelection(for: commitment)
                     } label: {
-                        HStack(spacing: 12) {
+                        HStack(spacing: SeddlySpacing.lg) {
                             Image(systemName: viewModel.isSelected(commitment) ? "checkmark.circle.fill" : "circle")
                                 .foregroundStyle(viewModel.isSelected(commitment) ? .accent : .secondary)
                             CommitmentCardView(commitment: commitment)
                         }
                     }
                     .foregroundStyle(.primary)
+                    .accessibilityHint(viewModel.isSelected(commitment) ? "Double-tap to deselect" : "Double-tap to select for bulk action")
                 } else {
                     NavigationLink(value: commitment) {
                         CommitmentCardView(commitment: commitment)
@@ -324,6 +325,7 @@ struct LedgerView: View {
                         }
                         .tint(.green)
                     }
+                    .accessibilityHint("Swipe right to mark fulfilled, swipe left to dismiss")
                 }
             }
 
@@ -579,10 +581,12 @@ struct LedgerView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .clipShape(RoundedRectangle(cornerRadius: SeddlyRadius.large))
         .padding(.horizontal)
         .padding(.bottom)
         .transition(.move(edge: .bottom).combined(with: .opacity))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Bulk actions for \(viewModel.selectedCommitments.count) selected items")
     }
 
     private var totalActiveCount: Int {

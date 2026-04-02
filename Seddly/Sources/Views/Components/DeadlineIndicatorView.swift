@@ -28,11 +28,6 @@ struct DeadlineIndicatorView: View {
     }
 
     private var urgencyColor: Color {
-        switch urgency {
-        case .overdue: .red
-        case .approaching: .yellow
-        case .safe: .green
-        case .none: .secondary
-        }
+        SeddlyColors.urgency(urgency)
     }
 }
