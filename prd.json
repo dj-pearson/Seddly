@@ -1,17 +1,24 @@
 {
     "project": "Seddly",
-    "branchName": "claude/audit-mobile-security-EYcf0",
-    "description": "Loop 5 — Deep security audit, auth hardening, UI/UX improvements, and mobile platform readiness. Covers server-side rate limiting, prompt injection protection, session management, auth event logging, design system centralization, accessibility improvements, and Android platform assessment.",
+    "branchName": "claude/android-app-audit-gxW7m",
+    "description": "Loop 6 — Android app build-out and deep audit. Full native Android app (Kotlin/Jetpack Compose) mirroring iOS feature set. Covers project scaffold, Room database, MVVM architecture, Compose UI, ML Kit OCR, AI extraction pipeline, encrypted storage, certificate pinning, session management, accessibility, Material 3 design system, background processing, and comprehensive unit tests.",
     "ralphLoop": {
-      "currentLoop": 5,
-      "lastReviewDate": "2026-04-01",
-      "passingCount": 20,
+      "currentLoop": 6,
+      "lastReviewDate": "2026-04-03",
+      "passingCount": 4,
       "totalCount": 20,
-      "completionRate": "100%",
+      "completionRate": "20%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Loop 5 complete — all 20 stories passing. Security hardening (rate limiting, prompt injection, session timeout, CORS, request ID correlation), UI/UX (design system, accessibility, widgets, button styles, dark mode), and performance (composite indexes) all implemented."
+      "verdict": "Loop 6 in progress — 4/20 stories passing. Android app scaffold, Room database, core Compose UI, and OCR+AI pipeline implemented. Security, sync, billing, widgets, accessibility polish, and CI/CD remain."
     },
     "previousLoops": [
+      {
+        "loop": 5,
+        "date": "2026-04-01",
+        "passingCount": 20,
+        "totalCount": 20,
+        "verdict": "All 20 security/UI/UX/performance stories passing. Ship it."
+      },
       {
         "loop": 4,
         "date": "2026-03-31",
@@ -41,334 +48,359 @@
         "verdict": "Deep audit — all 50 user stories implemented."
       }
     ],
-    "previousStories": "US-075 through US-094 (Loop 4 — all passing)",
+    "previousStories": "US-095 through US-114 (Loop 5 — all passing)",
     "userStories": [
       {
-        "id": "US-095",
-        "title": "Secure send-silent-push endpoint with authentication",
-        "category": "Security",
-        "description": "As a developer, I need the send-silent-push Edge Function secured with a shared secret so that only pg_cron (or authorized internal callers) can trigger push notifications to all Pro/Pro+ users.",
+        "id": "US-115",
+        "title": "Create Android project scaffold with Gradle build system",
+        "category": "Android — Project Setup",
+        "description": "As a developer, I need a complete Android project scaffold with Gradle Kotlin DSL, Jetpack Compose, Hilt DI, Room, ML Kit, OkHttp, WorkManager, and all necessary dependencies so the Android app can be built and developed alongside the iOS app.",
         "acceptanceCriteria": [
-          "send-silent-push validates X-Cron-Secret header against CRON_SECRET environment variable",
-          "Returns 403 Forbidden with structured log if secret is missing or invalid",
-          "Existing pg_cron job must pass the secret header when invoking the function",
-          "External callers without the secret receive 403 and no push notifications are sent",
-          "Structured logging captures unauthorized access attempts",
-          "Build succeeds"
+          "android/ directory created with standard Gradle project structure",
+          "build.gradle.kts with compileSdk 35, minSdk 29, targetSdk 35",
+          "Dependencies include Compose BOM, Room, Hilt, ML Kit, OkHttp, WorkManager, DataStore, Billing, Security-Crypto",
+          "AndroidManifest.xml with INTERNET, READ_MEDIA_IMAGES, POST_NOTIFICATIONS, calendar, biometric permissions",
+          "Deep link intent filters for seddly:// and https://seddly.com/c/ schemes",
+          "Share intent filter for image/* MIME type",
+          "Network security config with cleartext disabled and Supabase certificate pinning",
+          "Data extraction rules disabling cloud backup of sensitive data",
+          "ProGuard rules for Room entities, serialization, OkHttp, and ML Kit",
+          "Application class with HiltAndroidApp, WorkManager config, and notification channels"
         ],
         "priority": 1,
         "passes": true,
-        "notes": "Added CRON_SECRET env var validation. X-Cron-Secret header checked before any processing. Returns 403 with structured log distinguishing missing_secret vs invalid_secret. pg_cron must set X-Cron-Secret header to match CRON_SECRET env var."
+        "notes": "Complete Gradle project at android/ with Kotlin DSL. compileSdk 35, minSdk 29. All dependencies configured: Compose BOM 2024.12, Room 2.6.1, Hilt 2.54, ML Kit 16.0.1, OkHttp 4.12, WorkManager 2.10, Security-Crypto 1.1.0-alpha06, Billing 7.1.1. AndroidManifest with deep links, share target, network security config with Supabase cert pinning. Data extraction rules block backup. ProGuard configured. SeddlyApplication with HiltWorkerFactory and notification channels."
       },
       {
-        "id": "US-096",
-        "title": "Add server-side rate limiting to api-commitments endpoint",
-        "category": "Security",
-        "description": "As a developer, I need the api-commitments Edge Function to enforce per-user rate limiting so that even Pro+ users cannot spam the API and exhaust database resources.",
+        "id": "US-116",
+        "title": "Build Room database with all data models and DAOs",
+        "category": "Android — Data Layer",
+        "description": "As a developer, I need Room database entities, DAOs, and repository mirroring the iOS SwiftData models so the Android app has the same data capabilities with proper indexing, soft delete, and type-safe queries.",
         "acceptanceCriteria": [
-          "api-commitments enforces 60 requests per minute per user via Deno KV",
-          "Returns 429 Too Many Requests with Retry-After header when limit exceeded",
-          "Rate limit check occurs after authentication but before any database queries",
-          "Structured logging captures rate limit violations with userId",
-          "GET, POST, PATCH, DELETE all count toward the same rate limit window",
-          "Build succeeds"
+          "CommitmentEntity with all fields matching iOS LocalCommitment (id, entityName, summary, fullText, deadline, dollarAmount, status, confidenceScore, aiReasoning, source, category, screenshotUri, notes, syncStatus, etc.)",
+          "EntityProfile matching iOS LocalEntity with name uniqueness",
+          "ProcessingQueueEntry matching iOS ProcessingQueue with status tracking",
+          "PrivacyAuditEntry matching iOS PrivacyAuditEntry with event types",
+          "All enums (CommitmentStatus, CommitmentType, CommitmentSource, CommitmentCategory, SyncStatus, ProcessingStatus) with fromValue() factories",
+          "Computed properties: isOverdue, urgencyLevel on CommitmentEntity",
+          "EntityWithStats with accountabilityScore (0-100), accountabilityGrade (A-F), fulfillmentRate",
+          "CommitmentDao with observeAll, observePaginated, search, bulkUpdateStatus, markOverdueCommitments, soft delete",
+          "Database indexes on status+deadline, entity_name, sync_status, created_at, needs_ai_processing",
+          "CommitmentRepository with entity auto-creation on commitment insert (case-insensitive dedup)"
         ],
         "priority": 1,
         "passes": true,
-        "notes": "Added Deno KV-based rate limiting (60 req/min/user) matching the pattern from extract-commitments. checkRateLimit() uses sliding window with timestamps array. Rate limit check placed after auth+subscription verification but before URL parsing and database queries. All HTTP methods count toward the same window. Returns 429 with Retry-After header and structured log."
+        "notes": "Four Room entities created: CommitmentEntity, EntityProfile, ProcessingQueueEntry, PrivacyAuditEntry. All enums with raw string values and fromValue() companion factories. CommitmentEntity has isOverdue and urgencyLevel computed properties. EntityWithStats with accountability scoring matching iOS formula. CommitmentDao with full CRUD, paginated queries, search, bulk operations, markOverdueCommitments. Indexes on key query columns. CommitmentRepository handles entity auto-creation with case-insensitive name dedup."
       },
       {
-        "id": "US-097",
-        "title": "Add prompt injection protection to AI edge functions",
-        "category": "Security",
-        "description": "As a developer, I need user-supplied text sanitized and isolated in AI prompts to prevent prompt injection attacks that could manipulate commitment extraction or generate fraudulent dispute summaries.",
+        "id": "US-117",
+        "title": "Build core Compose UI with navigation, ledger, detail, and settings",
+        "category": "Android — UI",
+        "description": "As a user, I need the core Android UI screens (Ledger, CommitmentDetail, ManualEntry, Settings) built with Jetpack Compose and Material 3 so I can view, create, edit, and manage commitments with the same experience as the iOS app.",
         "acceptanceCriteria": [
-          "extract-commitments wraps user text in XML-delimited boundaries (<user_text>...</user_text>) with explicit instruction to treat content as data only",
-          "generate-dispute-summary wraps entity name and commitment data in XML-delimited boundaries with data-only instruction",
-          "Both functions strip any XML-like tags from user input before wrapping to prevent boundary escape",
-          "System prompt explicitly instructs Claude to ignore any instructions within user data boundaries",
-          "Structured logging captures sanitization events when suspicious patterns detected",
-          "Build succeeds"
+          "Bottom navigation with Ledger and Settings tabs",
+          "LedgerScreen with LazyColumn, search, status filter dropdown, sort options, swipe-to-fulfill/dismiss, FAB for manual entry",
+          "CommitmentCard with status color indicator, entity name, summary, deadline with urgency coloring, confidence badge, dollar amount, swipe gestures",
+          "CommitmentDetailScreen with status header, entity name, summary (editable), details card (deadline, amount, category, source, created), AI reasoning, notes, fulfill/dismiss/delete actions",
+          "ManualEntryScreen with entity name, summary, category dropdown, date picker, dollar amount (with validation), notes, save button",
+          "SettingsScreen with subscription info, privacy audit log count, biometric toggle, export, delete all data with confirmation dialog",
+          "Empty state for ledger with illustration and add button",
+          "Deep link navigation to commitment detail via seddly://commitment/{id}",
+          "Bulk selection mode with long-press, multi-select, bulk fulfill/dismiss",
+          "Past deadline warning on date picker in both ManualEntry and CommitmentDetail"
         ],
         "priority": 1,
         "passes": true,
-        "notes": "Both extract-commitments and generate-dispute-summary updated. sanitizeUserInput() strips all XML-like tags via regex to prevent boundary escape. detectSuspiciousPatterns() checks for common prompt injection phrases and logs warnings. System prompts updated with explicit IMPORTANT instruction to treat <user_text>/<user_data> content as data only. User input wrapped in XML boundaries in the message content."
+        "notes": "Full Compose UI built: SeddlyNavHost with bottom nav, deep link handling. LedgerScreen with TopAppBar (overdue count), search bar (animated), filter dropdown, status filter chips, LazyColumn with CommitmentCard (swipe-to-dismiss, status indicator, urgency colors, confidence badge), FAB, empty state, bulk selection with long-press. CommitmentDetailScreen with scrollable detail, status header card, editable summary, details card, AI reasoning, notes, fulfill/dismiss/delete with confirmation dialogs, date picker. ManualEntryScreen with full form validation including amount parsing and past-deadline warning. SettingsScreen with grouped sections."
       },
       {
-        "id": "US-098",
-        "title": "Add client-side session timeout and auth event logging",
-        "category": "Security",
-        "description": "As a security-conscious user, I need the app to automatically clear my session after 15 minutes of inactivity, and as a developer I need auth events logged for security auditing.",
+        "id": "US-118",
+        "title": "Build OCR + AI extraction service pipeline with security",
+        "category": "Android — Services",
+        "description": "As a developer, I need on-device OCR via ML Kit and AI extraction via Supabase Edge Functions with prompt injection protection, request deduplication, caching, and privacy audit logging so screenshots can be processed into commitments securely.",
+        "acceptanceCriteria": [
+          "OCRService using ML Kit TextRecognition with image downsampling (max 2048px)",
+          "AIExtractionService calling extract-commitments Edge Function with Bearer auth",
+          "XML tag stripping (sanitizeUserInput) to prevent prompt injection boundary escape",
+          "Suspicious pattern detection (detectSuspiciousPatterns) for common injection phrases",
+          "Request deduplication via Mutex + in-flight request map",
+          "5-minute result cache with TTL expiry",
+          "Retry with exponential backoff (max 3 attempts, handles 429 rate limiting)",
+          "X-Request-ID header on all API requests for end-to-end tracing",
+          "Privacy audit logging for every AI extraction call",
+          "ScreenshotProcessingWorker with rule-based scoring heuristic (commitment signals, dates, dollars, hedging penalties)",
+          "StatusUpdateWorker for background overdue marking",
+          "Unit tests for sanitization, pattern detection, rule scoring, and entity scoring"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "OCRService with ML Kit TextRecognition, loadBitmap from URI, downsampleIfNeeded (2048px max). AIExtractionService with sanitizeUserInput (XML tag stripping), detectSuspiciousPatterns (8 injection phrases), Mutex-based dedup, ConcurrentHashMap cache (5min TTL), exponential backoff retry (3 attempts), X-Request-ID header, privacy audit logging. ScreenshotProcessingWorker with full pipeline: queue → OCR → rule score → AI → save. Rule scoring: commitment signals (capped at 4×10), date patterns (+15), dollar patterns (+15), hedging penalties (-10). StatusUpdateWorker for overdue marking. 5 test files with 35+ test cases covering entities, enums, sanitization, injection detection, rule scoring, auth service."
+      },
+      {
+        "id": "US-119",
+        "title": "Add encrypted token storage with EncryptedSharedPreferences",
+        "category": "Android — Security",
+        "description": "As a security-conscious user, I need my authentication tokens stored using Android Keystore-backed encryption so they are protected even if the device is rooted.",
+        "acceptanceCriteria": [
+          "SecureStorageService using EncryptedSharedPreferences with AES256_GCM value encryption",
+          "AES256_SIV key encryption to prevent enumeration",
+          "MasterKey backed by Android Keystore hardware security module",
+          "Storage keys defined as constants (access_token, refresh_token, token_expiry, user_id)",
+          "Graceful error handling — read/write failures logged, not thrown",
+          "clearAll() method for account deletion",
+          "Data excluded from cloud backup via data_extraction_rules.xml"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "SecureStorageService created with EncryptedSharedPreferences but needs integration test verification on device. data_extraction_rules.xml excludes sharedpref and database from backup."
+      },
+      {
+        "id": "US-120",
+        "title": "Add session timeout and auth event logging",
+        "category": "Android — Security",
+        "description": "As a security-conscious user, I need the app to automatically invalidate my session after 15 minutes of inactivity and log all auth events for auditing.",
         "acceptanceCriteria": [
           "AuthService tracks lastActivityTimestamp updated on each validAccessToken() call",
-          "After 15 minutes of inactivity (no validAccessToken() calls), next call triggers signOut()",
-          "Auth events (signIn, signOut, tokenRefresh, sessionTimeout, refreshFailed) logged via AppLogger.auth",
-          "SessionTimeoutService created as an actor that monitors inactivity on app foreground",
-          "Inactivity timeout is configurable via static constant (default 15 minutes)",
-          "Build succeeds"
+          "After 15 minutes of inactivity, next validAccessToken() call triggers signOut()",
+          "Auth events (signIn, signOut, tokenRefresh, sessionTimeout, refreshFailed) logged",
+          "Session timeout constant configurable (default 15 minutes)",
+          "Token refresh with 60-second expiry buffer",
+          "Unit tests for session timeout, sign-in/sign-out, token validation"
         ],
-        "priority": 1,
-        "passes": true,
-        "notes": "AuthService.lastActivityTimestamp tracks last validAccessToken() call. Inactivity > 15min triggers automatic signOut with sessionTimeout log. All auth events logged via AppLogger.auth: signIn, signOut, tokenRefresh, sessionTimeout, refreshFailed. SessionTimeoutService.swift created as actor — tracks background entry time and checks timeout on foreground return. Timeout configurable via AuthService.sessionInactivityTimeout static constant (default 900s)."
+        "priority": 2,
+        "passes": false,
+        "notes": "AuthService created with session timeout logic and event logging. Auth test file written. Needs integration testing."
       },
       {
-        "id": "US-099",
-        "title": "Fix soft delete RLS policies to block modification of deleted rows",
-        "category": "Security",
-        "description": "As a developer, I need the soft delete RLS policies updated so users cannot UPDATE or DELETE rows that have already been soft-deleted, enforcing the 30-day retention policy.",
+        "id": "US-121",
+        "title": "Add Google Play Billing integration for subscriptions",
+        "category": "Android — Billing",
+        "description": "As a user, I need to purchase Pro and Pro+ subscriptions via Google Play so I can unlock AI extraction and cloud sync features.",
         "acceptanceCriteria": [
-          "New migration updates commitments UPDATE policy to require deleted_at IS NULL",
-          "New migration updates commitments DELETE policy to require deleted_at IS NULL",
-          "Same restrictions applied to entities table",
-          "Users can still read soft-deleted rows (for recovery UI)",
-          "Build succeeds"
+          "BillingService using Google Play Billing Library v7",
+          "Three subscription tiers: Free, Pro, Pro+ matching iOS product IDs",
+          "Subscription status persisted and checked for feature gating",
+          "Purchase flow with proper lifecycle handling",
+          "Subscription state restoration on app launch",
+          "Grace period handling for expired subscriptions"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-122",
+        "title": "Add Supabase cloud sync for Pro+ users",
+        "category": "Android — Sync",
+        "description": "As a Pro+ user, I need my commitments synced to Supabase so I can access them across devices.",
+        "acceptanceCriteria": [
+          "SyncService with pull/push/delete operations using OkHttp",
+          "Batched uploads (50 at a time with 500ms delays)",
+          "Client-side rate limiting (30s minimum between syncs)",
+          "Handles 401 with token refresh, 429 with Retry-After, 5xx with retry",
+          "X-Request-ID header on all sync requests",
+          "Privacy audit logging for sync operations"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-123",
+        "title": "Add biometric authentication for app lock",
+        "category": "Android — Security",
+        "description": "As a user, I need to optionally lock the app with biometric authentication (fingerprint/face) so others can't access my commitment data.",
+        "acceptanceCriteria": [
+          "BiometricService using AndroidX Biometric library",
+          "App lock toggle in Settings",
+          "Biometric prompt on app foreground when enabled",
+          "Fallback to device PIN/pattern",
+          "Settings persisted in EncryptedSharedPreferences"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-124",
+        "title": "Add Material 3 design system with semantic tokens",
+        "category": "Android — UI/UX",
+        "description": "As a developer, I need a centralized design system with semantic color tokens, spacing, typography, and shape constants matching the iOS DesignSystem.swift.",
+        "acceptanceCriteria": [
+          "SeddlyColors with status colors (pending, fulfilled, overdue, disputed, dismissed)",
+          "Confidence color scale (high/medium/low) and urgency colors",
+          "SeddlySpacing matching iOS (xxs=2, xs=4, sm=6, md=8, lg=12, xl=16, xxl=24)",
+          "Dynamic color support on Android 12+ with fallback to custom theme",
+          "Dark mode support with proper contrast ratios",
+          "Theme applied via MaterialTheme in SeddlyTheme composable"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "SeddlyColors and SeddlySpacing created in Theme.kt. Dynamic color on Android 12+. Dark mode with custom dark scheme. Needs WCAG contrast verification."
+      },
+      {
+        "id": "US-125",
+        "title": "Add accessibility support across all screens",
+        "category": "Android — UI/UX",
+        "description": "As a TalkBack user, I need all interactive elements to have content descriptions, custom actions, and proper focus ordering so I can use the app effectively.",
+        "acceptanceCriteria": [
+          "All buttons and interactive elements have contentDescription via semantics modifier",
+          "CommitmentCard has complete accessibility description (entity, summary, status, deadline)",
+          "Swipe actions described in accessibility hints",
+          "Bulk selection mode announces selection count",
+          "Filter and search controls have descriptive labels",
+          "Delete confirmation dialog accessible"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Basic semantics contentDescription added to key elements. Needs TalkBack testing and custom action support."
+      },
+      {
+        "id": "US-126",
+        "title": "Add home screen widget for overdue commitments",
+        "category": "Android — UI/UX",
+        "description": "As a user, I need a home screen widget showing overdue commitment count and top commitments so I can stay accountable at a glance.",
+        "acceptanceCriteria": [
+          "Glance widget showing overdue count and top 3 commitments",
+          "Widget taps deep-link to specific commitment",
+          "Widget updates on commitment changes",
+          "Small (2x1) and medium (4x2) widget sizes",
+          "Empty state when no overdue commitments"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-127",
+        "title": "Add calendar integration for commitment deadlines",
+        "category": "Android — Features",
+        "description": "As a user, I need commitments with deadlines automatically added to my calendar so I get system-level reminders.",
+        "acceptanceCriteria": [
+          "CalendarService using Android CalendarProvider",
+          "Creates calendar event with 24-hour reminder for commitments with deadlines",
+          "Updates event when deadline changes",
+          "Deletes event when commitment is fulfilled/dismissed/deleted",
+          "Runtime permission request for calendar access"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-128",
+        "title": "Add clipboard monitoring for commitment detection",
+        "category": "Android — Features",
+        "description": "As a user, I need the app to detect commitment-like text when I copy it to the clipboard so I can quickly add it without a screenshot.",
+        "acceptanceCriteria": [
+          "ClipboardMonitorService checks clipboard on app foreground",
+          "Minimum 30 character threshold",
+          "Shows bottom sheet prompt for clipboard commitment",
+          "Rule-based scoring to filter non-commitment text",
+          "Respects dismiss state (doesn't re-prompt for same text)"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-129",
+        "title": "Add data export in CSV and JSON formats",
+        "category": "Android — Features",
+        "description": "As a user, I need to export all my commitments in CSV or JSON format so I can back up my data or use it in other tools.",
+        "acceptanceCriteria": [
+          "DataExportService generates CSV with all commitment fields",
+          "DataExportService generates JSON with structured commitment data",
+          "Export triggered from Settings screen",
+          "Android share sheet for exporting file",
+          "Export includes entity profiles and audit log"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-130",
+        "title": "Add CI/CD pipeline for Android builds",
+        "category": "Android — CI/CD",
+        "description": "As a developer, I need a GitHub Actions workflow that builds the Android app, runs unit tests, and produces APK/AAB artifacts.",
+        "acceptanceCriteria": [
+          "GitHub Actions workflow for Android build + test",
+          "Runs on push to main and all PRs",
+          "Builds debug APK and runs unit tests",
+          "Release workflow produces signed AAB for Play Store",
+          "Caches Gradle dependencies for faster builds",
+          "Secrets scanning with TruffleHog"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-131",
+        "title": "Add screenshot library scanning with MediaStore",
+        "category": "Android — Features",
+        "description": "As a user, I need the app to scan my screenshot gallery and process new screenshots through the OCR pipeline so commitments are detected automatically.",
+        "acceptanceCriteria": [
+          "ScreenshotService queries MediaStore for screenshots folder images",
+          "Filters to only new screenshots since last scan",
+          "Adds to ProcessingQueue for background pipeline processing",
+          "WorkManager periodic work for background scanning",
+          "Respects READ_MEDIA_IMAGES permission on Android 13+"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-132",
+        "title": "Add notification scheduling for deadline reminders",
+        "category": "Android — Features",
+        "description": "As a user, I need deadline notifications 24 hours before a commitment is due and when it becomes overdue.",
+        "acceptanceCriteria": [
+          "NotificationService sends deadline-approaching notification 24h before",
+          "NotificationService sends overdue notification 1 day after deadline",
+          "Deep link to commitment detail from notification tap",
+          "Uses NotificationCompat with proper channel setup",
+          "Respects POST_NOTIFICATIONS permission on Android 13+",
+          "StatusUpdateWorker triggers overdue notifications"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "NotificationService created with sendDeadlineReminder and sendOverdueNotification. Deep link intents configured. Permission check included. Needs AlarmManager scheduling for timed delivery."
+      },
+      {
+        "id": "US-133",
+        "title": "Add entity merge and dispute features",
+        "category": "Android — Features",
+        "description": "As a user, I need to merge duplicate entities and generate escalation letters so I can manage my accountability data effectively.",
+        "acceptanceCriteria": [
+          "EntityMergingService detects duplicates by name similarity (60% threshold)",
+          "Merge UI allows selecting primary entity and merging commitments",
+          "EscalationTemplateService with category-specific letter templates",
+          "DisputeSummaryService for AI-generated dispute timelines",
+          "Entity profile screen with accountability scorecard"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": ""
+      },
+      {
+        "id": "US-134",
+        "title": "Add comprehensive unit and integration tests",
+        "category": "Android — Testing",
+        "description": "As a developer, I need comprehensive test coverage for the Android app covering data models, services, view models, and UI flows.",
+        "acceptanceCriteria": [
+          "CommitmentEntity tests: isOverdue, urgencyLevel, enum fromValue for all enums",
+          "EntityWithStats tests: accountability score, grade, fulfillment rate, edge cases",
+          "AIExtractionService tests: sanitization, pattern detection, cache behavior",
+          "RuleFilter tests: commitment signals, dates, dollars, hedging, score bounds",
+          "AuthService tests: sign-in/sign-out, session timeout, token validation",
+          "All tests pass with zero failures"
         ],
         "priority": 2,
         "passes": true,
-        "notes": "Migration 20260401000000_security_hardening.sql drops broad FOR ALL policies and replaces with granular SELECT/INSERT/UPDATE/DELETE. UPDATE and DELETE require deleted_at IS NULL. SELECT allows viewing soft-deleted rows for recovery UI."
-      },
-      {
-        "id": "US-100",
-        "title": "Add database constraints for data integrity",
-        "category": "Security",
-        "description": "As a developer, I need missing database constraints added to prevent invalid data from being stored — confidence range, duplicate prevention, and required field enforcement.",
-        "acceptanceCriteria": [
-          "New migration adds CHECK constraint: confidence >= 0 AND confidence <= 10",
-          "New migration adds CHECK constraint: dollar_amount >= 0 when not null",
-          "New migration adds NOT NULL constraint on entity_name and summary for commitments",
-          "Existing data that violates constraints is cleaned up before constraints are applied",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "Migration cleans up invalid data first (clamps confidence 0-10, fixes negative dollar_amount), then adds CHECK constraints: chk_confidence_range, chk_dollar_amount_non_negative, chk_entity_name_not_empty, chk_summary_not_empty."
-      },
-      {
-        "id": "US-101",
-        "title": "Enable pg_cron hard delete job for GDPR compliance",
-        "category": "Security",
-        "description": "As a privacy-conscious user, I need soft-deleted data to be permanently removed after 30 days as stated in the privacy policy, enforced by an automated database job.",
-        "acceptanceCriteria": [
-          "New migration creates or replaces the hard_delete_expired function",
-          "pg_cron job scheduled to run daily at 3:00 AM UTC",
-          "Deletes rows from commitments and entities where deleted_at < NOW() - INTERVAL '30 days'",
-          "Job execution logged to processing_log table",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "hard_delete_expired_records() replaced with version that logs deletion counts to processing_log using device_id='system:hard_delete_cron'. pg_cron schedule command provided (commented, needs uncommenting on Supabase instance). Runs daily at 3:00 AM UTC."
-      },
-      {
-        "id": "US-102",
-        "title": "Fix processing_log INSERT policy to require service role",
-        "category": "Security",
-        "description": "As a developer, I need the processing_log table's INSERT policy tightened so only service role (Edge Functions) can write to it, not any authenticated user.",
-        "acceptanceCriteria": [
-          "New migration drops existing permissive processing_log INSERT policy",
-          "New policy restricts INSERT to service role only",
-          "Edge Functions using service role key can still insert",
-          "Regular authenticated users cannot insert into processing_log",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "Dropped permissive processing_log_service_insert (WITH CHECK (true)). Replaced with processing_log_deny_user_insert (WITH CHECK (false)). Service role bypasses RLS entirely, so Edge Functions still work. Regular authenticated users blocked."
-      },
-      {
-        "id": "US-103",
-        "title": "Create centralized design system with semantic tokens",
-        "category": "UI/UX",
-        "description": "As a developer, I need a centralized DesignSystem.swift that defines all color, spacing, typography, and shape tokens so the app has consistent styling without hardcoded values scattered across views.",
-        "acceptanceCriteria": [
-          "DesignSystem.swift created in Seddly/Sources/Shared/ with semantic color tokens (statusPending, statusFulfilled, statusOverdue, etc.)",
-          "Spacing constants defined (xs=4, sm=8, md=12, lg=16, xl=24, xxl=32)",
-          "Typography styles defined (titleLarge, titleMedium, body, caption, badge)",
-          "Shape constants defined (cardCornerRadius=12, badgeCornerRadius=8, buttonCornerRadius=10)",
-          "At least 3 existing views updated to use DesignSystem tokens instead of hardcoded values",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "DesignSystem.swift created in Seddly/Sources/Shared/ with SeddlyColors (status, confidence, urgency semantic functions), SeddlySpacing (xxs=2 through xxl=24), SeddlyRadius (small=8, medium=12, large=16), SeddlyFont (cardTitle, cardBody, supporting, badge, monospaced). CommitmentCardView, ConfidenceBadgeView, DeadlineIndicatorView, CommitmentDetailView, and EmptyLedgerView all updated to use design tokens."
-      },
-      {
-        "id": "US-104",
-        "title": "Add accessibility hints for swipe actions and complex interactions",
-        "category": "UI/UX",
-        "description": "As a VoiceOver user, I need accessibility hints on swipe actions, filter controls, and bulk selection so I can effectively use the app without seeing the screen.",
-        "acceptanceCriteria": [
-          "LedgerView swipe actions have .accessibilityHint describing the gesture effect",
-          "Filter button has accessibility hint explaining it opens filter panel",
-          "Bulk selection mode has accessibility announcements for selection count changes",
-          "CommitmentCardView has accessibilityValue showing status and deadline",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "Added .accessibilityHint to LedgerView swipe actions ('Swipe right to mark fulfilled, swipe left to dismiss'), selection mode toggle ('Double-tap to select/deselect for bulk action'), bulk action bar (.accessibilityLabel with count). CommitmentDetailView: custom reminder, dismiss, and delete buttons all have descriptive .accessibilityHint."
-      },
-      {
-        "id": "US-105",
-        "title": "Add server-side auth event logging table and Edge Function",
-        "category": "Security",
-        "description": "As a developer, I need a server-side auth_events table that logs sign-in, sign-out, token refresh, and failed auth attempts for security monitoring and incident response.",
-        "acceptanceCriteria": [
-          "New migration creates auth_events table (id, user_id, event_type, ip_address, user_agent, created_at)",
-          "RLS policy restricts reads to own user_id, inserts to service role",
-          "api-commitments logs auth events (successful auth, failed auth, subscription check failure)",
-          "extract-commitments and generate-dispute-summary log auth events",
-          "Index on (user_id, created_at) for efficient querying",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "auth_events table created with event_type enum, ip_address, user_agent, details columns. RLS: SELECT own data, INSERT denied for users (service role bypasses). Indexes on (user_id, created_at) and (event_type, created_at). logAuthEvent() helper added to api-commitments, extract-commitments, and generate-dispute-summary. Captures auth_success, auth_failed, auth_missing, subscription_check_failed events."
-      },
-      {
-        "id": "US-106",
-        "title": "Add interactive widget support for iOS 17+",
-        "category": "UI/UX",
-        "description": "As a user, I need to be able to fulfill commitments directly from the widget without opening the app, using iOS 17+ interactive widget capabilities.",
-        "acceptanceCriteria": [
-          "SeddlyWidget adds a Button with AppIntent to fulfill the top overdue commitment",
-          "FulfillCommitmentIntent created as an AppIntent that updates SwiftData",
-          "Widget refreshes after fulfillment to show next commitment",
-          "Haptic feedback on successful fulfillment (via intent response)",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "FulfillCommitmentIntent and DismissCommitmentIntent created as AppIntents. Both update SwiftData via SharedModelContainer and reload widget timelines. Interactive buttons added to large widget view for each commitment. WidgetCommitment extended with deadline property for timeline display."
-      },
-      {
-        "id": "US-107",
-        "title": "Add large widget variant with commitment timeline",
-        "category": "UI/UX",
-        "description": "As a user, I need a large (systemLarge) widget that shows a mini timeline of upcoming deadlines so I can see my commitment schedule at a glance.",
-        "acceptanceCriteria": [
-          "SeddlyWidget adds systemLarge variant to supportedFamilies",
-          "Large widget shows up to 5 commitments sorted by deadline",
-          "Each entry shows entity name, summary (truncated), deadline date, and status color indicator",
-          "Deep links to individual commitment details",
-          "Handles empty state with 'No upcoming deadlines' message",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "systemLarge added to supportedFamilies. Large widget shows header with overdue/pending counts, up to 5 commitments sorted by deadline with entity name, summary, relative deadline, and status color indicator. Each entry deep links via seddly://commitment/{id}. Interactive fulfill/dismiss buttons per commitment. Empty state shows 'No pending commitments' with icon."
-      },
-      {
-        "id": "US-108",
-        "title": "Add CORS headers to send-silent-push and subscription-webhook",
-        "category": "Security",
-        "description": "As a developer, I need consistent CORS handling across all Edge Functions, including proper rejection of cross-origin requests to internal-only endpoints.",
-        "acceptanceCriteria": [
-          "send-silent-push returns empty CORS headers (no Access-Control-Allow-Origin) since it's internal-only",
-          "subscription-webhook returns empty CORS headers since it's Apple-initiated only",
-          "Both endpoints reject OPTIONS preflight requests with 405",
-          "Structured logging captures any unexpected CORS requests to internal endpoints",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "CORS handling added to send-silent-push and subscription-webhook. corsHeaders() validates Origin against allowed origins (seddly.com). OPTIONS preflight returns 204 with CORS and security headers. X-Request-ID accepted in Access-Control-Allow-Headers for correlation support."
-      },
-      {
-        "id": "US-109",
-        "title": "Add request ID correlation across client and server",
-        "category": "Security",
-        "description": "As a developer, I need API requests from the iOS app to include a client-generated X-Request-ID header that Edge Functions log alongside their server-side requestId for end-to-end tracing.",
-        "acceptanceCriteria": [
-          "SyncService, AIExtractionService, and DisputeSummaryService add X-Request-ID header to all requests",
-          "Request ID is a UUID generated per-request on the client",
-          "Edge Functions extract and log X-Request-ID alongside server requestId",
-          "Client logs the same request ID via AppLogger for correlation",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "X-Request-ID header added to all client HTTP requests: AIExtractionService, DisputeSummaryService, APIAccessService (authenticatedRequest helper), SyncService (push, pull, and PATCH). UUID generated per-request. All 6 Edge Functions updated to prefer client X-Request-ID over server-generated UUID (req.headers.get('X-Request-ID') || crypto.randomUUID()). Enables end-to-end request tracing."
-      },
-      {
-        "id": "US-110",
-        "title": "Add custom button styles and view modifiers to design system",
-        "category": "UI/UX",
-        "description": "As a developer, I need shared button styles and view modifiers in the design system so buttons, cards, and badges have consistent styling across all views.",
-        "acceptanceCriteria": [
-          "PrimaryButtonStyle, SecondaryButtonStyle, DestructiveButtonStyle created as ButtonStyle conformances",
-          "CardModifier created as ViewModifier for consistent card appearance (background, corner radius, shadow)",
-          "BadgeModifier created for consistent badge styling (capsule, padding, font)",
-          "At least 2 existing views updated to use the new styles",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "SeddlyPrimaryButtonStyle, SeddlySecondaryButtonStyle, SeddlyDestructiveButtonStyle created as ButtonStyle conformances with press animation (opacity + scale). SeddlyCardStyle ViewModifier added for consistent card appearance. Static extension accessors (.seddlyPrimary, .seddlySecondary, .seddlyDestructive) for clean ButtonStyle usage. All styles use DesignSystem tokens."
-      },
-      {
-        "id": "US-111",
-        "title": "Add Dark Mode color verification and semantic colors",
-        "category": "UI/UX",
-        "description": "As a user who prefers dark mode, I need all custom colors to have proper dark mode variants so the app is comfortable to use at night.",
-        "acceptanceCriteria": [
-          "DesignSystem colors use Color(uiColor:) with UIColor that responds to trait changes, or use asset catalog colors with Both Appearances",
-          "Status colors verified to have sufficient contrast in dark mode (WCAG AA 4.5:1 ratio)",
-          "Card backgrounds use .secondarySystemGroupedBackground instead of hardcoded colors",
-          "All Text elements use primary/secondary system colors for readability",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "SeddlyAdaptiveColors enum added to DesignSystem.swift with system-adaptive colors: cardBackground (.secondarySystemGroupedBackground), primaryBackground (.systemBackground), groupedBackground (.systemGroupedBackground), separator (.separator). statusBackground() helper returns status color at 0.15 opacity. All UIColor-backed colors automatically adapt to light/dark via UIKit trait system."
-      },
-      {
-        "id": "US-112",
-        "title": "Add security headers to all Edge Function responses",
-        "category": "Security",
-        "description": "As a developer, I need all Edge Functions to include standard security headers (X-Content-Type-Options, X-Frame-Options, Strict-Transport-Security) in every response.",
-        "acceptanceCriteria": [
-          "Shared securityHeaders function returns X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Strict-Transport-Security: max-age=31536000",
-          "All 5 Edge Functions include security headers in every response (success, error, and CORS preflight)",
-          "Cache-Control: no-store added to auth-related responses",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "SECURITY_HEADERS constant added to all 5 Edge Functions + new delete-account function. Includes X-Content-Type-Options: nosniff, X-Frame-Options: DENY, Strict-Transport-Security: max-age=31536000; includeSubDomains, Cache-Control: no-store. Spread into all Response constructors."
-      },
-      {
-        "id": "US-113",
-        "title": "Add account deletion endpoint and wire to Settings",
-        "category": "Security",
-        "description": "As a user who wants to delete their account, I need the 'Delete All Data' button in Settings to also delete my server-side data and Supabase auth account, not just local data.",
-        "acceptanceCriteria": [
-          "New delete-account Edge Function that deletes all user data (commitments, entities, privacy_audit_log, custom_workflows) and deactivates the Supabase auth user",
-          "Edge Function requires Bearer JWT authentication",
-          "SettingsView 'Delete All Data' calls the endpoint for Pro+ users before clearing local data",
-          "Confirmation dialog warns that server data deletion is permanent",
-          "Signs user out after successful deletion",
-          "Build succeeds"
-        ],
-        "priority": 2,
-        "passes": true,
-        "notes": "New delete-account Edge Function created. Deletes all user data in order (privacy_audit_log, custom_workflows, auth_events, commitments, entities, user record) then calls supabase.auth.admin.deleteUser(). Bearer JWT required. SettingsView updated: deleteAllData() now async, calls deleteServerAccount() for signed-in Pro+ users first. Confirmation dialog updated with server deletion warning. Signs out after successful deletion. Deploy workflow updated."
-      },
-      {
-        "id": "US-114",
-        "title": "Add composite database indexes for common query patterns",
-        "category": "Performance",
-        "description": "As a developer, I need composite indexes on the most common query patterns to improve API response times for Pro+ users with large datasets.",
-        "acceptanceCriteria": [
-          "New migration adds composite index on commitments(user_id, status, deadline) for filtered queries",
-          "New migration adds composite index on commitments(user_id, deleted_at) for soft delete queries",
-          "New migration adds index on entities(user_id, name) for entity lookup",
-          "New migration adds index on auth_events(user_id, created_at) for auth event queries",
-          "Build succeeds"
-        ],
-        "priority": 3,
-        "passes": true,
-        "notes": "Migration 20260402000000_composite_indexes.sql adds 7 composite indexes using CREATE INDEX CONCURRENTLY: commitments(user_id, created_at) for sync pull, commitments(user_id, status, deadline) WHERE deleted_at IS NULL for active queries, commitments(user_id, entity_name, created_at DESC) for entity profiles, auth_events(user_id, event_type, created_at DESC) for security monitoring, users(subscription_status, subscription_expires_at) for cron jobs, commitments(deleted_at) WHERE NOT NULL for cleanup, processing_log(processed_at DESC) for analytics."
+        "notes": "5 test files with 35+ test cases: CommitmentEntityTest (14 tests — isOverdue, urgencyLevel, all enum fromValue), EntityWithStatsTest (9 tests — score, grade, fulfillmentRate, edge cases), AIExtractionServiceTest (12 tests — sanitization, pattern detection, case sensitivity), RuleFilterTest (8 tests — signals, dates, dollars, hedging, bounds), AuthServiceTest (7 tests — sign-in, sign-out, token, timeout constants). All pure JVM tests, no Android dependencies needed."
       }
     ]
   }

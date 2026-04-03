@@ -752,3 +752,199 @@ Ship it. Again.
 
 — Ralph, SnarktTank
 ================================================================================
+
+
+================================================================================
+  SNARKTANK — RALPH'S PRD LOOP REVIEW
+  Project: Seddly (Android App Build-Out & Deep Audit)
+  Date: 2026-04-03
+  Loop: 6 (Android Platform — From Zero to App)
+  Reviewer: Ralph AI — SnarktTank
+================================================================================
+
+OVERALL VERDICT: 4 / 20 USER STORIES PASSING (TOP 4 PRIORITIES COMPLETED)
+COMPLETION RATE: 20%
+
+Ralph says: "You had zero lines of Android code. Now you have a full
+Kotlin/Jetpack Compose app with Room, Hilt, ML Kit OCR, an AI extraction
+pipeline with prompt injection protection, swipe-to-dismiss cards, Material 3
+theming, and 35+ unit tests. In one session. From nothing. I'm... not mad
+about it."
+
+================================================================================
+DEEP AUDIT FINDINGS — ANDROID APP
+================================================================================
+
+Before we built anything, here's what the audit found:
+
+  ANDROID APP STATUS: NONEXISTENT
+  ────────────────────────────────
+  • Zero Android files in the entire repository
+  • No build.gradle, no AndroidManifest, no Kotlin, no Java
+  • iOS app had 27 views, 30+ services, 5 loops of hardening
+  • Android had a mention in Loop 5 prd.json and nothing else
+  • That's not a platform strategy, that's a platform daydream
+
+  WHAT NEEDED TO BE BUILT:
+  ────────────────────────
+  • Full Gradle project scaffold with 20+ dependencies
+  • Room database mirroring 4 SwiftData models + 6 enums
+  • MVVM architecture with Hilt DI
+  • 5 Compose screens (Ledger, Detail, ManualEntry, Settings, Navigation)
+  • OCR pipeline (ML Kit) + AI extraction (Supabase Edge Functions)
+  • Security layer (encrypted storage, cert pinning, session timeout)
+  • Background processing (WorkManager workers)
+  • 35+ unit tests
+  • Material 3 design system matching iOS
+
+================================================================================
+COMPLETED STORIES (Batch 1 — Priority 1)
+================================================================================
+
+[ANDROID — PROJECT SETUP] — 1/1 passing
+──────────────────────────────────────
+
+  US-115  PASS  Create Android project scaffold with Gradle build system
+    → Complete Gradle Kotlin DSL project at android/. compileSdk 35, minSdk 29.
+      20+ dependencies: Compose BOM 2024.12, Room 2.6.1, Hilt 2.54, ML Kit
+      16.0.1, OkHttp 4.12, WorkManager 2.10, Security-Crypto, Billing 7.1.1.
+      AndroidManifest: deep links (seddly://, seddly.com/c/), share target,
+      network security config with Supabase cert pins, data extraction rules
+      blocking cloud backup. ProGuard for Room, serialization, OkHttp, ML Kit.
+      SeddlyApplication with HiltWorkerFactory and 2 notification channels.
+      Files: 10 config/resource files created
+
+[ANDROID — DATA LAYER] — 1/1 passing
+──────────────────────────────────────
+
+  US-116  PASS  Build Room database with all data models and DAOs
+    → Four Room entities: CommitmentEntity (25 fields, 5 indexes),
+      EntityProfile (unique name), ProcessingQueueEntry, PrivacyAuditEntry.
+      Six enums with raw string values and fromValue() factories:
+      CommitmentStatus, CommitmentType, CommitmentSource, CommitmentCategory,
+      SyncStatus, ProcessingStatus. Computed: isOverdue, urgencyLevel.
+      EntityWithStats: accountability score (0-100), grade (A-F), fulfillment
+      rate. Four DAOs with Flow-based queries, pagination, search, bulk ops,
+      markOverdueCommitments. CommitmentRepository with entity auto-creation
+      (case-insensitive dedup).
+      Files: 8 Kotlin files (entities, DAOs, database, repository)
+
+[ANDROID — UI] — 1/1 passing
+──────────────────────────────────────
+
+  US-117  PASS  Build core Compose UI with navigation, ledger, detail, settings
+    → SeddlyNavHost: bottom navigation (Ledger, Settings), deep link handling.
+      LedgerScreen: TopAppBar with overdue count, animated search bar, filter
+      dropdown, status filter chips, LazyColumn of CommitmentCards with swipe-
+      to-fulfill/dismiss (SwipeToDismissBox), FAB, empty state, bulk selection
+      via long-press. CommitmentCard: status indicator, entity name, summary,
+      deadline with urgency coloring, confidence badge, dollar amount, full
+      accessibility semantics. CommitmentDetailScreen: scrollable detail with
+      status card, editable summary, details (deadline with DatePicker, amount,
+      category, source, created), AI reasoning, notes, fulfill/dismiss/delete
+      with confirmation dialogs, past-deadline warning. ManualEntryScreen:
+      entity name, summary, category ExposedDropdownMenu, date picker, dollar
+      amount with validation (multi-dot, negative, NaN), notes, save. Settings:
+      grouped sections (subscription, privacy, notifications, data, about),
+      delete all with confirmation dialog.
+      Files: 10 Kotlin files (screens, viewmodels, components, navigation)
+
+[ANDROID — SERVICES] — 1/1 passing
+──────────────────────────────────────
+
+  US-118  PASS  Build OCR + AI extraction service pipeline with security
+    → OCRService: ML Kit TextRecognition, bitmap loading from URI, 2048px
+      downsampling, suspendCancellableCoroutine bridge. AIExtractionService:
+      sanitizeUserInput() strips XML tags (prevents boundary escape),
+      detectSuspiciousPatterns() checks 8 injection phrases, Mutex-based
+      request deduplication, ConcurrentHashMap cache (5min TTL), exponential
+      backoff retry (3 attempts, handles 429 Retry-After), X-Request-ID
+      header, privacy audit logging. ScreenshotProcessingWorker: HiltWorker
+      with full pipeline (queue → OCR → rule score → AI → save), rule-based
+      scoring (commitment signals capped at 40pts, dates +15, dollars +15,
+      hedging -10, clamped 0-100), batch processing (max 10). StatusUpdate-
+      Worker for background overdue marking. NotificationService with deep
+      link intents, permission checks, channel support. AuthService with
+      EncryptedSharedPreferences, 15min session timeout, auth event logging.
+      5 test files, 35+ test cases.
+      Files: 12 Kotlin files (services, workers, tests)
+
+================================================================================
+REMAINING STORIES (16 pending)
+================================================================================
+
+Priority 2 (6 stories):
+  US-119  PENDING  Encrypted token storage verification
+  US-120  PENDING  Session timeout integration testing
+  US-121  PENDING  Google Play Billing integration
+  US-122  PENDING  Supabase cloud sync
+  US-130  PENDING  CI/CD pipeline for Android
+  US-131  PENDING  Screenshot library scanning with MediaStore
+  US-132  PENDING  Notification scheduling with AlarmManager
+
+Priority 3 (7 stories):
+  US-123  PENDING  Biometric authentication
+  US-124  PENDING  Material 3 design system polish
+  US-125  PENDING  Accessibility (TalkBack) audit
+  US-126  PENDING  Home screen widget
+  US-127  PENDING  Calendar integration
+  US-128  PENDING  Clipboard monitoring
+  US-129  PENDING  Data export (CSV/JSON)
+  US-133  PENDING  Entity merge and dispute features
+
+Already Passing (1 story):
+  US-134  PASS   Comprehensive unit tests (35+ cases)
+
+================================================================================
+RALPH'S LOOP 6 INTERIM SUMMARY
+================================================================================
+
+From zero to a real Android app in one session. Here's the scoreboard:
+
+  CREATED:
+  ────────
+  • 1 complete Gradle project (build.gradle.kts, settings, wrapper, proguard)
+  • 4 Room entities with 6 enums and computed properties
+  • 4 DAOs with 30+ queries (CRUD, search, pagination, bulk, overdue marking)
+  • 1 repository with entity auto-creation
+  • 5 Compose screens (Ledger, Detail, Manual, Settings, Navigation)
+  • 3 ViewModels with StateFlow + Flow-based reactive UI
+  • 1 CommitmentCard component (swipe gestures, urgency colors, accessibility)
+  • 1 OCR service (ML Kit)
+  • 1 AI extraction service (dedup, cache, retry, sanitization, audit logging)
+  • 1 Auth service (encrypted storage, session timeout, event logging)
+  • 1 Notification service (deadline reminders, deep links)
+  • 2 WorkManager workers (screenshot processing, status updates)
+  • 1 Design system (semantic colors, spacing, dynamic color, dark mode)
+  • 5 test files with 35+ test cases
+  • 10 resource/config files (manifest, themes, strings, security config, etc.)
+
+  TOTAL FILES: ~40 new Kotlin + config files
+  TOTAL TEST CASES: 35+
+  SECURITY FEATURES:
+  • EncryptedSharedPreferences (AES-256 GCM + SIV)
+  • Certificate pinning for Supabase
+  • Prompt injection protection (XML stripping + pattern detection)
+  • Session inactivity timeout (15 min)
+  • No cloud backup of sensitive data
+  • HTTPS-only via network security config
+  • Request ID tracing on all API calls
+
+  ARCHITECTURE:
+  • MVVM with Hilt DI
+  • Room database with Flow-based reactive queries
+  • Jetpack Compose with Material 3
+  • WorkManager for background processing
+  • Coroutines throughout (no callbacks)
+
+The iOS app took 5 loops to get to production-ready. The Android app just
+did its first loop and already has the data layer, core UI, OCR pipeline,
+AI extraction with security hardening, and 35+ tests.
+
+Sixteen stories to go. The hardest parts (billing, sync, CI/CD) are next.
+But the foundation? Solid.
+
+Keep building.
+
+— Ralph, SnarktTank
+================================================================================
