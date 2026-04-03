@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Seddly</string>
+    <string name="tab_ledger">Ledger</string>
+    <string name="tab_settings">Settings</string>
+    <string name="empty_ledger_title">No Commitments Yet</string>
+    <string name="empty_ledger_subtitle">Take a screenshot of a promise, commitment, or agreement and Seddly will track it for you.</string>
+    <string name="add_manual">Add Manually</string>
+    <string name="filter">Filter</string>
+    <string name="search">Search</string>
+    <string name="fulfill">Fulfill</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="delete">Delete</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="deadline">Deadline</string>
+    <string name="entity">Entity</string>
+    <string name="amount">Amount</string>
+    <string name="status">Status</string>
+    <string name="confidence">Confidence</string>
+    <string name="notes">Notes</string>
+    <string name="summary">Summary</string>
+    <string name="processing">Processing…</string>
+    <string name="scan_screenshots">Scan Screenshots</string>
+    <string name="no_permissions">Permission required to access screenshots</string>
+</resources>
