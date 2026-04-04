@@ -1,0 +1,19 @@
+#!/bin/sh
+# Gradle wrapper stub — downloads Gradle if not present
+# In production, use the full gradlew from gradle init
+
+GRADLE_VERSION=8.11.1
+WRAPPER_PROPERTIES="gradle/wrapper/gradle-wrapper.properties"
+
+if [ ! -f "$WRAPPER_PROPERTIES" ]; then
+    echo "Error: Gradle wrapper properties not found"
+    exit 1
+fi
+
+# Try system gradle first
+if command -v gradle >/dev/null 2>&1; then
+    exec gradle "$@"
+fi
+
+echo "Gradle not found. Please install Gradle $GRADLE_VERSION or run 'gradle wrapper' to generate the wrapper."
+exit 1
