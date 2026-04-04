@@ -63,6 +63,29 @@
             </intent-filter>
         </activity>
 
+        <!-- FileProvider for data export sharing -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Home screen widget -->
+        <receiver
+            android:name=".ui.widget.SeddlyWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/seddly_widget_info" />
+        </receiver>
+
         <!-- Deadline alarm receiver -->
         <receiver
             android:name=".service.notification.DeadlineAlarmReceiver"

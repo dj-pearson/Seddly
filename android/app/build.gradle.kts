@@ -107,6 +107,10 @@ dependencies {
     // Image loading
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    // Glance Widgets
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
+
     // Google Play Billing
     implementation("com.android.billingclient:billing-ktx:7.1.1")
 

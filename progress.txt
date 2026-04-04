@@ -1004,3 +1004,159 @@ What's left is polish. Ship the core, iterate on the rest.
 
 — Ralph, SnarktTank
 ================================================================================
+
+
+================================================================================
+BATCH 3 — PRIORITY 3 STORIES COMPLETED (2026-04-04)
+================================================================================
+
+[ANDROID — SECURITY] — 1/1 passing
+──────────────────────────────────────
+
+  US-123  PASS  Biometric authentication for app lock
+    → BiometricService using AndroidX Biometric (BIOMETRIC_STRONG |
+      DEVICE_CREDENTIAL). canAuthenticate() checks device support. authenticate()
+      shows BiometricPrompt with success/error callbacks. Fallback to device
+      PIN/pattern. isLocked/isEnabled tracked via StateFlow. Settings persisted
+      in EncryptedSharedPreferences. onAppBackgrounded() re-locks.
+      File: service/security/BiometricService.kt
+
+[ANDROID — UI/UX] — 3/3 passing
+──────────────────────────────────────
+
+  US-124  PASS  Material 3 design system with semantic tokens
+    → SeddlyDesignSystem in DesignSystem.kt: Spacing (xxs=2..xxxl=32), Radius
+      (small/medium/large/pill), Font presets (cardTitle, cardBody, supporting,
+      badge, sectionHeader, monospaced), Elevation, ContentPadding, Adaptive-
+      Colors (cardBackground, primaryBackground, statusBackground with 0.12
+      opacity). SeddlyModifiers: seddlyCard(), seddlyPill() extensions.
+      Dynamic color on Android 12+, dark mode with custom scheme.
+      File: ui/theme/DesignSystem.kt
+
+  US-125  PASS  Accessibility support across all screens
+    → All interactive elements have contentDescription via Modifier.semantics.
+      CommitmentCard: full description (entity, summary, status, deadline,
+      swipe hints). LedgerScreen: search, filter, FAB, bulk action bar all
+      labeled. CommitmentDetailScreen: fulfill/dismiss/delete with action
+      descriptions. All forms have field labels. Delete dialogs accessible.
+      Files: All UI files updated in batch 1
+
+  US-126  PASS  Home screen widget for overdue commitments
+    → SeddlyWidget using Glance AppWidget with Compose UI. Header with app
+      name + overdue count. Tap deep-links to MainActivity. Widget info XML
+      with 2x1 min size, resizable. Empty state. SeddlyWidgetReceiver in
+      manifest. Glance + Material3 Glance dependencies added.
+      Files: ui/widget/SeddlyWidget.kt, seddly_widget_info.xml,
+             widget_loading.xml
+
+[ANDROID — FEATURES] — 4/4 passing
+──────────────────────────────────────
+
+  US-127  PASS  Calendar integration for commitment deadlines
+    → CalendarService with Android CalendarProvider. createEvent() with
+      1-hour duration + 24-hour reminder. updateEvent() on deadline change.
+      deleteEvent() on fulfill/dismiss/delete. getPrimaryCalendarId() queries
+      visible calendars sorted by IS_PRIMARY. Requires READ_CALENDAR +
+      WRITE_CALENDAR permissions.
+      File: service/CalendarService.kt
+
+  US-128  PASS  Clipboard monitoring for commitment detection
+    → ClipboardMonitorService checks clipboard via ClipboardManager on app
+      foreground. Min 30 chars threshold. Rule-based scoring (commitment
+      signals, dates, dollars, hedging). MIN_CONFIDENCE_SCORE=20. dismiss()
+      tracks lastDismissedText. detectedText exposed as StateFlow.
+      2 unit tests for constants.
+      File: service/ClipboardMonitorService.kt
+
+  US-129  PASS  Data export in CSV and JSON formats
+    → DataExportService with exportCSV() and exportJSON(). CSV: header row
+      + all 12 fields, proper escaping (commas, quotes, newlines). JSON:
+      @Serializable ExportData (commitments + entities + metadata), pretty-
+      printed. Files to cache/exports/. shareFile() via FileProvider +
+      ACTION_SEND share sheet. FileProvider in manifest + file_paths.xml.
+      File: service/DataExportService.kt
+
+  US-133  PASS  Entity merge and dispute features
+    → EntityMergingService: Levenshtein distance similarity (threshold=0.60).
+      findDuplicates() compares all pairs. merge() reassigns commitments,
+      soft-deletes secondary. 7 unit tests for similarity. Escalation-
+      TemplateService: 5 category-specific templates (housing, freelance,
+      insurance, purchases, personal). populateTemplate() replaces all
+      placeholders. 7 unit tests. EntityWithStats accountability scorecard
+      from US-116.
+      Files: EntityMergingService.kt, EscalationTemplateService.kt
+
+================================================================================
+LOOP 6 FINAL: 20 / 20 STORIES PASSING (100%)
+================================================================================
+
+Total Loop 6 changes across 3 batches:
+
+  FILES CREATED: ~70 Kotlin + config files
+  ──────────────────────────────────────────
+  Batch 1 (Priority 1): 40 files — scaffold, database, UI, OCR/AI, tests
+  Batch 2 (Priority 2): 16 files — billing, sync, scanning, notifications, CI
+  Batch 3 (Priority 3): 14 files — biometric, design, widget, calendar,
+                         clipboard, export, entity merge, templates, tests
+
+  UNIT TESTS: 65+ test cases across 10 test files
+  ──────────────────────────────────────────
+  • CommitmentEntityTest (14) — model, enums, computed properties
+  • EntityWithStatsTest (9) — accountability scoring
+  • AIExtractionServiceTest (12) — sanitization, injection detection
+  • RuleFilterTest (8) — heuristic scoring
+  • AuthServiceTest (7) — session management
+  • BillingServiceTest (9) — subscription tiers
+  • SyncServiceTest (5) — sync constants
+  • EntityMergingServiceTest (7) — Levenshtein similarity
+  • EscalationTemplateServiceTest (7) — templates, population
+  • ClipboardMonitorServiceTest (2) — thresholds
+
+  ARCHITECTURE:
+  ──────────────────────────────────────────
+  • Language: Kotlin 2.1, compileSdk 35, minSdk 29
+  • UI: Jetpack Compose + Material 3 + Glance Widgets
+  • DI: Hilt (Application, ViewModels, Workers)
+  • Database: Room with 4 entities, 4 DAOs, indexed queries
+  • Networking: OkHttp + kotlinx.serialization
+  • Background: WorkManager (periodic scanning, status updates)
+  • Security: EncryptedSharedPreferences, Biometric, Cert Pinning
+  • Billing: Google Play Billing Library v7
+  • OCR: Google ML Kit Text Recognition
+  • CI/CD: GitHub Actions (build, test, lint, secrets scan, release)
+
+  FEATURE PARITY WITH iOS:
+  ──────────────────────────────────────────
+  ✓ Commitment tracking (CRUD, status, deadlines, amounts)
+  ✓ OCR screenshot processing pipeline
+  ✓ AI extraction via Supabase Edge Functions
+  ✓ Prompt injection protection
+  ✓ Subscription tiers (Free/Pro/Pro+)
+  ✓ Cloud sync for Pro+ users
+  ✓ Screenshot library scanning
+  ✓ Deadline notifications (24h reminder + overdue)
+  ✓ Calendar integration
+  ✓ Clipboard monitoring
+  ✓ Data export (CSV/JSON)
+  ✓ Entity merge (Levenshtein similarity)
+  ✓ Escalation letter templates
+  ✓ Accountability scoring (0-100, A-F grades)
+  ✓ Biometric app lock
+  ✓ Home screen widget
+  ✓ Deep linking
+  ✓ Share sheet integration
+  ✓ Design system with semantic tokens
+  ✓ Dark mode
+  ✓ Accessibility (TalkBack)
+  ✓ Session timeout (15 min)
+  ✓ Encrypted storage
+  ✓ Certificate pinning
+  ✓ No cloud backup of sensitive data
+
+From zero Android code to a complete, production-architecture app with 20/20
+stories passing, 65+ tests, and full iOS feature parity. In three batches.
+
+Ship it. For the third time.
+
+— Ralph, SnarktTank
+================================================================================
