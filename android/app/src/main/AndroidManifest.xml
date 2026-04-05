@@ -12,6 +12,9 @@
     <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:name=".SeddlyApplication"
@@ -59,6 +62,43 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
+
+        <!-- FileProvider for data export sharing -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Home screen widget -->
+        <receiver
+            android:name=".ui.widget.SeddlyWidgetReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/seddly_widget_info" />
+        </receiver>
+
+        <!-- Deadline alarm receiver -->
+        <receiver
+            android:name=".service.notification.DeadlineAlarmReceiver"
+            android:exported="false" />
+
+        <!-- Boot receiver to reschedule alarms -->
+        <receiver
+            android:name=".service.notification.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <!-- WorkManager initialization -->
         <provider

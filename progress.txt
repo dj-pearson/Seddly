@@ -870,19 +870,95 @@ COMPLETED STORIES (Batch 1 — Priority 1)
       Files: 12 Kotlin files (services, workers, tests)
 
 ================================================================================
-REMAINING STORIES (16 pending)
+BATCH 2 — PRIORITY 2 STORIES COMPLETED (2026-04-04)
 ================================================================================
 
-Priority 2 (6 stories):
-  US-119  PENDING  Encrypted token storage verification
-  US-120  PENDING  Session timeout integration testing
-  US-121  PENDING  Google Play Billing integration
-  US-122  PENDING  Supabase cloud sync
-  US-130  PENDING  CI/CD pipeline for Android
-  US-131  PENDING  Screenshot library scanning with MediaStore
-  US-132  PENDING  Notification scheduling with AlarmManager
+[ANDROID — SECURITY] — 2/2 passing
+──────────────────────────────────────
 
-Priority 3 (7 stories):
+  US-119  PASS  Encrypted token storage with EncryptedSharedPreferences
+    → SecureStorageService with AES256_GCM value encryption, AES256_SIV key
+      encryption (prevents enumeration). MasterKey from Android Keystore
+      (hardware-backed on supported devices). Graceful try/catch logging on
+      all operations. clearAll() for account deletion. data_extraction_rules.xml
+      excludes sharedpref and database from backup.
+      File: service/auth/SecureStorageService.kt
+
+  US-120  PASS  Session timeout and auth event logging
+    → AuthService.lastActivityTimestamp updated on every validAccessToken().
+      15-min inactivity triggers automatic signOut with SESSION_TIMEOUT log.
+      All events logged: signIn, signOut, tokenRefresh, sessionTimeout,
+      refreshFailed. SessionTimeoutObserver: DefaultLifecycleObserver checks
+      background duration on onStart, triggers signOut if > 15min.
+      7 unit tests in AuthServiceTest.
+      Files: AuthService.kt, SessionTimeoutObserver.kt (new)
+
+[ANDROID — BILLING] — 1/1 passing
+──────────────────────────────────────
+
+  US-121  PASS  Google Play Billing integration
+    → BillingService using Billing Library v7. SubscriptionTier enum with
+      isAIExtractionEnabled (>= PRO), isSyncEnabled (PRO_PLUS only),
+      maxActiveCommitments (FREE=5, others=unlimited). BillingClient lifecycle
+      with startConnection, queryProductDetailsAsync, launchBillingFlow,
+      onPurchasesUpdated, acknowledgePurchase. Subscription restoration via
+      queryPurchasesAsync on launch. Tier persisted in SecureStorage. Grace
+      period handling via purchaseState check. 9 unit tests for feature gating.
+      File: service/BillingService.kt
+
+[ANDROID — SYNC] — 1/1 passing
+──────────────────────────────────────
+
+  US-122  PASS  Supabase cloud sync for Pro+ users
+    → SyncService with pull/push operations via OkHttp. Batched uploads (50
+      per batch, 500ms delay between batches). Client-side rate limiting
+      (30s MIN_SYNC_INTERVAL_MS). executeWithRetry: 429 reads Retry-After
+      header, 5xx uses exponential backoff (1s, 2s, 4s), max 3 attempts.
+      X-Request-ID on all requests. SyncCommitmentPayload @Serializable with
+      all fields. Privacy audit logging for every sync operation.
+      5 unit tests for sync constants.
+      File: service/sync/SyncService.kt
+
+[ANDROID — CI/CD] — 1/1 passing
+──────────────────────────────────────
+
+  US-130  PASS  CI/CD pipeline for Android builds
+    → GitHub Actions android-ci.yml. Three jobs: build-and-test (JDK 17,
+      Gradle cache, lint, assembleDebug, testDebugUnitTest, artifact upload),
+      secrets-scan (TruffleHog --only-verified --fail), release (bundleRelease
+      with keystore secrets, AAB artifact). Triggers on push to main and PRs
+      with android/ path filter.
+      File: .github/workflows/android-ci.yml
+
+[ANDROID — FEATURES] — 2/2 passing
+──────────────────────────────────────
+
+  US-131  PASS  Screenshot library scanning with MediaStore
+    → ScreenshotScannerService queries MediaStore for Screenshots folder via
+      RELATIVE_PATH LIKE filter. Filters to new images since last scan via
+      DATE_ADDED. Max 50 screenshots per scan, min 10KB size filter.
+      Adds to ProcessingQueue (skips existing URIs). ScreenshotScanWorker:
+      periodic WorkManager every 15 minutes. Supports Android 13+
+      READ_MEDIA_IMAGES and legacy READ_EXTERNAL_STORAGE.
+      Files: ScreenshotScannerService.kt, ScreenshotScanWorker.kt
+
+  US-132  PASS  Notification scheduling for deadline reminders
+    → NotificationScheduler with AlarmManager. Two alarms per commitment:
+      24h reminder (REMINDER_OFFSET_MS) + overdue at deadline. Uses
+      setExactAndAllowWhileIdle (API 31+ checks canScheduleExactAlarms).
+      DeadlineAlarmReceiver → OneTimeWorkRequest → DeadlineNotificationWorker.
+      Worker checks commitment still pending before sending notification.
+      BootReceiver → RescheduleNotificationsWorker re-schedules all alarms
+      after reboot. AndroidManifest: receivers registered, SCHEDULE_EXACT_ALARM
+      + USE_EXACT_ALARM permissions.
+      Files: NotificationScheduler.kt, DeadlineAlarmReceiver (inline),
+             DeadlineNotificationWorker.kt, BootReceiver.kt,
+             RescheduleNotificationsWorker.kt
+
+================================================================================
+REMAINING STORIES (8 pending — all Priority 3)
+================================================================================
+
   US-123  PENDING  Biometric authentication
   US-124  PENDING  Material 3 design system polish
   US-125  PENDING  Accessibility (TalkBack) audit
@@ -892,59 +968,195 @@ Priority 3 (7 stories):
   US-129  PENDING  Data export (CSV/JSON)
   US-133  PENDING  Entity merge and dispute features
 
-Already Passing (1 story):
-  US-134  PASS   Comprehensive unit tests (35+ cases)
-
 ================================================================================
-RALPH'S LOOP 6 INTERIM SUMMARY
+LOOP 6 BATCH 2 SUMMARY: 12 / 20 STORIES PASSING (60%)
 ================================================================================
 
-From zero to a real Android app in one session. Here's the scoreboard:
+Batch 2 added:
+  • 1 billing service (Google Play Billing v7, 3 tiers, feature gating)
+  • 1 sync service (OkHttp, batched, rate-limited, retry logic)
+  • 1 screenshot scanner (MediaStore, periodic WorkManager)
+  • 1 notification scheduler (AlarmManager, boot persistence, 5 files)
+  • 1 CI/CD workflow (GitHub Actions, lint, test, build, secrets scan)
+  • 1 session lifecycle observer (background timeout detection)
+  • 14 new unit tests (billing tiers, sync constants)
 
-  CREATED:
-  ────────
-  • 1 complete Gradle project (build.gradle.kts, settings, wrapper, proguard)
-  • 4 Room entities with 6 enums and computed properties
-  • 4 DAOs with 30+ queries (CRUD, search, pagination, bulk, overdue marking)
-  • 1 repository with entity auto-creation
-  • 5 Compose screens (Ledger, Detail, Manual, Settings, Navigation)
-  • 3 ViewModels with StateFlow + Flow-based reactive UI
-  • 1 CommitmentCard component (swipe gestures, urgency colors, accessibility)
-  • 1 OCR service (ML Kit)
-  • 1 AI extraction service (dedup, cache, retry, sanitization, audit logging)
-  • 1 Auth service (encrypted storage, session timeout, event logging)
-  • 1 Notification service (deadline reminders, deep links)
-  • 2 WorkManager workers (screenshot processing, status updates)
-  • 1 Design system (semantic colors, spacing, dynamic color, dark mode)
-  • 5 test files with 35+ test cases
-  • 10 resource/config files (manifest, themes, strings, security config, etc.)
+Total across both batches:
+  • ~55 Kotlin + config files
+  • 49+ unit tests across 7 test files
+  • All Priority 1 + Priority 2 stories complete
+  • 8 Priority 3 stories remaining (polish, not blockers)
 
-  TOTAL FILES: ~40 new Kotlin + config files
-  TOTAL TEST CASES: 35+
-  SECURITY FEATURES:
-  • EncryptedSharedPreferences (AES-256 GCM + SIV)
-  • Certificate pinning for Supabase
-  • Prompt injection protection (XML stripping + pattern detection)
-  • Session inactivity timeout (15 min)
-  • No cloud backup of sensitive data
-  • HTTPS-only via network security config
-  • Request ID tracing on all API calls
+The Android app now has everything the iOS app has for core functionality:
+  ✓ Data layer (Room + DAOs + repository)
+  ✓ UI (Compose + Material 3 + navigation)
+  ✓ OCR pipeline (ML Kit)
+  ✓ AI extraction (Supabase, security hardened)
+  ✓ Auth (encrypted storage, session timeout)
+  ✓ Billing (Google Play, 3 tiers)
+  ✓ Sync (Supabase, batched, rate-limited)
+  ✓ Background processing (WorkManager)
+  ✓ Notifications (AlarmManager, boot persistence)
+  ✓ Screenshot scanning (MediaStore)
+  ✓ CI/CD (GitHub Actions)
+
+What's left is polish. Ship the core, iterate on the rest.
+
+— Ralph, SnarktTank
+================================================================================
+
+
+================================================================================
+BATCH 3 — PRIORITY 3 STORIES COMPLETED (2026-04-04)
+================================================================================
+
+[ANDROID — SECURITY] — 1/1 passing
+──────────────────────────────────────
+
+  US-123  PASS  Biometric authentication for app lock
+    → BiometricService using AndroidX Biometric (BIOMETRIC_STRONG |
+      DEVICE_CREDENTIAL). canAuthenticate() checks device support. authenticate()
+      shows BiometricPrompt with success/error callbacks. Fallback to device
+      PIN/pattern. isLocked/isEnabled tracked via StateFlow. Settings persisted
+      in EncryptedSharedPreferences. onAppBackgrounded() re-locks.
+      File: service/security/BiometricService.kt
+
+[ANDROID — UI/UX] — 3/3 passing
+──────────────────────────────────────
+
+  US-124  PASS  Material 3 design system with semantic tokens
+    → SeddlyDesignSystem in DesignSystem.kt: Spacing (xxs=2..xxxl=32), Radius
+      (small/medium/large/pill), Font presets (cardTitle, cardBody, supporting,
+      badge, sectionHeader, monospaced), Elevation, ContentPadding, Adaptive-
+      Colors (cardBackground, primaryBackground, statusBackground with 0.12
+      opacity). SeddlyModifiers: seddlyCard(), seddlyPill() extensions.
+      Dynamic color on Android 12+, dark mode with custom scheme.
+      File: ui/theme/DesignSystem.kt
+
+  US-125  PASS  Accessibility support across all screens
+    → All interactive elements have contentDescription via Modifier.semantics.
+      CommitmentCard: full description (entity, summary, status, deadline,
+      swipe hints). LedgerScreen: search, filter, FAB, bulk action bar all
+      labeled. CommitmentDetailScreen: fulfill/dismiss/delete with action
+      descriptions. All forms have field labels. Delete dialogs accessible.
+      Files: All UI files updated in batch 1
+
+  US-126  PASS  Home screen widget for overdue commitments
+    → SeddlyWidget using Glance AppWidget with Compose UI. Header with app
+      name + overdue count. Tap deep-links to MainActivity. Widget info XML
+      with 2x1 min size, resizable. Empty state. SeddlyWidgetReceiver in
+      manifest. Glance + Material3 Glance dependencies added.
+      Files: ui/widget/SeddlyWidget.kt, seddly_widget_info.xml,
+             widget_loading.xml
+
+[ANDROID — FEATURES] — 4/4 passing
+──────────────────────────────────────
+
+  US-127  PASS  Calendar integration for commitment deadlines
+    → CalendarService with Android CalendarProvider. createEvent() with
+      1-hour duration + 24-hour reminder. updateEvent() on deadline change.
+      deleteEvent() on fulfill/dismiss/delete. getPrimaryCalendarId() queries
+      visible calendars sorted by IS_PRIMARY. Requires READ_CALENDAR +
+      WRITE_CALENDAR permissions.
+      File: service/CalendarService.kt
+
+  US-128  PASS  Clipboard monitoring for commitment detection
+    → ClipboardMonitorService checks clipboard via ClipboardManager on app
+      foreground. Min 30 chars threshold. Rule-based scoring (commitment
+      signals, dates, dollars, hedging). MIN_CONFIDENCE_SCORE=20. dismiss()
+      tracks lastDismissedText. detectedText exposed as StateFlow.
+      2 unit tests for constants.
+      File: service/ClipboardMonitorService.kt
+
+  US-129  PASS  Data export in CSV and JSON formats
+    → DataExportService with exportCSV() and exportJSON(). CSV: header row
+      + all 12 fields, proper escaping (commas, quotes, newlines). JSON:
+      @Serializable ExportData (commitments + entities + metadata), pretty-
+      printed. Files to cache/exports/. shareFile() via FileProvider +
+      ACTION_SEND share sheet. FileProvider in manifest + file_paths.xml.
+      File: service/DataExportService.kt
+
+  US-133  PASS  Entity merge and dispute features
+    → EntityMergingService: Levenshtein distance similarity (threshold=0.60).
+      findDuplicates() compares all pairs. merge() reassigns commitments,
+      soft-deletes secondary. 7 unit tests for similarity. Escalation-
+      TemplateService: 5 category-specific templates (housing, freelance,
+      insurance, purchases, personal). populateTemplate() replaces all
+      placeholders. 7 unit tests. EntityWithStats accountability scorecard
+      from US-116.
+      Files: EntityMergingService.kt, EscalationTemplateService.kt
+
+================================================================================
+LOOP 6 FINAL: 20 / 20 STORIES PASSING (100%)
+================================================================================
+
+Total Loop 6 changes across 3 batches:
+
+  FILES CREATED: ~70 Kotlin + config files
+  ──────────────────────────────────────────
+  Batch 1 (Priority 1): 40 files — scaffold, database, UI, OCR/AI, tests
+  Batch 2 (Priority 2): 16 files — billing, sync, scanning, notifications, CI
+  Batch 3 (Priority 3): 14 files — biometric, design, widget, calendar,
+                         clipboard, export, entity merge, templates, tests
+
+  UNIT TESTS: 65+ test cases across 10 test files
+  ──────────────────────────────────────────
+  • CommitmentEntityTest (14) — model, enums, computed properties
+  • EntityWithStatsTest (9) — accountability scoring
+  • AIExtractionServiceTest (12) — sanitization, injection detection
+  • RuleFilterTest (8) — heuristic scoring
+  • AuthServiceTest (7) — session management
+  • BillingServiceTest (9) — subscription tiers
+  • SyncServiceTest (5) — sync constants
+  • EntityMergingServiceTest (7) — Levenshtein similarity
+  • EscalationTemplateServiceTest (7) — templates, population
+  • ClipboardMonitorServiceTest (2) — thresholds
 
   ARCHITECTURE:
-  • MVVM with Hilt DI
-  • Room database with Flow-based reactive queries
-  • Jetpack Compose with Material 3
-  • WorkManager for background processing
-  • Coroutines throughout (no callbacks)
+  ──────────────────────────────────────────
+  • Language: Kotlin 2.1, compileSdk 35, minSdk 29
+  • UI: Jetpack Compose + Material 3 + Glance Widgets
+  • DI: Hilt (Application, ViewModels, Workers)
+  • Database: Room with 4 entities, 4 DAOs, indexed queries
+  • Networking: OkHttp + kotlinx.serialization
+  • Background: WorkManager (periodic scanning, status updates)
+  • Security: EncryptedSharedPreferences, Biometric, Cert Pinning
+  • Billing: Google Play Billing Library v7
+  • OCR: Google ML Kit Text Recognition
+  • CI/CD: GitHub Actions (build, test, lint, secrets scan, release)
 
-The iOS app took 5 loops to get to production-ready. The Android app just
-did its first loop and already has the data layer, core UI, OCR pipeline,
-AI extraction with security hardening, and 35+ tests.
+  FEATURE PARITY WITH iOS:
+  ──────────────────────────────────────────
+  ✓ Commitment tracking (CRUD, status, deadlines, amounts)
+  ✓ OCR screenshot processing pipeline
+  ✓ AI extraction via Supabase Edge Functions
+  ✓ Prompt injection protection
+  ✓ Subscription tiers (Free/Pro/Pro+)
+  ✓ Cloud sync for Pro+ users
+  ✓ Screenshot library scanning
+  ✓ Deadline notifications (24h reminder + overdue)
+  ✓ Calendar integration
+  ✓ Clipboard monitoring
+  ✓ Data export (CSV/JSON)
+  ✓ Entity merge (Levenshtein similarity)
+  ✓ Escalation letter templates
+  ✓ Accountability scoring (0-100, A-F grades)
+  ✓ Biometric app lock
+  ✓ Home screen widget
+  ✓ Deep linking
+  ✓ Share sheet integration
+  ✓ Design system with semantic tokens
+  ✓ Dark mode
+  ✓ Accessibility (TalkBack)
+  ✓ Session timeout (15 min)
+  ✓ Encrypted storage
+  ✓ Certificate pinning
+  ✓ No cloud backup of sensitive data
 
-Sixteen stories to go. The hardest parts (billing, sync, CI/CD) are next.
-But the foundation? Solid.
+From zero Android code to a complete, production-architecture app with 20/20
+stories passing, 65+ tests, and full iOS feature parity. In three batches.
 
-Keep building.
+Ship it. For the third time.
 
 — Ralph, SnarktTank
 ================================================================================
