@@ -1160,3 +1160,124 @@ Ship it. For the third time.
 
 — Ralph, SnarktTank
 ================================================================================
+
+================================================================================
+LOOP 7 — Premium Mobile UI/UX Elevation (2026-04-05)
+================================================================================
+
+Goal: Elevate the iOS + Android apps from "functional" to "premium" — so the
+experience soars over competitors and any paid feature feels worth it.
+
+Ten stories defined (US-135 through US-144). 5/10 shipped this iteration:
+
+  ✓ US-135 Premium design-system foundation (iOS + Android)
+          iOS: Seddly/Sources/Shared/PremiumDesignSystem.swift
+          Android: android/.../ui/theme/PremiumDesignSystem.kt
+          Tokens: gradients (hero/cardSurface/proShimmer/status),
+                  shadows (card/elevated/subtle), spring motion presets
+                  (snappy/smooth/celebratory/easeSoft), expressive display
+                  fonts (hero/display/accent/tabularNumber), StatusRail view,
+                  premiumCard() modifier on both platforms.
+
+  ✓ US-137 Premium CommitmentCard redesign (iOS + Android)
+          iOS: gradient StatusRail accent, SeddlyDisplayFont.accent entity
+               name, hero-gradient NEW pill with glow shadow.
+          Android: gradient vertical rail, 16dp continuous corners,
+                   status-tinted shadow, animateDpAsState press elevation
+                   3dp→8dp via MutableInteractionSource, status-gradient
+                   row background, LocalIndication ripple.
+
+  ✓ US-138 Delightful animated empty state (iOS)
+          EmptyLedgerView normal state: ZStack hero with blurred gradient
+          halo (opacity 0.4↔0.75 loop), floating glyph (-10pt loop),
+          SeddlyDisplayFont.display headline, dual seddlyPrimary +
+          seddlySecondary CTAs with haptic taps.
+          Android parity deferred to next iteration.
+
+  ✓ US-139 Centralized haptics service (iOS + Android)
+          iOS: Services/HapticsService.swift @MainActor enum with prepared
+               reusable generators, semantic methods
+               tap/select/confirm/success/warning/error/celebrate/longPress.
+          Android: service/HapticsService.kt with VibratorManager (S+) /
+                   Vibrator branching, predefined effects on Q+, waveform
+                   celebrate pattern, rememberHaptics() composable helper.
+
+  ✓ US-141 Pro feature shimmer lock treatment (iOS + Android)
+          iOS: Views/Components/ProShimmerView.swift with .proShimmer()
+               modifier (masked gradient, plusLighter blend), ProBadge,
+               ProLockWrapper<Content> dim+blur with warning haptic.
+          Android: ui/components/ProShimmer.kt with ProShimmerBox
+                   (Animatable + infiniteRepeatable), ProBadge with
+                   SeddlyPremium.Gradients.proShimmer.
+
+All remaining 5 stories shipped in the second half of Loop 7:
+
+  ✓ US-136 Hero accountability header on Ledger
+          iOS LedgerHeaderView: gradient hero card, 72pt MomentumRing
+          (animated with celebratory spring), hero numeric display, streak
+          + pending StatChips, expandable weekly sparkline (7 bars), tap
+          to expand with select haptic. Wired into LedgerView as first
+          section via headerWeeklyStats + headerStreakDays computed props.
+          Android LedgerHeader composable with Canvas-drawn MomentumRing,
+          matching gradient card, StatChips, AnimatedVisibility sparkline.
+          LedgerViewModel extended with pendingCount/fulfilledThisWeek/
+          totalThisWeek/streakDays/weekly computed via computeHeaderStats()
+          in the combine block.
+
+  ✓ US-140 Premium paywall redesign
+          iOS SubscriptionView.swift fully rewritten: hero gradient
+          header with ProBadge, horizontally scrolling feature showcase
+          (5 cards, each with ProShimmer), pill billing toggle with
+          "Save 33%" badge, selectable Pro / Pro+ tier cards with spring
+          scale + accent border, social proof (5 stars + testimonial),
+          primary CTA with celebrate/error haptics. Android new
+          PaywallScreen.kt in ui/screens/paywall/ with parity: hero
+          header, FeatureShowcase row (ProShimmerBox), BillingToggle,
+          TierCard, SocialProof, gradient CTA.
+
+  ✓ US-142 Cinematic onboarding redesign
+          iOS OnboardingView pages rebuilt on new CinematicPage<CTA>
+          component: per-page unique gradient (hero, blue→purple,
+          teal→ink), ambient orb, celebratory-spring hero icon, display
+          title, staggered bullet rows (80ms offsets via smooth spring),
+          parallax on icon + orb. nextButton upgraded to white capsule
+          with accent foreground. Android new OnboardingScreen.kt in
+          ui/screens/onboarding/ with HorizontalPager, 4 pages, staggered
+          AnimatedVisibility bullets, scale spring icon, animated 8→22dp
+          page dots, white capsule CTA, Skip affordance.
+
+  ✓ US-143 Floating tab / nav treatment
+          iOS ContentView init() configures SeddlyTabBarAppearance:
+          systemUltraThinMaterial background, translucent tint, accent
+          selected icons + semibold titles, cleared shadow. onChange
+          of selectedTab triggers HapticsService.select(). Android
+          SeddlyNavHost bottom bar replaced with FloatingBottomNav
+          composable: 24dp rounded surface with accent-tinted 12dp
+          shadow, hero gradient pill on selected item with animated
+          label reveal, HapticsService.select(view) on tap.
+
+  ✓ US-144 Android expressive-motion parity
+          SeddlyNavHost composables now use spring-driven enter/exit
+          transitions matching iOS SeddlyMotion.smooth (StiffnessMediumLow,
+          0.82 damping). Settings: horizontal slide + fade. Detail:
+          vertical slide + fade with popExit slide-down (iOS sheet feel).
+          ManualEntry: full-height modal slide + fade with matching
+          popExit.
+
+──────────────────────────────────────────
+LOOP 7 SUMMARY
+──────────────────────────────────────────
+  Stories:    10/10 shipped
+  Files:      18 new, 9 modified
+  Platforms:  iOS (SwiftUI) + Android (Jetpack Compose)
+
+Premium tokens: gradients, shadows, spring motion, expressive
+typography. Redesigned: CommitmentCard, EmptyLedgerView, LedgerHeader,
+SubscriptionView, OnboardingView, tab bar / bottom nav. New services:
+HapticsService, ProShimmer. Nav motion: spring-driven on Android.
+
+Both apps should now soar over utility-tier competitors — every tap,
+swipe, and screen transition feels cohesive, tactile, and premium.
+
+— Claude, Loop 7
+================================================================================

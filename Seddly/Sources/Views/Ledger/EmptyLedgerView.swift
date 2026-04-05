@@ -23,28 +23,80 @@ struct EmptyLedgerView: View {
         return status == .authorized || status == .limited
     }
 
+    @State private var floatOffset: CGFloat = 0
+    @State private var glowOpacity: Double = 0.4
+
     private var normalEmptyView: some View {
-        ContentUnavailableView {
-            Label("No Commitments Yet", systemImage: "doc.text.magnifyingglass")
-        } description: {
-            Text("Take a screenshot of a promise someone made, or add one manually.")
-        } actions: {
-            VStack(spacing: 12) {
+        VStack(spacing: SeddlySpacing.xxl) {
+            Spacer()
+
+            // Floating hero illustration with animated glow (US-138)
+            ZStack {
+                Circle()
+                    .fill(SeddlyGradient.hero)
+                    .frame(width: 180, height: 180)
+                    .blur(radius: 40)
+                    .opacity(glowOpacity)
+
+                Circle()
+                    .fill(Color.accentColor.opacity(0.12))
+                    .frame(width: 140, height: 140)
+
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 62, weight: .light))
+                    .foregroundStyle(SeddlyGradient.hero)
+                    .symbolRenderingMode(.hierarchical)
+                    .offset(y: floatOffset)
+            }
+            .accessibilityHidden(true)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true)) {
+                    floatOffset = -10
+                }
+                withAnimation(.easeInOut(duration: 3.2).repeatForever(autoreverses: true)) {
+                    glowOpacity = 0.75
+                }
+            }
+
+            VStack(spacing: SeddlySpacing.md) {
+                Text("Your Ledger Awaits")
+                    .font(SeddlyDisplayFont.display)
+                    .multilineTextAlignment(.center)
+
+                Text("Capture a screenshot of a promise — Seddly quietly holds people accountable so you don't have to.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, SeddlySpacing.xxl)
+            }
+
+            VStack(spacing: SeddlySpacing.lg) {
                 if hasPhotoAccess, let onScan = onScanScreenshots {
                     Button {
+                        HapticsService.tap()
                         onScan()
                     } label: {
                         Label("Scan Existing Screenshots", systemImage: "photo.stack")
                     }
-                    .buttonStyle(.borderedProminent)
+                    .buttonStyle(.seddlyPrimary)
                 }
 
                 if let onAddManually {
-                    Button("Add Manually", action: onAddManually)
-                        .buttonStyle(hasPhotoAccess ? .bordered : .borderedProminent)
+                    Button {
+                        HapticsService.tap()
+                        onAddManually()
+                    } label: {
+                        Label("Add Manually", systemImage: "plus.circle")
+                    }
+                    .buttonStyle(.seddlySecondary)
                 }
             }
+            .padding(.horizontal, SeddlySpacing.xxl)
+
+            Spacer()
+            Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var permissionDeniedView: some View {

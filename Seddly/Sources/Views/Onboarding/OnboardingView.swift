@@ -80,57 +80,61 @@ struct OnboardingView: View {
         }
     }
 
+    // MARK: - Cinematic Pages (US-142)
+
     private var welcomePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "checkmark.shield")
-                .font(.system(size: 80))
-                .foregroundStyle(.accent)
-            Text("Seddly")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-            Text("Hold everyone to their word.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-            Spacer()
-            nextButton
-        }
-        .padding()
+        CinematicPage(
+            gradient: SeddlyGradient.hero,
+            icon: "checkmark.shield.fill",
+            title: "Seddly",
+            subtitle: "Hold everyone to their word.",
+            bullets: [],
+            cta: nextButton
+        )
     }
 
     private var howItWorksPage: some View {
-        VStack(spacing: 32) {
-            Spacer()
-            StepRow(icon: "camera.viewfinder", title: "Screenshot", description: "Take a screenshot of any promise, commitment, or agreement.")
-            StepRow(icon: "text.viewfinder", title: "Extract", description: "AI detects who promised what and by when — automatically.")
-            StepRow(icon: "bell.badge", title: "Remind", description: "Get notified when deadlines approach or pass.")
-            Spacer()
-            nextButton
-        }
-        .padding()
+        CinematicPage(
+            gradient: LinearGradient(
+                colors: [
+                    Color(red: 0.18, green: 0.36, blue: 0.85),
+                    Color(red: 0.52, green: 0.29, blue: 0.88)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            icon: "camera.viewfinder",
+            title: "How It Works",
+            subtitle: "Three steps to accountability.",
+            bullets: [
+                ("camera.viewfinder", "Screenshot", "Take a screenshot of any promise or agreement."),
+                ("text.viewfinder", "Extract", "AI detects who promised what — automatically."),
+                ("bell.badge.fill", "Remind", "Get nudged when deadlines approach or pass.")
+            ],
+            cta: nextButton
+        )
     }
 
     private var privacyPage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "lock.shield")
-                .font(.system(size: 60))
-                .foregroundStyle(.green)
-            Text("Your Privacy Comes First")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            VStack(alignment: .leading, spacing: 16) {
-                PrivacyRow(icon: "xmark.circle", text: "Never uploads your screenshots", color: .red)
-                PrivacyRow(icon: "xmark.circle", text: "Never accesses photos or videos", color: .red)
-                PrivacyRow(icon: "xmark.circle", text: "Never shares data with third parties", color: .red)
-                PrivacyRow(icon: "checkmark.circle", text: "All text extraction happens on your device", color: .green)
-            }
-
-            Spacer()
-            nextButton
-        }
-        .padding()
+        CinematicPage(
+            gradient: LinearGradient(
+                colors: [
+                    Color(red: 0.09, green: 0.55, blue: 0.42),
+                    Color(red: 0.04, green: 0.35, blue: 0.52)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            icon: "lock.shield.fill",
+            title: "Privacy, First",
+            subtitle: "Your screenshots never leave your device.",
+            bullets: [
+                ("checkmark.circle.fill", "On-device", "All text extraction happens on your iPhone."),
+                ("xmark.circle.fill", "No uploads", "Screenshots are never sent to our servers."),
+                ("xmark.circle.fill", "No tracking", "We don't share data with anyone.")
+            ],
+            cta: nextButton
+        )
     }
 
     private var permissionPage: some View {
@@ -206,15 +210,20 @@ struct OnboardingView: View {
 
     private var nextButton: some View {
         Button {
-            withAnimation {
+            HapticsService.tap()
+            withAnimation(SeddlyMotion.smooth) {
                 viewModel.advancePage()
             }
         } label: {
             Text("Continue")
+                .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(Color.white)
+                .foregroundStyle(Color.accentColor)
+                .clipShape(Capsule())
+                .shadow(color: .black.opacity(0.18), radius: 12, x: 0, y: 6)
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
     }
 
     private func finishOnboarding() {
@@ -258,6 +267,103 @@ private struct PrivacyRow: View {
                 .foregroundStyle(color)
             Text(text)
                 .font(.subheadline)
+        }
+    }
+}
+
+// MARK: - Cinematic Page (US-142)
+
+private struct CinematicPage<CTA: View>: View {
+    let gradient: LinearGradient
+    let icon: String
+    let title: String
+    let subtitle: String
+    /// (icon, title, description) — rendered as staggered feature rows.
+    let bullets: [(String, String, String)]
+    let cta: CTA
+
+    @State private var parallax: CGFloat = 0
+    @State private var iconScale: CGFloat = 0.6
+    @State private var bulletsVisible: Bool = false
+
+    var body: some View {
+        ZStack {
+            gradient
+                .ignoresSafeArea()
+
+            // Soft background orb for depth
+            Circle()
+                .fill(Color.white.opacity(0.08))
+                .frame(width: 420, height: 420)
+                .offset(x: parallax * 0.3, y: -120 + parallax * 0.2)
+                .blur(radius: 40)
+
+            VStack(spacing: SeddlySpacing.xl) {
+                Spacer()
+
+                Image(systemName: icon)
+                    .font(.system(size: 78, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .white.opacity(0.4), radius: 20, x: 0, y: 0)
+                    .scaleEffect(iconScale)
+                    .offset(y: parallax * -0.5)
+
+                VStack(spacing: SeddlySpacing.md) {
+                    Text(title)
+                        .font(SeddlyDisplayFont.display)
+                        .foregroundStyle(.white)
+
+                    Text(subtitle)
+                        .font(.title3)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, SeddlySpacing.xxl)
+                }
+
+                if !bullets.isEmpty {
+                    VStack(alignment: .leading, spacing: SeddlySpacing.lg) {
+                        ForEach(Array(bullets.enumerated()), id: \.offset) { idx, b in
+                            HStack(alignment: .top, spacing: SeddlySpacing.lg) {
+                                Image(systemName: b.0)
+                                    .font(.title3.weight(.semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 28)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(b.1)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                    Text(b.2)
+                                        .font(.caption)
+                                        .foregroundStyle(.white.opacity(0.85))
+                                }
+                                Spacer()
+                            }
+                            .opacity(bulletsVisible ? 1 : 0)
+                            .offset(y: bulletsVisible ? 0 : 12)
+                            .animation(
+                                SeddlyMotion.smooth.delay(0.25 + Double(idx) * 0.08),
+                                value: bulletsVisible
+                            )
+                        }
+                    }
+                    .padding(.horizontal, SeddlySpacing.xxl)
+                }
+
+                Spacer()
+
+                cta
+                    .padding(.horizontal, SeddlySpacing.xxl)
+                    .padding(.bottom, SeddlySpacing.xxl)
+            }
+        }
+        .onAppear {
+            withAnimation(SeddlyMotion.celebratory) {
+                iconScale = 1.0
+            }
+            withAnimation(SeddlyMotion.smooth.delay(0.1)) {
+                parallax = 1
+            }
+            bulletsVisible = true
         }
     }
 }

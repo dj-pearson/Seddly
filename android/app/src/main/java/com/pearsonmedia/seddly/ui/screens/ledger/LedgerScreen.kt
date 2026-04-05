@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.item
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
@@ -51,6 +52,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pearsonmedia.seddly.data.local.entity.CommitmentStatus
 import com.pearsonmedia.seddly.ui.components.CommitmentCard
+import com.pearsonmedia.seddly.ui.components.LedgerHeader
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -222,6 +224,16 @@ fun LedgerScreen(
                             vertical = 8.dp
                         )
                     ) {
+                        // Hero accountability header (US-136)
+                        item(key = "hero-header") {
+                            LedgerHeader(
+                                pendingCount = uiState.pendingCount,
+                                fulfilledThisWeek = uiState.fulfilledThisWeek,
+                                totalThisWeek = uiState.totalThisWeek,
+                                streakDays = uiState.streakDays,
+                                weekly = uiState.weekly
+                            )
+                        }
                         items(
                             items = uiState.commitments,
                             key = { it.id }
