@@ -277,8 +277,68 @@ struct LedgerView: View {
         }
     }
 
+    // MARK: - Hero header stats (US-136)
+
+    private var headerPendingCount: Int {
+        visibleCommitments.filter { $0.status == .pending || $0.status == .overdue }.count
+    }
+
+    private var headerWeeklyStats: (fulfilled: Int, total: Int, weekly: [Int]) {
+        let cal = Calendar.current
+        guard let weekStart = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: .now)) else {
+            return (0, 0, Array(repeating: 0, count: 7))
+        }
+        var daily = Array(repeating: 0, count: 7)
+        var fulfilled = 0
+        var total = 0
+        for c in visibleCommitments {
+            if c.updatedAt >= weekStart {
+                total += 1
+                if c.status == .fulfilled {
+                    fulfilled += 1
+                    let dayIdx = cal.dateComponents([.day], from: weekStart, to: c.updatedAt).day ?? 0
+                    if dayIdx >= 0 && dayIdx < 7 { daily[dayIdx] += 1 }
+                }
+            }
+        }
+        return (fulfilled, total, daily)
+    }
+
+    private var headerStreakDays: Int {
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: .now)
+        var streak = 0
+        for offset in 0..<60 {
+            guard let day = cal.date(byAdding: .day, value: -offset, to: today) else { break }
+            guard let next = cal.date(byAdding: .day, value: 1, to: day) else { break }
+            let anyFulfilled = visibleCommitments.contains { $0.status == .fulfilled && $0.updatedAt >= day && $0.updatedAt < next }
+            if anyFulfilled { streak += 1 } else if offset > 0 { break } else { /* today empty: keep checking backwards */ }
+        }
+        return streak
+    }
+
+    private var ledgerHeroHeader: some View {
+        let stats = headerWeeklyStats
+        return LedgerHeaderView(
+            pendingCount: headerPendingCount,
+            fulfilledThisWeek: stats.fulfilled,
+            totalThisWeek: stats.total,
+            streakDays: headerStreakDays,
+            weekly: stats.weekly
+        )
+        .padding(.horizontal)
+        .padding(.top, SeddlySpacing.md)
+        .listRowInsets(EdgeInsets())
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+    }
+
     private var commitmentList: some View {
         List {
+            Section {
+                ledgerHeroHeader
+            }
+
             if newCommitmentsCount > 0 {
                 Section {
                     HStack {
