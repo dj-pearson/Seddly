@@ -10,24 +10,30 @@ struct CommitmentCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        HStack(alignment: .top, spacing: SeddlySpacing.lg) {
+            // Premium status rail (US-137)
+            StatusRail(status: commitment.status)
+                .frame(maxHeight: .infinity)
+
+            VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text(commitment.entityName)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundStyle(.secondary)
+                    .font(SeddlyDisplayFont.accent)
+                    .foregroundStyle(.primary)
 
                 sourceIcon
 
                 if isNew {
-                    Text("New")
+                    Text("NEW")
                         .font(.caption2)
-                        .fontWeight(.bold)
+                        .fontWeight(.heavy)
+                        .tracking(0.6)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(.accent)
+                        .background(SeddlyGradient.hero)
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
+                        .shadow(color: .accentColor.opacity(0.3), radius: 4, x: 0, y: 2)
                 }
 
                 Spacer()
@@ -99,8 +105,11 @@ struct CommitmentCardView: View {
                 .foregroundStyle(statusColor)
                 .clipShape(Capsule())
             }
+            } // end inner VStack
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, SeddlySpacing.sm)
+        .padding(.horizontal, SeddlySpacing.xs)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
     }

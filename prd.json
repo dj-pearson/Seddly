@@ -1,17 +1,24 @@
 {
     "project": "Seddly",
-    "branchName": "claude/android-app-audit-gxW7m",
-    "description": "Loop 6 — Android app build-out and deep audit. Full native Android app (Kotlin/Jetpack Compose) mirroring iOS feature set. Covers project scaffold, Room database, MVVM architecture, Compose UI, ML Kit OCR, AI extraction pipeline, encrypted storage, certificate pinning, session management, accessibility, Material 3 design system, background processing, and comprehensive unit tests.",
+    "branchName": "claude/mobile-ui-ux-improvements-Rmzjr",
+    "description": "Loop 7 — Premium mobile UI/UX elevation. Ten stories focused on making both iOS (SwiftUI) and Android (Jetpack Compose) apps feel dramatically more premium than utility-tier competitors: expressive design tokens (gradients, shadows, motion), redesigned CommitmentCard, delightful animated empty states, centralized haptics, Pro shimmer treatment, hero accountability header, cinematic onboarding, redesigned paywall, floating navigation, and Android expressive-motion parity.",
     "ralphLoop": {
-      "currentLoop": 6,
-      "lastReviewDate": "2026-04-03",
-      "passingCount": 20,
-      "totalCount": 20,
-      "completionRate": "100%",
+      "currentLoop": 7,
+      "lastReviewDate": "2026-04-05",
+      "passingCount": 5,
+      "totalCount": 10,
+      "completionRate": "50%",
       "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Loop 6 complete — all 20 stories passing. Full native Android app built from scratch: Gradle project, Room DB, Compose UI, OCR/AI pipeline, billing, sync, notifications, screenshot scanning, biometric auth, widget, calendar, clipboard, data export, entity merge, CI/CD. 65+ unit tests. Ship it."
+      "verdict": "Loop 7 in progress — 5/10 premium UI/UX stories shipped (design-system foundation, premium commitment card, delightful empty state, haptics service, Pro shimmer). Five stories remain: hero accountability header, paywall redesign, cinematic onboarding, floating nav treatment, and Android expressive-motion parity."
     },
     "previousLoops": [
+      {
+        "loop": 6,
+        "date": "2026-04-03",
+        "passingCount": 20,
+        "totalCount": 20,
+        "verdict": "Full native Android app built: scaffold, Room DB, Compose UI, OCR/AI, billing, sync, notifications, widget, CI/CD. 65+ tests. Ship it."
+      },
       {
         "loop": 5,
         "date": "2026-04-01",
@@ -48,7 +55,7 @@
         "verdict": "Deep audit — all 50 user stories implemented."
       }
     ],
-    "previousStories": "US-095 through US-114 (Loop 5 — all passing)",
+    "previousStories": "US-115 through US-134 (Loop 6 — all passing)",
     "userStories": [
       {
         "id": "US-115",
@@ -401,6 +408,179 @@
         "priority": 2,
         "passes": true,
         "notes": "5 test files with 35+ test cases: CommitmentEntityTest (14 tests — isOverdue, urgencyLevel, all enum fromValue), EntityWithStatsTest (9 tests — score, grade, fulfillmentRate, edge cases), AIExtractionServiceTest (12 tests — sanitization, pattern detection, case sensitivity), RuleFilterTest (8 tests — signals, dates, dollars, hedging, bounds), AuthServiceTest (7 tests — sign-in, sign-out, token, timeout constants). All pure JVM tests, no Android dependencies needed."
+      },
+      {
+        "id": "US-135",
+        "title": "Premium design-system foundation: gradients, shadows, motion, expressive type",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a user opening Seddly, I should immediately feel the app is premium through expressive gradients, layered depth, spring motion, and confident typography — not the flat utility styling of most productivity apps. This story introduces a shared premium token layer on top of the existing DesignSystem on both platforms.",
+        "acceptanceCriteria": [
+          "iOS Shared/PremiumDesignSystem.swift defines SeddlyGradient (hero, cardSurface, proShimmer, status tint), SeddlyShadow (card/elevated/subtle), SeddlyMotion (snappy/smooth/celebratory/easeSoft), and SeddlyDisplayFont (hero/display/accent/tabularNumber)",
+          "premiumCard() view modifier applies gradient surface + continuous corners + hairline border + soft shadow",
+          "StatusRail view provides a reusable gradient accent bar keyed to CommitmentStatus",
+          "Android ui/theme/PremiumDesignSystem.kt provides matching SeddlyPremium.Gradients, Motion, DisplayFont, Shapes and a Modifier.premiumCard()",
+          "Motion spring presets match across platforms (snappy ~0.28s, smooth ~0.45s, celebratory bouncy)",
+          "All tokens are additive — no regression to existing SeddlyColors / SeddlySpacing / SeddlyRadius"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. iOS: Seddly/Sources/Shared/PremiumDesignSystem.swift with SeddlyGradient (hero/cardSurface/proShimmer/status), SeddlyShadow struct + .seddlyShadow() modifier, SeddlyMotion spring presets, SeddlyDisplayFont (rounded hero/display/accent/tabularNumber), PremiumCardStyle + .premiumCard() modifier, StatusRail view, SeddlyRadius.hero/sheet extensions. Android: android/.../ui/theme/PremiumDesignSystem.kt with SeddlyPremium.Gradients (hero/proShimmer/status/cardSurface), Motion springs (snappy/smooth/celebratory/easeSoft), DisplayFont (hero/display/accent), Shapes (hero/sheet), Modifier.premiumCard()."
+      },
+      {
+        "id": "US-136",
+        "title": "Hero accountability header on Ledger (weekly streak + momentum ring)",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a user opening the ledger, I should see a hero header that celebrates my accountability momentum — weekly streak, pending count, and a progress ring — so the app feels like a coach, not a database viewer. This is the primary visual differentiator vs competitors.",
+        "acceptanceCriteria": [
+          "iOS LedgerHeaderView with gradient background, hero rounded title, momentum ring (% fulfilled this week), streak counter, and pending count",
+          "Ring animates on appear using SeddlyMotion.celebratory",
+          "Tapping the header expands to reveal weekly sparkline (Swift Charts)",
+          "Android LedgerHeader composable with matching gradient, ring, counters, and expandable sparkline",
+          "Header collapses on scroll (iOS: scrollView offset, Android: nestedScroll)",
+          "Values pulled from existing CommitmentRepository / SwiftData query, no backend changes",
+          "Accessibility: header announces 'X pending, Y streak, Z% momentum' as a single element"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "Pending — slated for next Ralph iteration."
+      },
+      {
+        "id": "US-137",
+        "title": "Premium CommitmentCard redesign with status rail and press motion",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a user scanning my ledger, each commitment card should feel tactile and premium — gradient status rail, depth shadow tinted by status, spring press animation, and expressive typography.",
+        "acceptanceCriteria": [
+          "iOS CommitmentCardView uses StatusRail (gradient vertical bar) as leading accent",
+          "Card uses SeddlyDisplayFont.accent for entity name and upgraded NEW pill with hero gradient + glow shadow",
+          "Android CommitmentCard uses gradient status rail, 16dp rounded corners, status-tinted shadow",
+          "Press state animates elevation from 3dp → 8dp via animateDpAsState (Android) / scale spring (iOS)",
+          "Card background uses SeddlyPremium.Gradients.status(statusColor) tint on Android",
+          "No regression to existing swipe, selection, or accessibility behavior"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. iOS CommitmentCardView: StatusRail leading accent, SeddlyDisplayFont.accent entity name, hero-gradient NEW pill with accent glow shadow, extra horizontal padding. Android CommitmentCard: gradient vertical status rail (56dp), 16dp corners, status-tinted shadow via Modifier.shadow with spotColor, animateDpAsState press elevation 3→8dp via MutableInteractionSource, status gradient background tint on row, LocalIndication ripple. Accessibility descriptions preserved."
+      },
+      {
+        "id": "US-138",
+        "title": "Delightful animated empty state with floating hero",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a first-time user, my empty ledger should feel welcoming and alive rather than sterile — floating illustration, pulsing gradient glow, confident copy, and clear dual CTAs.",
+        "acceptanceCriteria": [
+          "iOS EmptyLedgerView normal state shows circular hero with hierarchical glyph, blurred gradient halo, and floating vertical offset animation",
+          "Glow opacity animates 0.4 → 0.75 on a 3.2s loop; glyph floats -10pt on a 2.8s loop",
+          "Copy uses SeddlyDisplayFont.display for 'Your Ledger Awaits' headline",
+          "Primary CTA uses .seddlyPrimary style; secondary uses .seddlySecondary; both trigger HapticsService.tap() on press",
+          "Android EmptyLedger composable with matching circular hero, gradient halo, infinite float animation, primary + secondary CTAs",
+          "No layout regression for permission-denied state"
+        ],
+        "priority": 2,
+        "passes": true,
+        "notes": "Shipped on iOS (EmptyLedgerView.swift normal state rewritten with ZStack hero, blurred gradient halo, float + glow withAnimation repeatForever loops, SeddlyDisplayFont.display headline, dual seddlyPrimary/seddlySecondary CTAs with haptic taps). Android parity: pending next Ralph iteration — file at android/.../ui/screens/ledger/LedgerScreen.kt EmptyLedgerContent should mirror iOS hero."
+      },
+      {
+        "id": "US-139",
+        "title": "Centralized haptics service and motion language",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a user, every interaction — tap, swipe, fulfill, purchase — should feel cohesive. A single HapticsService on each platform ensures taps feel identical everywhere and no interaction feels 'silent'.",
+        "acceptanceCriteria": [
+          "iOS Services/HapticsService.swift exposes tap/select/confirm/success/warning/error/celebrate/longPress as @MainActor static functions",
+          "Generators prepared once and reused (no per-call allocation)",
+          "Android service/HapticsService.kt exposes identical semantic methods using VibrationEffect + HapticFeedbackConstants, with Vibrator/VibratorManager API-level branching",
+          "Android rememberHaptics() composable returns a Haptics instance bound to LocalView + LocalContext",
+          "celebrate() produces a two-step pattern on both platforms (rigid + soft on iOS, 30/60/40 waveform on Android)",
+          "No direct UIImpactFeedbackGenerator / Vibrator calls in new code — all routed through the service"
+        ],
+        "priority": 2,
+        "passes": true,
+        "notes": "Shipped. iOS HapticsService @MainActor enum with prepared reusable generators (selection/light/medium/heavy/rigid/soft/notification) and semantic methods tap/select/confirm/success/warning/error/celebrate/longPress. Android HapticsService object with getVibrator() branching VibratorManager (S+) / Vibrator, predefined effects on Q+, fallback createOneShot on O+, waveform for celebrate(). rememberHaptics() @Composable returns Haptics class wrapping LocalView + LocalContext."
+      },
+      {
+        "id": "US-140",
+        "title": "Premium paywall redesign with feature showcase and social proof",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a free user considering Pro, the paywall should feel like an aspirational showroom, not a wall. Each paid feature gets a showcase card with live preview, benefit-led copy, and social proof.",
+        "acceptanceCriteria": [
+          "Redesigned SubscriptionView (iOS) and PaywallScreen (Android) with gradient hero header (SeddlyGradient.hero)",
+          "Feature showcase: horizontally scrolling premium cards for AI extraction, cloud sync, unlimited commitments, Pro+ sync devices, shimmer on each",
+          "Benefit copy: 'Never miss a promise', 'Stay accountable anywhere', 'Unlimited ledger capacity'",
+          "Social proof row: star rating + short testimonial",
+          "Annual toggle with 'Save 30%' pill",
+          "Terms/Privacy links in footer",
+          "HapticsService.celebrate() on successful purchase"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Pending — will be tackled in next Ralph iteration on the same branch."
+      },
+      {
+        "id": "US-141",
+        "title": "Pro feature shimmer lock treatment",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a free user, when I encounter a paid feature inline (in settings, detail views, etc.), I should see a subtle gold shimmer + PRO badge rather than a grey 'locked' icon — making paid features feel valuable and aspirational rather than punitive.",
+        "acceptanceCriteria": [
+          "iOS Views/Components/ProShimmerView.swift exports .proShimmer() modifier, ProBadge (compact + full), and ProLockWrapper<Content>",
+          "Shimmer uses masked linear gradient with plusLighter blend mode, infinite eased loop ~2.4s",
+          "ProLockWrapper dims + blurs content slightly and overlays a compact ProBadge; tapping triggers HapticsService.warning() and onTap callback",
+          "Android ui/components/ProShimmer.kt exports ProShimmerBox composable and ProBadge composable using SeddlyPremium.Gradients.proShimmer",
+          "Animation uses Animatable + infiniteRepeatable linear tween",
+          "Accessibility: ProBadge announces 'Pro feature', ProLockWrapper adds 'tap to upgrade' hint"
+        ],
+        "priority": 2,
+        "passes": true,
+        "notes": "Shipped. iOS ProShimmerView.swift: .proShimmer() ViewModifier with masked gradient + plusLighter, ProBadge (crown icon + PRO label, compact variant), ProLockWrapper<Content> with dim + blur + warning haptic on tap. Android ProShimmer.kt: ProShimmerBox with Animatable phase + infiniteRepeatable linear tween, ProBadge with SeddlyPremium.Gradients.proShimmer. Accessibility labels on both platforms."
+      },
+      {
+        "id": "US-142",
+        "title": "Cinematic onboarding redesign with parallax and feature animations",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a brand-new user, the onboarding flow should feel cinematic — gradient backdrops, parallax page transitions, and feature cards that animate into place — so the first 60 seconds sell the product.",
+        "acceptanceCriteria": [
+          "4-page flow: Welcome → How it works → Privacy promise → Ready to start",
+          "Each page has a unique SeddlyGradient backdrop and a hero illustration",
+          "Page dots animate with spring motion on swipe",
+          "Feature bullets fade+slide in with staggered delays (80ms apart)",
+          "CTA button uses .seddlyPrimary with hero gradient fill",
+          "Swipe transitions include parallax on the illustration (translates slower than the page)",
+          "Android parity using HorizontalPager + AnimatedVisibility"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Pending — will be tackled in next Ralph iteration."
+      },
+      {
+        "id": "US-143",
+        "title": "Floating tab / nav treatment with material glow",
+        "category": "Mobile — UI/UX (iOS + Android)",
+        "description": "As a user navigating the app, the primary navigation should feel like a floating premium surface — not a flat system tab bar. This signals craft and polish from the first frame.",
+        "acceptanceCriteria": [
+          "iOS custom tab bar background with .ultraThinMaterial, continuous 28pt corners, subtle accent glow shadow, inset 16pt from screen edges",
+          "Active tab icon animates with spring bounce on selection",
+          "Android bottom nav with rounded 24dp surface, elevation 8dp, accent-tinted shadow",
+          "Selected indicator: gradient pill behind active item",
+          "Haptic select() on tab change",
+          "Does not break existing navigation destinations / deep links"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Pending — will be tackled in next Ralph iteration."
+      },
+      {
+        "id": "US-144",
+        "title": "Android expressive-motion parity: shared element transitions + spring specs",
+        "category": "Mobile — UI/UX (Android)",
+        "description": "As an Android user, navigating from the Ledger to a commitment detail should feel as smooth as iOS — shared element transitions, spring-driven enter/exit animations, and consistent spring specs that match iOS SeddlyMotion.",
+        "acceptanceCriteria": [
+          "Navigation animations use SeddlyPremium.Motion presets (snappy/smooth/celebratory)",
+          "Ledger → Detail uses SharedTransitionLayout with shared-bounds on the CommitmentCard surface",
+          "Detail screen enter uses slideInVertically + fadeIn with smooth spring",
+          "FAB uses expressive scale spring on press",
+          "All new code uses androidx.compose.animation 1.7+ SharedTransitionLayout",
+          "No regression to existing deep-link navigation or bottom nav"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Pending — will be tackled in next Ralph iteration."
       }
     ]
   }

@@ -43,7 +43,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pearsonmedia.seddly.data.local.entity.CommitmentEntity
 import com.pearsonmedia.seddly.data.local.entity.UrgencyLevel
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.shadow
 import com.pearsonmedia.seddly.ui.theme.SeddlyColors
+import com.pearsonmedia.seddly.ui.theme.SeddlyPremium
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -123,13 +129,29 @@ fun CommitmentCard(
         enableDismissFromEndToStart = !isSelectionMode,
         modifier = modifier.semantics { contentDescription = accessibilityDesc }
     ) {
+        // Premium card: spring-animated press elevation + status gradient rail (US-137)
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val elevation by animateDpAsState(
+            targetValue = if (isPressed) 8.dp else 3.dp,
+            label = "cardElevation"
+        )
+
         Card(
             colors = CardDefaults.cardColors(containerColor = selectedColor),
-            shape = RoundedCornerShape(12.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = elevation),
             modifier = Modifier
                 .fillMaxWidth()
+                .shadow(
+                    elevation = elevation,
+                    shape = RoundedCornerShape(16.dp),
+                    ambientColor = Color.Black.copy(alpha = 0.06f),
+                    spotColor = statusColor.copy(alpha = 0.15f)
+                )
                 .combinedClickable(
+                    interactionSource = interactionSource,
+                    indication = androidx.compose.foundation.LocalIndication.current,
                     onClick = onClick,
                     onLongClick = onLongClick
                 )
@@ -137,16 +159,24 @@ fun CommitmentCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
+                    .background(SeddlyPremium.Gradients.status(statusColor))
+                    .padding(14.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // Status indicator
+                // Premium vertical status rail (US-137)
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .clip(CircleShape)
-                        .background(statusColor)
-                        .align(Alignment.CenterVertically)
+                        .width(4.dp)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
+                                colors = listOf(
+                                    statusColor,
+                                    statusColor.copy(alpha = 0.55f)
+                                )
+                            )
+                        )
                 )
 
                 Spacer(modifier = Modifier.width(12.dp))

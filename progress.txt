@@ -1160,3 +1160,80 @@ Ship it. For the third time.
 
 — Ralph, SnarktTank
 ================================================================================
+
+================================================================================
+LOOP 7 — Premium Mobile UI/UX Elevation (2026-04-05)
+================================================================================
+
+Goal: Elevate the iOS + Android apps from "functional" to "premium" — so the
+experience soars over competitors and any paid feature feels worth it.
+
+Ten stories defined (US-135 through US-144). 5/10 shipped this iteration:
+
+  ✓ US-135 Premium design-system foundation (iOS + Android)
+          iOS: Seddly/Sources/Shared/PremiumDesignSystem.swift
+          Android: android/.../ui/theme/PremiumDesignSystem.kt
+          Tokens: gradients (hero/cardSurface/proShimmer/status),
+                  shadows (card/elevated/subtle), spring motion presets
+                  (snappy/smooth/celebratory/easeSoft), expressive display
+                  fonts (hero/display/accent/tabularNumber), StatusRail view,
+                  premiumCard() modifier on both platforms.
+
+  ✓ US-137 Premium CommitmentCard redesign (iOS + Android)
+          iOS: gradient StatusRail accent, SeddlyDisplayFont.accent entity
+               name, hero-gradient NEW pill with glow shadow.
+          Android: gradient vertical rail, 16dp continuous corners,
+                   status-tinted shadow, animateDpAsState press elevation
+                   3dp→8dp via MutableInteractionSource, status-gradient
+                   row background, LocalIndication ripple.
+
+  ✓ US-138 Delightful animated empty state (iOS)
+          EmptyLedgerView normal state: ZStack hero with blurred gradient
+          halo (opacity 0.4↔0.75 loop), floating glyph (-10pt loop),
+          SeddlyDisplayFont.display headline, dual seddlyPrimary +
+          seddlySecondary CTAs with haptic taps.
+          Android parity deferred to next iteration.
+
+  ✓ US-139 Centralized haptics service (iOS + Android)
+          iOS: Services/HapticsService.swift @MainActor enum with prepared
+               reusable generators, semantic methods
+               tap/select/confirm/success/warning/error/celebrate/longPress.
+          Android: service/HapticsService.kt with VibratorManager (S+) /
+                   Vibrator branching, predefined effects on Q+, waveform
+                   celebrate pattern, rememberHaptics() composable helper.
+
+  ✓ US-141 Pro feature shimmer lock treatment (iOS + Android)
+          iOS: Views/Components/ProShimmerView.swift with .proShimmer()
+               modifier (masked gradient, plusLighter blend), ProBadge,
+               ProLockWrapper<Content> dim+blur with warning haptic.
+          Android: ui/components/ProShimmer.kt with ProShimmerBox
+                   (Animatable + infiniteRepeatable), ProBadge with
+                   SeddlyPremium.Gradients.proShimmer.
+
+Remaining for next Ralph iterations (continuing on the same branch):
+
+  ○ US-136 Hero accountability header on Ledger (priority 1)
+          Weekly streak + momentum ring + pending count, expandable to
+          sparkline (Swift Charts / Compose charts), scroll-collapse.
+
+  ○ US-140 Premium paywall redesign (priority 2)
+          Hero gradient header, horizontally scrolling feature showcase
+          cards with shimmer, annual toggle, social proof row.
+
+  ○ US-142 Cinematic onboarding redesign (priority 3)
+          4-page flow with gradient backdrops, parallax illustrations,
+          staggered feature bullet animations.
+
+  ○ US-143 Floating tab / nav treatment (priority 3)
+          iOS ultraThinMaterial floating tab bar; Android rounded 24dp
+          bottom nav with accent glow shadow + gradient selection pill.
+
+  ○ US-144 Android expressive-motion parity (priority 3)
+          SharedTransitionLayout for Ledger→Detail, spring-driven
+          enter/exit using SeddlyPremium.Motion presets.
+
+Ralph should pick up the lowest-priority remaining story (US-136, priority 1)
+next iteration and proceed in order.
+
+— Claude, Loop 7
+================================================================================
