@@ -1,8 +1,58 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+
+const howToSchema = {
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to Track Promises and Commitments with Screenshots",
+  "description": "Turn screenshots of promises into tracked, deadline-aware commitments using Seddly's on-device AI pipeline.",
+  "step": [
+    {
+      "@type": "HowToStep",
+      "position": 1,
+      "name": "Take a screenshot",
+      "text": "Take a screenshot of any promise — a text message from your landlord, an email from a client, a DM from a seller. You already do this instinctively."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 2,
+      "name": "On-device text extraction",
+      "text": "When you open Seddly, it scans your Screenshots album using Apple's Vision framework. All text extraction happens on your iPhone. No images are uploaded."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 3,
+      "name": "Smart classification",
+      "text": "Seddly's classifier separates conversations, receipts, and agreements from memes and irrelevant images — before any AI is involved."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 4,
+      "name": "AI commitment extraction",
+      "text": "For screenshots that likely contain promises, the extracted text is analyzed by AI. It identifies who promised what, by when, and for how much."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 5,
+      "name": "Your ledger updates",
+      "text": "Commitments appear in your ledger automatically. High-confidence items are added directly. Medium-confidence items go to a review queue."
+    },
+    {
+      "@type": "HowToStep",
+      "position": 6,
+      "name": "Deadlines are tracked",
+      "text": "Seddly sends you alerts when deadlines approach and notifications when they pass. No more forgotten promises."
+    }
+  ]
+};
 ---
 
-<BaseLayout title="How Seddly Works — Screenshot to Accountability">
+<BaseLayout
+  title="How Seddly Works — From Screenshot to Accountability in Seconds"
+  description="See how Seddly turns screenshots of promises into tracked commitments with on-device OCR and AI. No typing, no uploads, no account required."
+  keywords="how screenshot tracking works, promise tracking app tutorial, on-device OCR app, AI commitment extraction"
+  schema={howToSchema}
+>
   <section class="page-header">
     <h1>How Seddly Works</h1>
     <p>From screenshot to accountability in seconds. Here's the full pipeline.</p>

@@ -1,4 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /c/
 
+# Sitemaps
 Sitemap: https://seddly.com/sitemap.xml
+
+# Crawl rate
+Crawl-delay: 1

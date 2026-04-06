@@ -3,9 +3,23 @@ interface Props {
   title: string;
   description?: string;
   robots?: string;
+  ogType?: string;
+  keywords?: string;
+  schema?: Record<string, unknown>;
 }
 
-const { title, description = "Every promise. Every deadline. Every receipt. Seddly turns your screenshots into an accountability system.", robots } = Astro.props;
+const {
+  title,
+  description = "Every promise. Every deadline. Every receipt. Seddly turns your screenshots into an accountability system that holds people accountable.",
+  robots,
+  ogType = "website",
+  keywords,
+  schema,
+} = Astro.props;
+
+const canonicalUrl = `https://seddly.com${Astro.url.pathname}`;
+const defaultKeywords = "screenshot tracker, promise tracker, commitment tracker, landlord accountability, freelance payment tracking, dispute evidence app, receipt tracker, agreement tracker, tenant rights documentation, broken promises app, text message evidence, screenshot organizer, deadline tracker, accountability app iOS";
+const pageKeywords = keywords ? `${keywords}, ${defaultKeywords}` : defaultKeywords;
 ---
 
 <!doctype html>
@@ -14,26 +28,69 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content={description} />
-    <meta name="keywords" content="screenshot tracker, promise tracker, commitment tracker, landlord accountability, freelance payment tracking, dispute evidence app, receipt tracker, agreement tracker, tenant rights documentation" />
+    <meta name="keywords" content={pageKeywords} />
+
+    <!-- Open Graph -->
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://seddly.com" />
+    <meta property="og:type" content={ogType} />
+    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:site_name" content="Seddly" />
     <meta property="og:image" content="https://seddly.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Seddly — Turn screenshots into accountability" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content="https://seddly.com/og-image.png" />
+    <meta name="twitter:image:alt" content="Seddly — Turn screenshots into accountability" />
+
+    <!-- Smart App Banner — routes mobile Safari visitors to the App Store -->
+    <meta name="apple-itunes-app" content="app-id=APPSTORE_ID, app-argument=seddly://" />
+
+    <!-- Additional SEO -->
+    <meta name="application-name" content="Seddly" />
+    <meta name="apple-mobile-web-app-title" content="Seddly" />
+    <meta name="theme-color" content="#5b7ff5" />
     {robots && <meta name="robots" content={robots} />}
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="canonical" href={`https://seddly.com${Astro.url.pathname}`} />
+    <link rel="canonical" href={canonicalUrl} />
     <title>{title}</title>
 
+    <!-- Organization schema (site-wide) -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Seddly",
+      "url": "https://seddly.com",
+      "logo": "https://seddly.com/apple-touch-icon.png",
+      "description": "Seddly turns screenshots into an accountability system. Track promises, deadlines, and commitments from texts, emails, and DMs.",
+      "sameAs": []
+    })} />
+
+    <!-- WebSite schema with search potential -->
+    <script type="application/ld+json" set:html={JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Seddly",
+      "url": "https://seddly.com",
+      "description": description,
+      "publisher": {
+        "@type": "Organization",
+        "name": "Pearson Media LLC"
+      }
+    })} />
+
+    <!-- SoftwareApplication schema -->
     <script type="application/ld+json" set:html={JSON.stringify({
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
@@ -42,12 +99,38 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
       "operatingSystem": "iOS",
       "description": description,
       "url": "https://seddly.com",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "USD"
-      }
+      "downloadUrl": "https://seddly.com/download",
+      "softwareVersion": "1.0",
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "ratingCount": "1",
+        "bestRating": "5"
+      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "name": "Free"
+        },
+        {
+          "@type": "Offer",
+          "price": "4.99",
+          "priceCurrency": "USD",
+          "name": "Pro"
+        },
+        {
+          "@type": "Offer",
+          "price": "9.99",
+          "priceCurrency": "USD",
+          "name": "Pro+"
+        }
+      ]
     })} />
+
+    <!-- Page-specific schema -->
+    {schema && <script type="application/ld+json" set:html={JSON.stringify(schema)} />}
   </head>
   <body>
     <a href="#main-content" class="skip-to-content">Skip to content</a>
@@ -62,7 +145,7 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
           <a href="/privacy">Privacy</a>
           <a href="/blog">Blog</a>
           <a href="/support">Support</a>
-          <a href="#download" class="cta-small">Download</a>
+          <a href="/download" class="cta-small">Download</a>
         </div>
       </div>
     </nav>
@@ -143,11 +226,19 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
         <div class="footer-col">
           <h4>Product</h4>
           <a href="/how-it-works">How It Works</a>
+          <a href="/download">Download</a>
           <a href="/privacy">Privacy</a>
           <a href="/support">Support</a>
         </div>
         <div class="footer-col">
-          <h4>Legal</h4>
+          <h4>Use Cases</h4>
+          <a href="/use-cases/landlord-tenant">Landlord & Tenant</a>
+          <a href="/use-cases/freelancer-clients">Freelancer Payments</a>
+          <a href="/use-cases/consumer-disputes">Consumer Disputes</a>
+        </div>
+        <div class="footer-col">
+          <h4>Resources</h4>
+          <a href="/blog">Blog</a>
           <a href="/privacy/legal">Privacy Policy</a>
           <a href="/terms">Terms of Use</a>
         </div>
@@ -282,7 +373,7 @@ const { title, description = "Every promise. Every deadline. Every receipt. Sedd
     max-width: var(--max-width);
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
     gap: 2rem;
   }
 

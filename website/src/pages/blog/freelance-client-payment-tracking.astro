@@ -9,6 +9,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     "headline": "Stop Chasing Invoices: How Freelancers Can Track Client Payment Promises",
     "description": "When a client says 'we'll pay Net 30' in a text and it's now Net 60, you need more than a screenshot buried in your camera roll.",
     "datePublished": "2026-03-23",
+    "dateModified": "2026-04-06",
     "author": {
       "@type": "Organization",
       "name": "Seddly Team"
@@ -16,12 +17,23 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
     "publisher": {
       "@type": "Organization",
       "name": "Seddly",
-      "url": "https://seddly.com"
+      "url": "https://seddly.com",
+      "logo": { "@type": "ImageObject", "url": "https://seddly.com/apple-touch-icon.png" }
     },
     "mainEntityOfPage": {
       "@type": "WebPage",
       "@id": "https://seddly.com/blog/freelance-client-payment-tracking"
-    }
+    },
+    "keywords": ["freelance payments", "client invoices", "payment tracking", "freelancer accountability", "late payment"]
+  })} />
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://seddly.com" },
+      { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://seddly.com/blog" },
+      { "@type": "ListItem", "position": 3, "name": "Stop Chasing Invoices" }
+    ]
   })} />
   <article class="blog-post">
     <header>
