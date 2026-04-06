@@ -75,3 +75,7 @@ android/.cxx/
 
 # Node modules (website)
 node_modules/
+
+# Astro build artifacts (website)
+website/.astro/
+website/dist/

@@ -1,0 +1,247 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Seddly for Renters — Document Landlord Promises",
+  "description": "Track your landlord's repair promises, deposit commitments, and lease terms with screenshot-based accountability.",
+  "breadcrumb": {
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://seddly.com" },
+      { "@type": "ListItem", "position": 2, "name": "Use Cases", "item": "https://seddly.com/use-cases/landlord-tenant" },
+      { "@type": "ListItem", "position": 3, "name": "Landlord & Tenant" }
+    ]
+  }
+};
+---
+
+<BaseLayout
+  title="Seddly for Renters — Track Landlord Promises & Repair Deadlines"
+  description="Your landlord promised to fix the AC by Friday. Seddly makes sure you have proof. Track repair promises, deposit commitments, and lease terms from screenshots."
+  keywords="landlord promise tracker, tenant rights app, document landlord promises, repair deadline tracker, landlord accountability app, renter evidence app, lease agreement tracker, security deposit tracker"
+  schema={schema}
+>
+  <section class="page-header">
+    <span class="use-case-label">Use Case</span>
+    <h1>Hold your landlord accountable</h1>
+    <p>Track repair promises, deposit commitments, and lease terms — all from the screenshots you're already taking.</p>
+  </section>
+
+  <section class="problem">
+    <div class="section-inner">
+      <h2>The problem every renter knows</h2>
+      <div class="problem-grid">
+        <div class="problem-card">
+          <h3>Promises vanish</h3>
+          <p>Your landlord texts "I'll send someone by next week." That text gets buried in your camera roll. When they deny it, you can't find the proof.</p>
+        </div>
+        <div class="problem-card">
+          <h3>Deadlines are forgotten</h3>
+          <p>They said "by Friday." Friday came and went. Without a system tracking that deadline, you notice weeks later — after the damage compounds.</p>
+        </div>
+        <div class="problem-card">
+          <h3>Patterns are invisible</h3>
+          <p>Three missed repair deadlines in two months tells a story. But scattered screenshots across your phone don't connect those dots.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="solution">
+    <div class="section-inner">
+      <h2>How Seddly helps renters</h2>
+      <div class="steps">
+        <div class="step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h3>Screenshot the promise</h3>
+            <p>Text about repairs, deposit return dates, lease changes — screenshot it like you already do.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h3>Seddly extracts the commitment</h3>
+            <p>AI identifies who promised what, by when. "Landlord will fix AC by March 15" becomes a tracked deadline.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h3>Get alerted when deadlines pass</h3>
+            <p>No more manually checking. When a promise is broken, you know immediately — with the evidence to prove it.</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h3>Build your case</h3>
+            <p>If things escalate, generate a professional timeline of every promise, deadline, and broken commitment. Forward it to a lawyer or housing authority.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="scenarios">
+    <div class="section-inner">
+      <h2>What renters track with Seddly</h2>
+      <ul class="scenario-list">
+        <li><strong>Repair promises</strong> — "We'll fix the heater by Monday"</li>
+        <li><strong>Security deposit returns</strong> — "You'll get your deposit back within 30 days"</li>
+        <li><strong>Lease modifications</strong> — "I'll waive the late fee this month"</li>
+        <li><strong>Move-out agreements</strong> — "You can break the lease with 30 days notice"</li>
+        <li><strong>Maintenance schedules</strong> — "Pest control comes every quarter"</li>
+        <li><strong>Rent adjustments</strong> — "Rent stays the same through December"</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="cta-section">
+    <div class="section-inner">
+      <h2>Start documenting your landlord's promises</h2>
+      <p>Free to start. No account required. Your screenshots never leave your device.</p>
+      <a href="/download" class="cta">Download for iOS</a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .page-header {
+    text-align: center;
+    padding: 6rem 2rem 3rem;
+    max-width: var(--max-width);
+    margin: 0 auto;
+  }
+
+  .use-case-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--color-accent);
+    display: block;
+    margin-bottom: 0.75rem;
+  }
+
+  .page-header h1 {
+    font-size: clamp(2rem, 5vw, 3rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 1rem;
+  }
+
+  .page-header p {
+    color: var(--color-text-muted);
+    font-size: 1.1rem;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .section-inner {
+    max-width: var(--max-width);
+    margin: 0 auto;
+    padding: 4rem 2rem;
+  }
+
+  h2 {
+    font-size: 1.8rem;
+    font-weight: 700;
+    text-align: center;
+    margin-bottom: 2rem;
+    letter-spacing: -0.02em;
+  }
+
+  .problem-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+  }
+
+  .problem-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    padding: 2rem;
+  }
+
+  .problem-card h3 { margin-bottom: 0.5rem; font-size: 1.1rem; }
+  .problem-card p { color: var(--color-text-muted); font-size: 0.9rem; line-height: 1.6; }
+
+  .steps {
+    max-width: 650px;
+    margin: 0 auto;
+  }
+
+  .step {
+    display: flex;
+    gap: 1.5rem;
+    padding: 1.5rem 0;
+    border-left: 2px solid var(--color-border);
+    margin-left: 17px;
+    padding-left: 2rem;
+    position: relative;
+  }
+
+  .step-number {
+    position: absolute;
+    left: -18px;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: white;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+  }
+
+  .step-content h3 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+  .step-content p { color: var(--color-text-muted); font-size: 0.9rem; }
+
+  .scenario-list {
+    max-width: 600px;
+    margin: 0 auto;
+    list-style: none;
+    padding: 0;
+  }
+
+  .scenario-list li {
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: 0.95rem;
+  }
+
+  .scenario-list strong { color: var(--color-text); }
+
+  .cta-section {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .cta-section p {
+    color: var(--color-text-muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .cta {
+    display: inline-block;
+    background: var(--color-accent);
+    color: white;
+    padding: 0.9rem 2.5rem;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 1.05rem;
+  }
+
+  .cta:hover { background: var(--color-accent-hover); color: white; }
+
+  @media (max-width: 768px) {
+    .problem-grid { grid-template-columns: 1fr; }
+  }
+</style>
