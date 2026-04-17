@@ -13,6 +13,11 @@
     <string>Seddly needs full calendar access to create and manage events for your commitment deadlines.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Seddly uses Face ID to keep your commitments and entity profiles private when the app is reopened.</string>
+    <!-- US-151: Live Activities for the next-due commitment -->
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+    <key>NSSupportsLiveActivitiesFrequentUpdates</key>
+    <false/>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.pearsonmedia.Seddly.screenshot-refresh</string>

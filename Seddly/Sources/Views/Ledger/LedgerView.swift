@@ -25,6 +25,9 @@ struct LedgerView: View {
     @State private var showingDismissConfirm = false
     @State private var showingFulfillConfirm = false
     @State private var pendingSwipeCommitment: LocalCommitment?
+    // US-149: Snooze state
+    @State private var pendingSnoozeCommitment: LocalCommitment?
+    @State private var showingSnoozeMenu = false
     @State private var showingAIReview = false
     @State private var pendingAIText: String?
     @State private var pendingAICallback: ((String?) -> Void)?
@@ -119,6 +122,14 @@ struct LedgerView: View {
                         Picker("Sort", selection: $viewModel.sortOrder) {
                             ForEach(LedgerViewModel.SortOrder.allCases, id: \.self) { order in
                                 Text(order.rawValue).tag(order)
+                            }
+                        }
+                        Divider()
+                        // US-149: Let users reveal snoozed commitments or see
+                        // only snoozed ones without leaving the Ledger.
+                        Picker("Snoozed", selection: $viewModel.snoozeVisibility) {
+                            ForEach(LedgerViewModel.SnoozeVisibility.allCases, id: \.self) { vis in
+                                Text(vis.rawValue).tag(vis)
                             }
                         }
                     } label: {
@@ -242,6 +253,34 @@ struct LedgerView: View {
                     Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this action for 5 seconds.")
                 }
             }
+            // US-149: Snooze preset picker
+            .confirmationDialog(
+                "Snooze commitment",
+                isPresented: $showingSnoozeMenu,
+                titleVisibility: .visible,
+                presenting: pendingSnoozeCommitment
+            ) { commitment in
+                Button("1 day") {
+                    viewModel.snooze(commitment, days: 1)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("3 days") {
+                    viewModel.snooze(commitment, days: 3)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("7 days") {
+                    viewModel.snooze(commitment, days: 7)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingSnoozeCommitment = nil
+                }
+            } message: { commitment in
+                Text("Hide \"\(commitment.summary)\" from the active ledger. The deadline and reminders stay on the original date.")
+            }
             .sheet(isPresented: $showingAIReview) {
                 if let text = pendingAIText {
                     AITextReviewView(
@@ -311,6 +350,13 @@ struct LedgerView: View {
                     processOnForeground()
                     syncIfProPlus()
                     PhotoCleanupService.cleanupStaleReferences(in: modelContext)
+                    // US-149: Clear any snoozes whose date has passed so the
+                    // commitment re-enters the active ledger and a fresh
+                    // deadline reminder can be scheduled.
+                    wakeExpiredSnoozes()
+                    // US-151: Refresh the Live Activity for the next-due
+                    // pending commitment on every foreground.
+                    reconcileLiveActivity()
                 } else if newPhase == .background {
                     // Mark current time so "New" badges clear next session
                     (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(Date.now, forKey: "lastViewedDate")
@@ -455,6 +501,15 @@ struct LedgerView: View {
                         } label: {
                             Label("Dismiss", systemImage: "xmark")
                         }
+                        // US-149: Full-swipe snooze (3 days) on the trailing
+                        // edge as a secondary action. Tap to get preset menu.
+                        Button {
+                            pendingSnoozeCommitment = commitment
+                            showingSnoozeMenu = true
+                        } label: {
+                            Label("Snooze", systemImage: "bell.slash")
+                        }
+                        .tint(.orange)
                     }
                     .swipeActions(edge: .leading) {
                         Button {
@@ -465,7 +520,7 @@ struct LedgerView: View {
                         }
                         .tint(.green)
                     }
-                    .accessibilityHint("Swipe right to mark fulfilled, swipe left to dismiss")
+                    .accessibilityHint("Swipe right to mark fulfilled, swipe left to dismiss or snooze")
                 }
             }
 
@@ -510,6 +565,46 @@ struct LedgerView: View {
         .navigationDestination(for: LocalCommitment.self) { commitment in
             CommitmentDetailView(commitment: commitment)
         }
+    }
+
+    /// US-151: Shared LiveActivityService instance so reconcile calls target
+    /// the same actor state across refresh cycles.
+    private static let liveActivityService = LiveActivityService()
+
+    /// Pushes the current pending-commitment snapshot to LiveActivityService
+    /// so the Lock Screen / Dynamic Island reflect the soonest deadline.
+    private func reconcileLiveActivity() {
+        let snapshot = commitments
+            .filter { $0.status == .pending && !$0.isSnoozed && $0.deadline != nil }
+            .map {
+                LiveActivityService.PendingCommitment(
+                    id: $0.id,
+                    entityName: $0.entityName,
+                    summary: $0.summary,
+                    deadline: $0.deadline ?? .now
+                )
+            }
+        Task.detached(priority: .utility) {
+            await LedgerView.liveActivityService.reconcile(pendingCommitments: snapshot)
+        }
+    }
+
+    /// US-149: Wakes up commitments whose snoozedUntil has passed and
+    /// reschedules their approach/overdue notifications so users get a
+    /// fresh nudge once the snooze window ends.
+    private func wakeExpiredSnoozes() {
+        let woken = viewModel.wakeExpiredSnoozes(in: Array(commitments))
+        guard !woken.isEmpty else { return }
+        let wokenSet = Set(woken)
+        let wokenCommitments = commitments.filter { wokenSet.contains($0.id) }
+        Task.detached(priority: .utility) {
+            let service = NotificationService()
+            for commitment in wokenCommitments {
+                await service.scheduleDeadlineApproaching(for: commitment)
+                await service.scheduleDeadlinePassed(for: commitment)
+            }
+        }
+        try? modelContext.save()
     }
 
     /// US-148: Reset all filters and the search field in one tap from the
@@ -590,42 +685,13 @@ struct LedgerView: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
+    // US-153: Extracted to LedgerBannerViews for #Preview + reuse.
     private var offlineBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "wifi.slash")
-                .foregroundStyle(.white)
-            Text("Offline")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-            Text("— AI extraction and sync require internet")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.85))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.orange)
-        .clipShape(Capsule())
-        .padding(.top, 4)
-        .transition(.move(edge: .top).combined(with: .opacity))
-        .animation(.easeInOut, value: networkMonitor.isConnected)
+        LedgerOfflineBanner()
+            .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 
-    private var processingBanner: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .tint(.white)
-            Text("Processing new screenshots...")
-                .font(.caption)
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.accent)
-        .clipShape(Capsule())
-        .padding(.top, 4)
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
+    private var processingBanner: some View { LedgerProcessingBanner() }
 
     private var aiReviewBanner: some View {
         Button {
@@ -946,29 +1012,12 @@ struct LedgerView: View {
         withAnimation { undoState = nil }
     }
 
+    // US-153: Extracted to LedgerBannerViews.
     private var undoToast: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.uturn.backward.circle.fill")
-                .foregroundStyle(.white)
-            Text(undoState?.label ?? "")
-                .font(.subheadline)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            Spacer()
-            Button("Undo") {
-                performUndo()
-            }
-            .font(.subheadline.bold())
-            .foregroundStyle(.yellow)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial.opacity(0.9))
-        .background(Color.accentColor.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        LedgerUndoToast(
+            label: undoState?.label ?? "",
+            onUndo: { performUndo() }
+        )
     }
 }
 

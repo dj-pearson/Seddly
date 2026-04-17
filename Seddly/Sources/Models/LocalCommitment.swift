@@ -28,6 +28,12 @@ final class LocalCommitment {
     var workflowID: UUID?
     var createdAt: Date
     var updatedAt: Date
+    /// US-149: Hides the commitment from the active ledger until this date
+    /// passes. Nil when not snoozed. Lightweight SwiftData migration handles
+    /// existing rows (default nil). The original deadline is untouched, so
+    /// urgency and notifications still reflect the real promise date once
+    /// the snooze ends.
+    var snoozedUntil: Date?
 
     @Relationship(inverse: \LocalEntity.commitments)
     var entity: LocalEntity?
@@ -68,6 +74,14 @@ final class LocalCommitment {
         if daysUntil < 0 { return .overdue }
         if daysUntil <= 6 { return .approaching }
         return .safe
+    }
+
+    /// US-149: True when the commitment is currently snoozed (hidden from the
+    /// active ledger). Callers should use this instead of reading
+    /// `snoozedUntil` directly so the "date has passed" case is handled.
+    var isSnoozed: Bool {
+        guard let snoozedUntil else { return false }
+        return snoozedUntil > .now
     }
 
     init(

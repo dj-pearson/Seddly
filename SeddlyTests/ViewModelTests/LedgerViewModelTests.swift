@@ -151,6 +151,41 @@ struct LedgerViewModelTests {
         #expect(first.map(\.id) == second.map(\.id))
     }
 
+    // MARK: - US-149 (snooze)
+
+    @Test("Snooze hides commitment by default and surfaces it under snoozedOnly")
+    func snoozeVisibility() {
+        let vm = LedgerViewModel()
+        let active = LocalCommitment(entityName: "A", summary: "Active", fullText: "t")
+        let snoozed = LocalCommitment(entityName: "B", summary: "Snoozed", fullText: "t")
+        vm.snooze(snoozed, days: 3)
+        let input = [active, snoozed]
+
+        // Default: hide snoozed
+        let hidden = vm.sortedCommitments(input)
+        #expect(hidden.count == 1)
+        #expect(hidden[0].entityName == "A")
+
+        vm.snoozeVisibility = .snoozedOnly
+        let onlySnoozed = vm.sortedCommitments(input)
+        #expect(onlySnoozed.count == 1)
+        #expect(onlySnoozed[0].entityName == "B")
+
+        vm.snoozeVisibility = .showAll
+        #expect(vm.sortedCommitments(input).count == 2)
+    }
+
+    @Test("Expired snoozes are cleared on wake")
+    func wakeExpiredSnoozes() {
+        let vm = LedgerViewModel()
+        let commitment = LocalCommitment(entityName: "A", summary: "t", fullText: "t")
+        commitment.snoozedUntil = Date.now.addingTimeInterval(-1) // already past
+        let woken = vm.wakeExpiredSnoozes(in: [commitment])
+        #expect(woken == [commitment.id])
+        #expect(commitment.snoozedUntil == nil)
+        #expect(!commitment.isSnoozed)
+    }
+
     @Test("Changing a filter invalidates the memoized sort result")
     func memoizationInvalidatesOnFilterChange() {
         let vm = LedgerViewModel()

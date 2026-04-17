@@ -31,7 +31,18 @@ final class LedgerViewModel {
     }
     var filterAmountMin: Double? { didSet { cachedSortKey = nil } }
     var filterAmountMax: Double? { didSet { cachedSortKey = nil } }
+    /// US-149: Controls whether snoozed commitments are hidden (default),
+    /// shown exclusively, or included alongside the rest of the ledger.
+    var snoozeVisibility: SnoozeVisibility = .hideSnoozed {
+        didSet { cachedSortKey = nil }
+    }
     var searchText = "" { didSet { cachedSortKey = nil } }
+
+    enum SnoozeVisibility: String, CaseIterable, Hashable {
+        case hideSnoozed = "Hide snoozed"
+        case snoozedOnly = "Snoozed only"
+        case showAll     = "Show all"
+    }
 
     // MARK: - Filter/sort memoization (US-145)
     /// Caches the last filter+sort result so repeated renders with identical inputs
@@ -122,6 +133,7 @@ final class LedgerViewModel {
         hasher.combine(filterAmountMin)
         hasher.combine(filterAmountMax)
         hasher.combine(searchText)
+        hasher.combine(snoozeVisibility)
         hasher.combine(displayedCount)
         return hasher.finalize()
     }
@@ -131,6 +143,17 @@ final class LedgerViewModel {
         if cachedSortKey == key { return cachedSortResult }
 
         var filtered = commitments
+
+        // US-149: Snooze visibility (applied before other filters so the count
+        // reported by activeFilterCount stays meaningful).
+        switch snoozeVisibility {
+        case .hideSnoozed:
+            filtered = filtered.filter { !$0.isSnoozed }
+        case .snoozedOnly:
+            filtered = filtered.filter { $0.isSnoozed }
+        case .showAll:
+            break
+        }
 
         // Status filter
         if let filterStatus {
@@ -258,6 +281,46 @@ final class LedgerViewModel {
             entityName: commitment.entityName, summary: commitment.summary,
             statusRaw: commitment.statusRaw
         )
+    }
+
+    // MARK: - Snooze (US-149)
+
+    /// Snoozes a commitment by setting `snoozedUntil` to now + `days` days.
+    /// The original deadline is untouched.
+    func snooze(_ commitment: LocalCommitment, days: Int) {
+        let target = Calendar.current.date(byAdding: .day, value: days, to: .now) ?? .now
+        snooze(commitment, until: target)
+    }
+
+    func snooze(_ commitment: LocalCommitment, until date: Date) {
+        commitment.snoozedUntil = date
+        commitment.updatedAt = .now
+        cachedSortKey = nil
+    }
+
+    /// Clears `snoozedUntil` so the commitment re-enters the active ledger.
+    func unsnooze(_ commitment: LocalCommitment) {
+        commitment.snoozedUntil = nil
+        commitment.updatedAt = .now
+        cachedSortKey = nil
+    }
+
+    /// Iterates the given commitments and clears any `snoozedUntil` that has
+    /// already passed. Intended to be called on foreground. Returns the IDs
+    /// of commitments that were woken so callers can re-schedule reminders.
+    @discardableResult
+    func wakeExpiredSnoozes(in commitments: [LocalCommitment]) -> [UUID] {
+        var woken: [UUID] = []
+        for commitment in commitments {
+            guard let until = commitment.snoozedUntil, until <= .now else { continue }
+            commitment.snoozedUntil = nil
+            commitment.updatedAt = .now
+            woken.append(commitment.id)
+        }
+        if !woken.isEmpty {
+            cachedSortKey = nil
+        }
+        return woken
     }
 
     // MARK: - Bulk Edit
