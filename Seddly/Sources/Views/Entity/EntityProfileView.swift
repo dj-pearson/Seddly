@@ -222,8 +222,7 @@ struct EntityProfileView: View {
             }
             defer { timeoutTask.cancel() }
 
-            guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-                  let supabaseURL = URL(string: supabaseURLString) else {
+            guard let cfg = AppConfiguration.supabase else {
                 // No Supabase URL configured — use local fallback
                 disputeSummary = DisputeSummaryService.generateLocalSummary(
                     entityName: entity.name,
@@ -234,7 +233,7 @@ struct EntityProfileView: View {
                 return
             }
 
-            let endpointURL = supabaseURL.appendingPathComponent("functions/v1/generate-dispute-summary")
+            let endpointURL = cfg.url.appendingPathComponent("functions/v1/generate-dispute-summary")
             let token = await authService.validAccessToken()
             let service = DisputeSummaryService(endpointURL: endpointURL, authToken: token)
 

@@ -239,10 +239,10 @@ struct SettingsView: View {
             throw URLError(.userAuthenticationRequired)
         }
 
-        let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
-        guard let url = URL(string: "\(supabaseURLString)/functions/v1/delete-account") else {
+        guard let cfg = AppConfiguration.supabase else {
             throw URLError(.badURL)
         }
+        let url = cfg.url.appendingPathComponent("functions/v1/delete-account")
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"

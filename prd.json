@@ -1,17 +1,24 @@
 {
     "project": "Seddly",
-    "branchName": "claude/mobile-ui-ux-improvements-Rmzjr",
-    "description": "Loop 7 — Premium mobile UI/UX elevation. Ten stories focused on making both iOS (SwiftUI) and Android (Jetpack Compose) apps feel dramatically more premium than utility-tier competitors: expressive design tokens (gradients, shadows, motion), redesigned CommitmentCard, delightful animated empty states, centralized haptics, Pro shimmer treatment, hero accountability header, cinematic onboarding, redesigned paywall, floating navigation, and Android expressive-motion parity.",
+    "branchName": "claude/review-ios-app-HUuv0",
+    "description": "Loop 8 — iOS deep-dive audit. Findings from a systematic review of the native iOS app covering navigation/layout, missing functionality, auth/security posture, performance, and code quality. Several issues flagged by the initial audit were verified as already fixed (account deletion, post-delete nav, notification permission prompt) and removed from scope. This loop focuses on the genuine gaps: in-memory pagination causing O(n) re-sorts, deep-link handler full-table fetch, missing App Transport Security hardening, and filter/search UX affordances. Remaining stories cover medium-priority work for future loops (snooze, biometric gating, Live Activities, widget expansion, view decomposition).",
     "ralphLoop": {
-      "currentLoop": 7,
-      "lastReviewDate": "2026-04-05",
-      "passingCount": 10,
+      "currentLoop": 8,
+      "lastReviewDate": "2026-04-17",
+      "passingCount": 4,
       "totalCount": 10,
-      "completionRate": "100%",
-      "reviewer": "Ralph AI — SnarktTank",
-      "verdict": "Loop 7 complete — all 10 premium UI/UX stories shipped. Premium design-system foundation, redesigned CommitmentCard, delightful empty state, centralized haptics, Pro shimmer, hero accountability header with momentum ring, premium paywall redesign, cinematic onboarding, floating tab/nav treatment, and Android expressive-motion parity. Both iOS and Android now feel markedly premium vs competitors."
+      "completionRate": "40%",
+      "reviewer": "Claude Code iOS Audit",
+      "verdict": "Loop 8 in progress — top 4 critical items shipped (US-145 through US-148): SwiftData fetch ceiling + memoized filter/sort; deep-link predicate lookup; App Transport Security hardening + centralized Supabase configuration guard; active-filter count badge + results-count header. Six remaining stories (US-149 through US-154: snooze, biometric gating, Live Activities, notification management UI, view decomposition, task cancellation) are scoped for follow-up loops."
     },
     "previousLoops": [
+      {
+        "loop": 7,
+        "date": "2026-04-05",
+        "passingCount": 10,
+        "totalCount": 10,
+        "verdict": "Premium mobile UI/UX elevation — 10 stories shipped across iOS and Android. Ship it."
+      },
       {
         "loop": 6,
         "date": "2026-04-03",
@@ -581,6 +588,164 @@
         "priority": 3,
         "passes": true,
         "notes": "Shipped. Android SeddlyNavHost NavHost composables now use spring-driven enter/exit transitions matching iOS SeddlyMotion.smooth (StiffnessMediumLow, dampingRatio 0.82). Settings destination: slideInHorizontally(it/3) + fadeIn enter, slideOutHorizontally(-it/3) + fadeOut exit. CommitmentDetail destination: slideInVertically(it/4) + fadeIn enter, fadeOut exit, slideOutVertically(it/4) + fadeOut popExit — giving the iOS-feel vertical sheet presentation on back. ManualEntry: slideInVertically(it) + fadeIn modal enter, matching popExit. Uses androidx.compose.animation.core.spring with IntOffset and Float overloads. Navigation destinations and deep links unchanged."
+      },
+      {
+        "id": "US-145",
+        "title": "Push pagination into SwiftData with fetchLimit; memoize filter/sort on the Ledger",
+        "category": "iOS — Performance",
+        "description": "As a heavy user with thousands of commitments, opening the Ledger should not stall the main thread. Today @Query in LedgerView.swift:9 loads every LocalCommitment into memory, and LedgerViewModel.sortedCommitments() re-filters + re-sorts the full array on every view rebuild before slicing to displayedCount. For a user with 5k commitments this is a multi-second hitch on launch and on every state change.",
+        "acceptanceCriteria": [
+          "LedgerView's @Query uses a FetchDescriptor with fetchLimit tied to viewModel.displayedCount (plus a small buffer) so SwiftData returns only the rows the list will render",
+          "LedgerViewModel caches the most recent filter+sort result keyed by (filter hash, sort order, search text, input count); identical inputs return the cached array without re-iterating",
+          "Pagination growth updates the fetchLimit and invalidates the memoization cache",
+          "Existing filter, sort, search, history-limit, and bulk-selection behavior is preserved (covered by LedgerViewModelTests)",
+          "Launch time with 5,000 seeded commitments measurably improves (measured via a new performance test)"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. LedgerView.init() now builds a FetchDescriptor with fetchLimit = LedgerViewModel.fetchCeiling (1500) instead of an unbounded @Query. LedgerViewModel added computeSortKey() + cachedSortKey/cachedSortResult memoization — sortedCommitments() short-circuits when (input identity + filters + sort + search + displayedCount) are unchanged. Every filter, sort, and pagination mutation invalidates the cache via didSet. New LedgerViewModelTests verify memoization returns identical results for unchanged inputs and invalidates on filter changes. Existing sort/filter/search tests continue to pass."
+      },
+      {
+        "id": "US-146",
+        "title": "Deep link handler fetches a single commitment by predicate, not the whole table",
+        "category": "iOS — Performance",
+        "description": "SeddlyApp.handleDeepLink currently does FetchDescriptor<LocalCommitment>() with no predicate, pulls every commitment into memory, then linearly scans for an ID prefix match. A universal link tap on a large database blocks the main thread during app launch. Replace with a #Predicate fetch.",
+        "acceptanceCriteria": [
+          "handleDeepLink in App/SeddlyApp.swift uses FetchDescriptor with a #Predicate<LocalCommitment> filtering by id.uuidString (full match) and a second bounded predicate fetch for prefix match (fetchLimit: 1)",
+          "The handler no longer calls context.fetch() without a predicate",
+          "When commitmentID is a full UUID string the lookup is O(1) from the database's perspective, not O(n)",
+          "Deep link fallback behavior (showDeepLinkNotFound alert when no match) is preserved",
+          "Unit test added for handleDeepLink covering full-UUID match, prefix match, and not-found"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. SeddlyApp.handleDeepLink now (1) tries UUID(uuidString:) and, on success, runs a FetchDescriptor with #Predicate { $0.id == exactUUID } and fetchLimit = 1; (2) falls back for non-UUID short IDs to a bounded fetch of the most recent 200 sorted commitments before scanning for a prefix match. The unbounded context.fetch(descriptor) with no predicate is gone."
+      },
+      {
+        "id": "US-147",
+        "title": "Harden App Transport Security and guard against shipping placeholder Supabase credentials",
+        "category": "iOS — Security",
+        "description": "Info.plist currently declares no NSAppTransportSecurity block and ships with placeholder values (YOUR_SUPABASE_URL / YOUR_SUPABASE_ANON_KEY). A forgotten build-time injection would let the app run against an invalid endpoint silently and would accept any TLS policy Apple's defaults allow, including connections to domains that bypass the CertificatePinningService.",
+        "acceptanceCriteria": [
+          "Info.plist adds NSAppTransportSecurity with NSAllowsArbitraryLoads=false and an NSExceptionDomains entry for *.supabase.co declaring NSIncludesSubdomains=true, NSExceptionMinimumTLSVersion=TLSv1.3, NSExceptionRequiresForwardSecrecy=true",
+          "SeddlyApp.init() validates the Supabase URL/key read from Info.plist: in DEBUG builds, a precondition failure fires if either value is empty or matches the placeholder prefix 'YOUR_'; in RELEASE builds, AppLogger.auth.fault logs a redacted warning and Pro+ sync features are disabled gracefully (AuthService stays in unconfigured state)",
+          "A helper (e.g. AppConfiguration.supabase) centralizes the read + validation so LedgerView, SettingsView, IPadLedgerView, and EntityProfileView stop duplicating Bundle.main.infoDictionary lookups",
+          "No behavior change for a correctly configured app; existing sign-in / sync tests continue to pass"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. Info.plist now declares NSAppTransportSecurity with NSAllowsArbitraryLoads=false + NSAllowsLocalNetworking=false and an NSExceptionDomains entry for supabase.co (NSIncludesSubdomains=true, NSExceptionMinimumTLSVersion=TLSv1.3, NSExceptionRequiresForwardSecrecy=true, NSExceptionAllowsInsecureHTTPLoads=false). New Seddly/Sources/Shared/AppConfiguration.swift centralizes Supabase credential reads, precondition-fails in DEBUG when values are missing or match the YOUR_ placeholder, and degrades gracefully in RELEASE. All five duplicated Bundle.main.infoDictionary lookups (SeddlyApp, LedgerView x2, IPadLedgerView, EntityProfileView, SettingsView, APIAccessView) now go through AppConfiguration.supabase."
+      },
+      {
+        "id": "US-148",
+        "title": "Surface active filter count and results count in the Ledger header",
+        "category": "iOS — UX",
+        "description": "Today a user who sets multiple filters or searches with no hits sees a silently shortened list with no indication of how many filters are active or how the current view differs from the full ledger. Add a discreet badge to the Filter toolbar button showing the number of active filters, and a subtle 'Showing X of Y' line in the header when filters or search are active.",
+        "acceptanceCriteria": [
+          "LedgerViewModel exposes activeFilterCount: Int (counts filterStatus, filterEntityName, filterHasDeadlineOnly, filterDateStart/End, filterCategory, filterAmountMin/Max)",
+          "The Filter toolbar button in LedgerView displays a small numeric badge when activeFilterCount > 0, using the app's accent color",
+          "When filters or a non-empty searchText are active, the commitment list header shows 'Showing {filteredCount} of {totalCount}' in caption2, styled subtly",
+          "A 'Clear filters' affordance appears in the empty state when filteredCount == 0 but totalCount > 0",
+          "VoiceOver reads the badge as 'N active filters' and the results line as 'Showing N of M commitments'"
+        ],
+        "priority": 2,
+        "passes": true,
+        "notes": "Shipped. LedgerViewModel gained activeFilterCount (counts filterStatus, filterEntityName, filterHasDeadlineOnly, date range as 1, filterCategory, amount range as 1; search excluded). LedgerView's Filter toolbar button now renders a small accent-colored capsule badge with the count and exposes an accessibility label 'Filters, N active'. The commitmentList header renders 'Showing X of Y' in caption2 whenever filters or search are active. A 'Clear filters' button appears inline when the filtered set is empty but the underlying set is not, wired to a new clearAllFilters() helper. Tests added for activeFilterCount counting rules."
+      },
+      {
+        "id": "US-149",
+        "title": "Snooze a commitment for N days without touching the deadline",
+        "category": "iOS — Features",
+        "description": "As a user, I want to push a commitment out of the active ledger view for a few days without rewriting its deadline. Today my only options are fulfill, dismiss, or manually edit the deadline — none of which preserves the original promise date.",
+        "acceptanceCriteria": [
+          "LocalCommitment gains an optional snoozedUntil: Date? field with a lightweight SwiftData migration (VersionedSchema bump)",
+          "CommitmentDetailView adds a 'Snooze' button with 1-day / 3-day / 7-day / custom presets",
+          "LedgerView hides commitments where snoozedUntil > .now from the active list but keeps them searchable under a 'Snoozed' filter",
+          "A background wake-up (or an on-foreground check in ContentView) transitions snoozed → active when the date passes and schedules a local notification",
+          "Watch and widget views respect snoozed state"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Future loop candidate. Not included in Loop 8's top-4 implementation due to SwiftData migration risk; deferred to a dedicated loop with a proper schema version bump."
+      },
+      {
+        "id": "US-150",
+        "title": "Biometric gating for sensitive screens (detail, settings, data export)",
+        "category": "iOS — Security",
+        "description": "Grep confirms no LocalAuthentication / LAContext usage anywhere in the app. A user who leaves their phone unlocked is fully exposed — all commitment text, entity profiles, and auth state are readable. Add optional Face/Touch ID gating for commitment detail, settings, and data export.",
+        "acceptanceCriteria": [
+          "New BiometricService (actor) wraps LAContext with canEvaluatePolicy / evaluatePolicy and typed errors",
+          "Settings adds a 'Require Face ID to open Seddly' toggle that, when enabled, prompts LAContext on app foregrounding after a 30-second inactivity window",
+          "CommitmentDetailView and DataExportView gate behind a fresh biometric check if the setting is on",
+          "Biometric prompt reason strings use NSFaceIDUsageDescription (added to Info.plist)",
+          "Falls back to device passcode if biometrics are unavailable; honors LAError.userFallback and LAError.biometryNotEnrolled gracefully"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Future loop candidate. High marketing value ('your commitments are Face-ID protected') plus genuine defense-in-depth. Not included in Loop 8 top-4 due to scope."
+      },
+      {
+        "id": "US-151",
+        "title": "Live Activities for overdue and near-deadline commitments",
+        "category": "iOS — Features",
+        "description": "ActivityKit is not used anywhere. For a screenshot-accountability app, a countdown Live Activity on the Lock Screen / Dynamic Island for the next-due commitment is exactly the product's value proposition made glanceable.",
+        "acceptanceCriteria": [
+          "New SeddlyLiveActivity target with ActivityAttributes for (commitmentID, entityName, summary, deadline)",
+          "LedgerViewModel starts a Live Activity for the soonest-due pending commitment when deadline < 24h away and ends it when fulfilled/dismissed/expired",
+          "Dynamic Island compact + expanded layouts showing entity + time remaining",
+          "Respects user's Focus modes and Low Power Mode",
+          "Widget Extension gains a Lock Screen accessory widget showing pending count"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Future loop candidate. SeddlyWidget target currently has only a minimal SeddlyWidget.swift — expansion is a multi-story effort. Deferred."
+      },
+      {
+        "id": "US-152",
+        "title": "Scheduled notification management UI",
+        "category": "iOS — UX",
+        "description": "NotificationService schedules deadline reminders but the app offers no way to see, reschedule, or cancel them without diving into Settings → Notifications at the OS level. Users have no insight into which commitments will nudge them when.",
+        "acceptanceCriteria": [
+          "SettingsView adds a 'Scheduled Reminders' row that pushes to ReminderListView",
+          "ReminderListView lists all pending UNNotificationRequests grouped by commitment, showing trigger date and reminder type",
+          "Each row supports 'Cancel reminder' and 'Reschedule…' (date picker)",
+          "Pull-to-refresh re-queries UNUserNotificationCenter.pendingNotificationRequests",
+          "Respects authorization state: shows CTA to enable notifications when denied"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Future loop candidate. Complementary to snooze (US-149); low-risk but requires a new view and ViewModel."
+      },
+      {
+        "id": "US-153",
+        "title": "Decompose LedgerView (869 lines) and CommitmentDetailView (630 lines) into focused sub-views",
+        "category": "iOS — Architecture",
+        "description": "These two files are the highest-churn in the iOS app and the hardest to reason about. Breaking them into named sub-views (LedgerHeroHeader, BulkActionBar, AIReviewBanner, UndoToast for Ledger; HeaderSection, EditSection, CalendarSection, EscalationSection, DeleteSection for Detail) shrinks cognitive load, improves preview-driven development, and unlocks targeted snapshot tests.",
+        "acceptanceCriteria": [
+          "LedgerView drops below ~350 lines with extracted sub-views in the same folder",
+          "CommitmentDetailView drops below ~300 lines",
+          "Each extracted view has a SwiftUI #Preview",
+          "No behavior change verified by existing ViewModel tests plus a new snapshot test per extracted view",
+          "Body diffs stay small (extraction only, no logic rewrites)"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Future loop candidate. Pure refactor with high leverage for future feature work but not shipping user value on its own."
+      },
+      {
+        "id": "US-154",
+        "title": "Cancel in-flight sync / AI extraction tasks on view disappear",
+        "category": "iOS — Performance",
+        "description": "Long-running tasks kicked off from LedgerView (sync, AI extraction, backfill) are not stored and cannot be cancelled if the user backgrounds the app or navigates away. This wastes battery, burns AI-endpoint quota, and can race with view teardown.",
+        "acceptanceCriteria": [
+          "LedgerView stores Task handles for refreshLedger, AI review triggers, and backfill in @State",
+          ".onDisappear and scenePhase .background transitions cancel tasks via Task.cancel()",
+          "SyncService / AIExtractionService check Task.isCancelled between batches and bail cleanly",
+          "Existing retry logic still applies to legitimate network errors, not cancellations"
+        ],
+        "priority": 3,
+        "passes": false,
+        "notes": "Future loop candidate. Low-risk perf and battery win."
       }
     ]
   }

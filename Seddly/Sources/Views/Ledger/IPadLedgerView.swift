@@ -194,10 +194,8 @@ struct IPadLedgerView: View {
         await StatusUpdateService.processAndUpdateBadge(in: modelContext)
 
         if subscriptionService.currentTier == .proPlus, isSignedIn {
-            if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-               let supabaseURL = URL(string: supabaseURLString),
-               let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
-                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
+            if let cfg = AppConfiguration.supabase {
+                let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
                 try? await syncService.pullCommitments(context: modelContext)
                 try? await syncService.syncCommitments(context: modelContext)
             }

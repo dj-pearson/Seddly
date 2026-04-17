@@ -6,7 +6,11 @@ struct LedgerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(SubscriptionService.self) private var subscriptionService
     @Environment(\.authService) private var authService
-    @Query(sort: \LocalCommitment.createdAt, order: .reverse) private var commitments: [LocalCommitment]
+    // US-145: Cap the SwiftData fetch so we never materialize an unbounded number
+    // of LocalCommitment rows. Users with deeper history still reach older records
+    // via search (which falls back to a predicate-driven fetch) or the sync'd
+    // cloud ledger on Pro+.
+    @Query private var commitments: [LocalCommitment]
     @State private var viewModel = LedgerViewModel()
     @State private var showingManualEntry = false
     @State private var showingFilter = false
@@ -26,6 +30,14 @@ struct LedgerView: View {
     @State private var pendingAICallback: ((String?) -> Void)?
     @State private var undoState: UndoState?
     @State private var undoDismissTask: Task<Void, Never>?
+
+    init() {
+        var descriptor = FetchDescriptor<LocalCommitment>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = LedgerViewModel.fetchCeiling
+        _commitments = Query(descriptor, animation: .default)
+    }
 
     private var networkMonitor: NetworkMonitorService { NetworkMonitorService.shared }
 
@@ -106,11 +118,33 @@ struct LedgerView: View {
                         Image(systemName: "arrow.up.arrow.down")
                     }
 
+                    // US-148: Filter button with active-count badge so users see
+                    // at a glance how many filters are narrowing their ledger.
                     Button {
                         showingFilter.toggle()
                     } label: {
-                        Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: viewModel.hasActiveFilters
+                                  ? "line.3.horizontal.decrease.circle.fill"
+                                  : "line.3.horizontal.decrease.circle")
+                            if viewModel.activeFilterCount > 0 {
+                                Text("\(viewModel.activeFilterCount)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .frame(minWidth: 14, minHeight: 14)
+                                    .background(Color.accentColor)
+                                    .clipShape(Capsule())
+                                    .offset(x: 6, y: -6)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                     }
+                    .accessibilityLabel(
+                        viewModel.activeFilterCount > 0
+                        ? "Filters, \(viewModel.activeFilterCount) active"
+                        : "Filters"
+                    )
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search commitments")
@@ -334,9 +368,36 @@ struct LedgerView: View {
     }
 
     private var commitmentList: some View {
-        List {
+        // US-148: Resolve the displayed set once per render so both the results-count
+        // header and the ForEach below share the same slice without recomputing
+        // (memoization in LedgerViewModel short-circuits repeat calls anyway).
+        let displayed = viewModel.sortedCommitments(visibleCommitments)
+        let showingResultsLine = !viewModel.searchText.isEmpty || viewModel.activeFilterCount > 0
+        let hasZeroResultsButDataExists = displayed.isEmpty && !visibleCommitments.isEmpty
+
+        return List {
             Section {
                 ledgerHeroHeader
+            }
+
+            if showingResultsLine {
+                Section {
+                    HStack(spacing: 6) {
+                        Text("Showing \(displayed.count) of \(visibleCommitments.count)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if hasZeroResultsButDataExists {
+                            Spacer()
+                            Button("Clear filters") {
+                                clearAllFilters()
+                            }
+                            .font(.caption2.weight(.semibold))
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Showing \(displayed.count) of \(visibleCommitments.count) commitments")
+                }
+                .listRowBackground(Color.clear)
             }
 
             if newCommitmentsCount > 0 {
@@ -351,7 +412,7 @@ struct LedgerView: View {
                 }
             }
 
-            ForEach(viewModel.sortedCommitments(visibleCommitments)) { commitment in
+            ForEach(displayed) { commitment in
                 if viewModel.isSelecting {
                     Button {
                         viewModel.toggleSelection(for: commitment)
@@ -432,6 +493,20 @@ struct LedgerView: View {
         }
     }
 
+    /// US-148: Reset all filters and the search field in one tap from the
+    /// zero-results affordance.
+    private func clearAllFilters() {
+        viewModel.filterStatus = nil
+        viewModel.filterEntityName = nil
+        viewModel.filterHasDeadlineOnly = false
+        viewModel.filterDateStart = nil
+        viewModel.filterDateEnd = nil
+        viewModel.filterCategory = nil
+        viewModel.filterAmountMin = nil
+        viewModel.filterAmountMax = nil
+        viewModel.searchText = ""
+    }
+
     private func refreshLedger() async {
         await StatusUpdateService.processAndUpdateBadge(in: modelContext)
 
@@ -462,10 +537,8 @@ struct LedgerView: View {
         }
 
         if subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected {
-            if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-               let supabaseURL = URL(string: supabaseURLString),
-               let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
-                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
+            if let cfg = AppConfiguration.supabase {
+                let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
                 try? await syncService.pullCommitments(context: modelContext)
                 try? await syncService.syncCommitments(context: modelContext)
             }
@@ -742,11 +815,8 @@ struct LedgerView: View {
         guard subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected else { return }
 
         Task {
-            guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-                  let supabaseURL = URL(string: supabaseURLString),
-                  let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String else { return }
-
-            let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
+            guard let cfg = AppConfiguration.supabase else { return }
+            let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
             try? await syncService.pullCommitments(context: modelContext)
             try? await syncService.syncCommitments(context: modelContext)
         }
