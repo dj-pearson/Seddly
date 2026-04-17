@@ -23,6 +23,7 @@ struct SeddlyApp: App {
     let modelContainer: ModelContainer
     @State private var subscriptionService = SubscriptionService()
     @State private var calendarService = CalendarService()
+    @State private var biometricService = BiometricService()
     private let authService: AuthService
     @AppStorage("deepLinkCommitmentID") private var deepLinkCommitmentID: String?
     @State private var showDeepLinkNotFound = false
@@ -83,6 +84,7 @@ struct SeddlyApp: App {
                 ContentView()
                     .environment(subscriptionService)
                     .environment(calendarService)
+                    .environment(biometricService)
                     .environment(\.authService, authService)
 
                 if isRunningInMemory {

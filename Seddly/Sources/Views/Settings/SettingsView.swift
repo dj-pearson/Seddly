@@ -5,6 +5,7 @@ import AuthenticationServices
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SubscriptionService.self) private var subscriptionService
+    @Environment(BiometricService.self) private var biometricService
     @Environment(\.authService) private var authService
     private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
     @AppStorage("offlineMode", store: appGroupDefaults) private var offlineMode = false
@@ -32,6 +33,15 @@ struct SettingsView: View {
                             UIApplication.shared.open(url)
                         }
                     }
+                }
+
+                // US-150: App Lock
+                Section {
+                    appLockToggle
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    appLockFooter
                 }
 
                 if subscriptionService.currentTier >= .pro {
@@ -87,6 +97,11 @@ struct SettingsView: View {
                             ),
                             displayedComponents: .hourAndMinute
                         )
+                    }
+                    // US-152: Let users see and cancel individual scheduled
+                    // deadline reminders without dropping into iOS Settings.
+                    NavigationLink("Scheduled Reminders") {
+                        ReminderListView()
                     }
                 }
 
@@ -171,6 +186,43 @@ struct SettingsView: View {
             } message: {
                 Text(deleteErrorMessage)
             }
+        }
+    }
+
+    // MARK: - App Lock (US-150)
+
+    @ViewBuilder
+    private var appLockToggle: some View {
+        let availability = biometricService.availability()
+        switch availability {
+        case .available(let kind):
+            @Bindable var vm = biometricService
+            Toggle("Require \(kind.displayName) to open Seddly", isOn: $vm.isAppLockEnabled)
+        case .notEnrolled:
+            HStack {
+                Text("App Lock")
+                Spacer()
+                Text("Enroll Face ID or Touch ID in Settings")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .unavailable:
+            HStack {
+                Text("App Lock")
+                Spacer()
+                Text("Unavailable on this device")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appLockFooter: some View {
+        if biometricService.isAppLockEnabled {
+            Text("Seddly will require authentication on launch and whenever it has been in the background for more than 30 seconds.")
+        } else {
+            Text("Lock the app so commitments, entity profiles, and data exports can only be viewed after you authenticate.")
         }
     }
 

@@ -11,6 +11,8 @@
     <string>Seddly creates calendar events for your commitment deadlines so you never miss a due date.</string>
     <key>NSCalendarsFullAccessUsageDescription</key>
     <string>Seddly needs full calendar access to create and manage events for your commitment deadlines.</string>
+    <key>NSFaceIDUsageDescription</key>
+    <string>Seddly uses Face ID to keep your commitments and entity profiles private when the app is reopened.</string>
     <key>BGTaskSchedulerPermittedIdentifiers</key>
     <array>
         <string>com.pearsonmedia.Seddly.screenshot-refresh</string>

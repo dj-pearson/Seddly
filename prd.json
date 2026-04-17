@@ -5,11 +5,11 @@
     "ralphLoop": {
       "currentLoop": 8,
       "lastReviewDate": "2026-04-17",
-      "passingCount": 4,
+      "passingCount": 7,
       "totalCount": 10,
-      "completionRate": "40%",
+      "completionRate": "70%",
       "reviewer": "Claude Code iOS Audit",
-      "verdict": "Loop 8 in progress — top 4 critical items shipped (US-145 through US-148): SwiftData fetch ceiling + memoized filter/sort; deep-link predicate lookup; App Transport Security hardening + centralized Supabase configuration guard; active-filter count badge + results-count header. Six remaining stories (US-149 through US-154: snooze, biometric gating, Live Activities, notification management UI, view decomposition, task cancellation) are scoped for follow-up loops."
+      "verdict": "Loop 8 in progress — seven of ten stories shipped. Critical items US-145..US-148 (fetch ceiling + memoization, deep-link predicate, ATS hardening + AppConfiguration, filter-count badge) + medium items US-150 (biometric app lock), US-152 (scheduled reminder management UI), US-154 (in-flight Task cancellation). Remaining: US-149 snooze (SwiftData migration risk), US-151 Live Activities (new target), US-153 view decomposition (pure refactor)."
     },
     "previousLoops": [
       {
@@ -681,8 +681,8 @@
           "Falls back to device passcode if biometrics are unavailable; honors LAError.userFallback and LAError.biometryNotEnrolled gracefully"
         ],
         "priority": 2,
-        "passes": false,
-        "notes": "Future loop candidate. High marketing value ('your commitments are Face-ID protected') plus genuine defense-in-depth. Not included in Loop 8 top-4 due to scope."
+        "passes": true,
+        "notes": "Shipped. New Seddly/Sources/Services/BiometricService.swift wraps LAContext as an @Observable @MainActor class exposing availability(), authenticate(reason:), markBackgrounded(), and shouldLockOnForeground() with a 30-second inactivity window. It stores the user's 'Require FaceID to open Seddly' preference in UserDefaults under biometrics.appLockEnabled. ContentView injects the service, overlays a full-screen AppLockOverlayView whenever isLocked is true (opaque background, FaceID/TouchID/OpticID-aware icon, retry button, passcode fallback via deviceOwnerAuthentication), hooks scenePhase .active for shouldLockOnForeground() checks, and scenePhase .background for markBackgrounded(). Cold launches also trigger the lock check via .task. SettingsView gained a 'Privacy' section with the App Lock toggle that hides gracefully when biometrics aren't enrolled or the device lacks hardware. Info.plist ships NSFaceIDUsageDescription. AppLogger gained a 'biometrics' category. LAError.userFallback, userCancel, appCancel, and systemCancel are mapped to .cancelled so the overlay stays up for retry."
       },
       {
         "id": "US-151",
@@ -713,8 +713,8 @@
           "Respects authorization state: shows CTA to enable notifications when denied"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "Future loop candidate. Complementary to snooze (US-149); low-risk but requires a new view and ViewModel."
+        "passes": true,
+        "notes": "Shipped. New Seddly/Sources/Views/Settings/ReminderListView.swift queries UNUserNotificationCenter.pendingNotificationRequests, parses the 'approaching-<uuid>' / 'overdue-<uuid>' identifier scheme used in NotificationService, correlates back to LocalCommitment via a @Query-injected id lookup, and groups reminders by Overdue / Today / Tomorrow / This Week / Later buckets. Each row shows the entity name, summary, fire date, a kind-specific icon+tint, and exposes a destructive swipe action that cancels the reminder via removePendingNotificationRequests(withIdentifiers:). Pull-to-refresh reloads. When notificationSettings().authorizationStatus == .denied the view surfaces a CTA to open iOS Settings. Empty state uses ContentUnavailableView. Linked from SettingsView's Notifications section via NavigationLink."
       },
       {
         "id": "US-153",
@@ -744,8 +744,8 @@
           "Existing retry logic still applies to legitimate network errors, not cancellations"
         ],
         "priority": 3,
-        "passes": false,
-        "notes": "Future loop candidate. Low-risk perf and battery win."
+        "passes": true,
+        "notes": "Shipped. LedgerView now holds @State Task<Void, Never>? handles for each long-running operation (foregroundProcessTask for screenshot processing, syncTask for Supabase push/pull, scenePhaseBadgeTask for badge refresh, aiReviewTask for AI review approval flow). Each spawn site cancels the prior handle before starting, and each Task sets its handle back to nil in a @MainActor defer block to release memory. syncIfProPlus adds Task.isCancelled checkpoints between push and pull. A new cancelInFlightTasks() helper is called from .onDisappear and scenePhase .background transitions, so work stops the moment the user swaps tabs or backgrounds the app."
       }
     ]
   }

@@ -30,6 +30,13 @@ struct LedgerView: View {
     @State private var pendingAICallback: ((String?) -> Void)?
     @State private var undoState: UndoState?
     @State private var undoDismissTask: Task<Void, Never>?
+    // US-154: Retain handles to in-flight Tasks so we can cancel them when the
+    // view disappears or the app backgrounds. Prevents wasted work, AI-endpoint
+    // quota burn, and races with view teardown.
+    @State private var foregroundProcessTask: Task<Void, Never>?
+    @State private var syncTask: Task<Void, Never>?
+    @State private var scenePhaseBadgeTask: Task<Void, Never>?
+    @State private var aiReviewTask: Task<Void, Never>?
 
     init() {
         var descriptor = FetchDescriptor<LocalCommitment>(
@@ -297,7 +304,8 @@ struct LedgerView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    Task {
+                    scenePhaseBadgeTask?.cancel()
+                    scenePhaseBadgeTask = Task {
                         await StatusUpdateService.processAndUpdateBadge(in: modelContext)
                     }
                     processOnForeground()
@@ -306,7 +314,18 @@ struct LedgerView: View {
                 } else if newPhase == .background {
                     // Mark current time so "New" badges clear next session
                     (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(Date.now, forKey: "lastViewedDate")
+                    // US-154: Cancel long-running tasks on background; the OS
+                    // will suspend us anyway, but explicit cancellation lets
+                    // batched operations short-circuit cleanly.
+                    cancelInFlightTasks()
                 }
+            }
+            .onDisappear {
+                // US-154: NavigationStack may reuse the LedgerView instance, but
+                // scene transitions route through here on tab swaps too. Cancel
+                // in-flight work to free up the main actor and stop burning
+                // network/AI quota while the user is elsewhere.
+                cancelInFlightTasks()
             }
         }
     }
@@ -637,7 +656,9 @@ struct LedgerView: View {
 
         pendingAIText = text
         pendingAICallback = { approvedText in
-            Task {
+            aiReviewTask?.cancel()
+            aiReviewTask = Task {
+                defer { Task { @MainActor in aiReviewTask = nil } }
                 if let approvedText {
                     let service = ScreenshotProcessingService()
                     // In production, pass real AI endpoint
@@ -777,7 +798,9 @@ struct LedgerView: View {
         guard !isProcessing else { return }
         isProcessing = true
 
-        Task {
+        foregroundProcessTask?.cancel()
+        foregroundProcessTask = Task {
+            defer { Task { @MainActor in foregroundProcessTask = nil } }
             let processingService = ScreenshotProcessingService()
             let lastProcessed = UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
                 .object(forKey: "lastProcessedDate") as? Date
@@ -814,12 +837,29 @@ struct LedgerView: View {
     private func syncIfProPlus() {
         guard subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected else { return }
 
-        Task {
+        syncTask?.cancel()
+        syncTask = Task {
+            defer { Task { @MainActor in syncTask = nil } }
             guard let cfg = AppConfiguration.supabase else { return }
             let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
+            if Task.isCancelled { return }
             try? await syncService.pullCommitments(context: modelContext)
+            if Task.isCancelled { return }
             try? await syncService.syncCommitments(context: modelContext)
         }
+    }
+
+    /// US-154: Cancels every long-running Task this view started so they don't
+    /// continue doing work after the user has moved on.
+    private func cancelInFlightTasks() {
+        foregroundProcessTask?.cancel()
+        foregroundProcessTask = nil
+        syncTask?.cancel()
+        syncTask = nil
+        scenePhaseBadgeTask?.cancel()
+        scenePhaseBadgeTask = nil
+        aiReviewTask?.cancel()
+        aiReviewTask = nil
     }
 
     private func updateDailyDigest(screenshotsProcessed: Int, commitmentsDetected: Int) {
