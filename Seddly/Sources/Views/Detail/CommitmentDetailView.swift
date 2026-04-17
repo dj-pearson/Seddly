@@ -21,9 +21,23 @@ struct CommitmentDetailView: View {
     @State private var showReminderToast = false
     @State private var reminderToastMessage = ""
     @State private var showNotificationPermissionAlert = false
+    // US-149
+    @State private var showingSnoozePicker = false
+    @State private var snoozeCustomDate = Calendar.current.date(byAdding: .day, value: 3, to: .now) ?? .now
 
     var body: some View {
         List {
+            // US-149 + US-153: Snooze banner extracted to CommitmentDetailSections.
+            if commitment.isSnoozed, let until = commitment.snoozedUntil {
+                Section {
+                    CommitmentSnoozeBanner(until: until) {
+                        commitment.snoozedUntil = nil
+                        commitment.updatedAt = .now
+                    }
+                }
+                .listRowBackground(Color.orange.opacity(0.08))
+            }
+
             // Original screenshot section
             if let image = screenshotImage {
                 Section {
@@ -341,6 +355,28 @@ struct CommitmentDetailView: View {
                 }
                 .accessibilityHint("Opens a date picker to schedule a notification reminder")
 
+                // US-149: Snooze keeps the deadline intact but hides the row
+                // from the active ledger until the chosen date.
+                if commitment.isSnoozed {
+                    Button {
+                        commitment.snoozedUntil = nil
+                        commitment.updatedAt = .now
+                    } label: {
+                        Label("Unsnooze", systemImage: "bell.and.waves.left.and.right")
+                    }
+                    .accessibilityHint("Returns this commitment to the active ledger immediately.")
+                } else {
+                    Menu {
+                        Button("1 day")  { snooze(days: 1) }
+                        Button("3 days") { snooze(days: 3) }
+                        Button("7 days") { snooze(days: 7) }
+                        Button("Custom…") { showingSnoozePicker = true }
+                    } label: {
+                        Label("Snooze", systemImage: "moon.zzz")
+                    }
+                    .accessibilityHint("Hides this commitment from the active ledger for a chosen duration.")
+                }
+
                 Button(role: .destructive) {
                     showDismissConfirmation = true
                 } label: {
@@ -379,6 +415,39 @@ struct CommitmentDetailView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete this commitment and cannot be undone.")
+        }
+        // US-149: Custom snooze date picker
+        .sheet(isPresented: $showingSnoozePicker) {
+            NavigationStack {
+                Form {
+                    DatePicker(
+                        "Snooze until",
+                        selection: $snoozeCustomDate,
+                        in: Date.now...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    Section {
+                        Text("The original deadline and reminders stay scheduled. The commitment reappears in your ledger on the date you choose.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .navigationTitle("Snooze")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showingSnoozePicker = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Snooze") {
+                            commitment.snoozedUntil = snoozeCustomDate
+                            commitment.updatedAt = .now
+                            showingSnoozePicker = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -459,6 +528,14 @@ struct CommitmentDetailView: View {
             }
         }
         .presentationDetents([.medium])
+    }
+
+    /// US-149: Snoozes the commitment by N days from now.
+    private func snooze(days: Int) {
+        let target = Calendar.current.date(byAdding: .day, value: days, to: .now) ?? .now
+        commitment.snoozedUntil = target
+        commitment.updatedAt = .now
+        HapticsService.tap()
     }
 
     private func deleteCommitment() {

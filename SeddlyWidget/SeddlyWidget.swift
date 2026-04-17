@@ -421,7 +421,6 @@ struct SeddlyWidgetEntryView: View {
 
 // MARK: - Widget Configuration
 
-@main
 struct SeddlyWidget: Widget {
     let kind = "SeddlyWidget"
 
@@ -433,6 +432,16 @@ struct SeddlyWidget: Widget {
         .configurationDisplayName("Commitments")
         .description("See overdue and pending commitments at a glance.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
+    }
+}
+
+// US-151: Register both the classic timeline widget and the Live Activity
+// presentation under a single bundle so the extension hosts both.
+@main
+struct SeddlyWidgetBundle: WidgetBundle {
+    var body: some Widget {
+        SeddlyWidget()
+        CommitmentLiveActivityWidget()
     }
 }
 

@@ -6,7 +6,11 @@ struct LedgerView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(SubscriptionService.self) private var subscriptionService
     @Environment(\.authService) private var authService
-    @Query(sort: \LocalCommitment.createdAt, order: .reverse) private var commitments: [LocalCommitment]
+    // US-145: Cap the SwiftData fetch so we never materialize an unbounded number
+    // of LocalCommitment rows. Users with deeper history still reach older records
+    // via search (which falls back to a predicate-driven fetch) or the sync'd
+    // cloud ledger on Pro+.
+    @Query private var commitments: [LocalCommitment]
     @State private var viewModel = LedgerViewModel()
     @State private var showingManualEntry = false
     @State private var showingFilter = false
@@ -21,11 +25,29 @@ struct LedgerView: View {
     @State private var showingDismissConfirm = false
     @State private var showingFulfillConfirm = false
     @State private var pendingSwipeCommitment: LocalCommitment?
+    // US-149: Snooze state
+    @State private var pendingSnoozeCommitment: LocalCommitment?
+    @State private var showingSnoozeMenu = false
     @State private var showingAIReview = false
     @State private var pendingAIText: String?
     @State private var pendingAICallback: ((String?) -> Void)?
     @State private var undoState: UndoState?
     @State private var undoDismissTask: Task<Void, Never>?
+    // US-154: Retain handles to in-flight Tasks so we can cancel them when the
+    // view disappears or the app backgrounds. Prevents wasted work, AI-endpoint
+    // quota burn, and races with view teardown.
+    @State private var foregroundProcessTask: Task<Void, Never>?
+    @State private var syncTask: Task<Void, Never>?
+    @State private var scenePhaseBadgeTask: Task<Void, Never>?
+    @State private var aiReviewTask: Task<Void, Never>?
+
+    init() {
+        var descriptor = FetchDescriptor<LocalCommitment>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = LedgerViewModel.fetchCeiling
+        _commitments = Query(descriptor, animation: .default)
+    }
 
     private var networkMonitor: NetworkMonitorService { NetworkMonitorService.shared }
 
@@ -102,15 +124,45 @@ struct LedgerView: View {
                                 Text(order.rawValue).tag(order)
                             }
                         }
+                        Divider()
+                        // US-149: Let users reveal snoozed commitments or see
+                        // only snoozed ones without leaving the Ledger.
+                        Picker("Snoozed", selection: $viewModel.snoozeVisibility) {
+                            ForEach(LedgerViewModel.SnoozeVisibility.allCases, id: \.self) { vis in
+                                Text(vis.rawValue).tag(vis)
+                            }
+                        }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                     }
 
+                    // US-148: Filter button with active-count badge so users see
+                    // at a glance how many filters are narrowing their ledger.
                     Button {
                         showingFilter.toggle()
                     } label: {
-                        Image(systemName: viewModel.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: viewModel.hasActiveFilters
+                                  ? "line.3.horizontal.decrease.circle.fill"
+                                  : "line.3.horizontal.decrease.circle")
+                            if viewModel.activeFilterCount > 0 {
+                                Text("\(viewModel.activeFilterCount)")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .padding(.horizontal, 4)
+                                    .frame(minWidth: 14, minHeight: 14)
+                                    .background(Color.accentColor)
+                                    .clipShape(Capsule())
+                                    .offset(x: 6, y: -6)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                     }
+                    .accessibilityLabel(
+                        viewModel.activeFilterCount > 0
+                        ? "Filters, \(viewModel.activeFilterCount) active"
+                        : "Filters"
+                    )
                 }
             }
             .searchable(text: $viewModel.searchText, prompt: "Search commitments")
@@ -201,6 +253,34 @@ struct LedgerView: View {
                     Text("\"\(commitment.summary)\" will be marked as fulfilled. You can undo this action for 5 seconds.")
                 }
             }
+            // US-149: Snooze preset picker
+            .confirmationDialog(
+                "Snooze commitment",
+                isPresented: $showingSnoozeMenu,
+                titleVisibility: .visible,
+                presenting: pendingSnoozeCommitment
+            ) { commitment in
+                Button("1 day") {
+                    viewModel.snooze(commitment, days: 1)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("3 days") {
+                    viewModel.snooze(commitment, days: 3)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("7 days") {
+                    viewModel.snooze(commitment, days: 7)
+                    HapticsService.tap()
+                    pendingSnoozeCommitment = nil
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingSnoozeCommitment = nil
+                }
+            } message: { commitment in
+                Text("Hide \"\(commitment.summary)\" from the active ledger. The deadline and reminders stay on the original date.")
+            }
             .sheet(isPresented: $showingAIReview) {
                 if let text = pendingAIText {
                     AITextReviewView(
@@ -263,16 +343,35 @@ struct LedgerView: View {
             }
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
-                    Task {
+                    scenePhaseBadgeTask?.cancel()
+                    scenePhaseBadgeTask = Task {
                         await StatusUpdateService.processAndUpdateBadge(in: modelContext)
                     }
                     processOnForeground()
                     syncIfProPlus()
                     PhotoCleanupService.cleanupStaleReferences(in: modelContext)
+                    // US-149: Clear any snoozes whose date has passed so the
+                    // commitment re-enters the active ledger and a fresh
+                    // deadline reminder can be scheduled.
+                    wakeExpiredSnoozes()
+                    // US-151: Refresh the Live Activity for the next-due
+                    // pending commitment on every foreground.
+                    reconcileLiveActivity()
                 } else if newPhase == .background {
                     // Mark current time so "New" badges clear next session
                     (UserDefaults(suiteName: AppConstants.appGroupIdentifier) ?? .standard).set(Date.now, forKey: "lastViewedDate")
+                    // US-154: Cancel long-running tasks on background; the OS
+                    // will suspend us anyway, but explicit cancellation lets
+                    // batched operations short-circuit cleanly.
+                    cancelInFlightTasks()
                 }
+            }
+            .onDisappear {
+                // US-154: NavigationStack may reuse the LedgerView instance, but
+                // scene transitions route through here on tab swaps too. Cancel
+                // in-flight work to free up the main actor and stop burning
+                // network/AI quota while the user is elsewhere.
+                cancelInFlightTasks()
             }
         }
     }
@@ -334,9 +433,36 @@ struct LedgerView: View {
     }
 
     private var commitmentList: some View {
-        List {
+        // US-148: Resolve the displayed set once per render so both the results-count
+        // header and the ForEach below share the same slice without recomputing
+        // (memoization in LedgerViewModel short-circuits repeat calls anyway).
+        let displayed = viewModel.sortedCommitments(visibleCommitments)
+        let showingResultsLine = !viewModel.searchText.isEmpty || viewModel.activeFilterCount > 0
+        let hasZeroResultsButDataExists = displayed.isEmpty && !visibleCommitments.isEmpty
+
+        return List {
             Section {
                 ledgerHeroHeader
+            }
+
+            if showingResultsLine {
+                Section {
+                    HStack(spacing: 6) {
+                        Text("Showing \(displayed.count) of \(visibleCommitments.count)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        if hasZeroResultsButDataExists {
+                            Spacer()
+                            Button("Clear filters") {
+                                clearAllFilters()
+                            }
+                            .font(.caption2.weight(.semibold))
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("Showing \(displayed.count) of \(visibleCommitments.count) commitments")
+                }
+                .listRowBackground(Color.clear)
             }
 
             if newCommitmentsCount > 0 {
@@ -351,7 +477,7 @@ struct LedgerView: View {
                 }
             }
 
-            ForEach(viewModel.sortedCommitments(visibleCommitments)) { commitment in
+            ForEach(displayed) { commitment in
                 if viewModel.isSelecting {
                     Button {
                         viewModel.toggleSelection(for: commitment)
@@ -375,6 +501,15 @@ struct LedgerView: View {
                         } label: {
                             Label("Dismiss", systemImage: "xmark")
                         }
+                        // US-149: Full-swipe snooze (3 days) on the trailing
+                        // edge as a secondary action. Tap to get preset menu.
+                        Button {
+                            pendingSnoozeCommitment = commitment
+                            showingSnoozeMenu = true
+                        } label: {
+                            Label("Snooze", systemImage: "bell.slash")
+                        }
+                        .tint(.orange)
                     }
                     .swipeActions(edge: .leading) {
                         Button {
@@ -385,7 +520,7 @@ struct LedgerView: View {
                         }
                         .tint(.green)
                     }
-                    .accessibilityHint("Swipe right to mark fulfilled, swipe left to dismiss")
+                    .accessibilityHint("Swipe right to mark fulfilled, swipe left to dismiss or snooze")
                 }
             }
 
@@ -432,6 +567,60 @@ struct LedgerView: View {
         }
     }
 
+    /// US-151: Shared LiveActivityService instance so reconcile calls target
+    /// the same actor state across refresh cycles.
+    private static let liveActivityService = LiveActivityService()
+
+    /// Pushes the current pending-commitment snapshot to LiveActivityService
+    /// so the Lock Screen / Dynamic Island reflect the soonest deadline.
+    private func reconcileLiveActivity() {
+        let snapshot = commitments
+            .filter { $0.status == .pending && !$0.isSnoozed && $0.deadline != nil }
+            .map {
+                LiveActivityService.PendingCommitment(
+                    id: $0.id,
+                    entityName: $0.entityName,
+                    summary: $0.summary,
+                    deadline: $0.deadline ?? .now
+                )
+            }
+        Task.detached(priority: .utility) {
+            await LedgerView.liveActivityService.reconcile(pendingCommitments: snapshot)
+        }
+    }
+
+    /// US-149: Wakes up commitments whose snoozedUntil has passed and
+    /// reschedules their approach/overdue notifications so users get a
+    /// fresh nudge once the snooze window ends.
+    private func wakeExpiredSnoozes() {
+        let woken = viewModel.wakeExpiredSnoozes(in: Array(commitments))
+        guard !woken.isEmpty else { return }
+        let wokenSet = Set(woken)
+        let wokenCommitments = commitments.filter { wokenSet.contains($0.id) }
+        Task.detached(priority: .utility) {
+            let service = NotificationService()
+            for commitment in wokenCommitments {
+                await service.scheduleDeadlineApproaching(for: commitment)
+                await service.scheduleDeadlinePassed(for: commitment)
+            }
+        }
+        try? modelContext.save()
+    }
+
+    /// US-148: Reset all filters and the search field in one tap from the
+    /// zero-results affordance.
+    private func clearAllFilters() {
+        viewModel.filterStatus = nil
+        viewModel.filterEntityName = nil
+        viewModel.filterHasDeadlineOnly = false
+        viewModel.filterDateStart = nil
+        viewModel.filterDateEnd = nil
+        viewModel.filterCategory = nil
+        viewModel.filterAmountMin = nil
+        viewModel.filterAmountMax = nil
+        viewModel.searchText = ""
+    }
+
     private func refreshLedger() async {
         await StatusUpdateService.processAndUpdateBadge(in: modelContext)
 
@@ -462,10 +651,8 @@ struct LedgerView: View {
         }
 
         if subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected {
-            if let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-               let supabaseURL = URL(string: supabaseURLString),
-               let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String {
-                let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
+            if let cfg = AppConfiguration.supabase {
+                let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
                 try? await syncService.pullCommitments(context: modelContext)
                 try? await syncService.syncCommitments(context: modelContext)
             }
@@ -498,42 +685,13 @@ struct LedgerView: View {
         .transition(.move(edge: .top).combined(with: .opacity))
     }
 
+    // US-153: Extracted to LedgerBannerViews for #Preview + reuse.
     private var offlineBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "wifi.slash")
-                .foregroundStyle(.white)
-            Text("Offline")
-                .font(.caption)
-                .fontWeight(.semibold)
-                .foregroundStyle(.white)
-            Text("— AI extraction and sync require internet")
-                .font(.caption)
-                .foregroundStyle(.white.opacity(0.85))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.orange)
-        .clipShape(Capsule())
-        .padding(.top, 4)
-        .transition(.move(edge: .top).combined(with: .opacity))
-        .animation(.easeInOut, value: networkMonitor.isConnected)
+        LedgerOfflineBanner()
+            .animation(.easeInOut, value: networkMonitor.isConnected)
     }
 
-    private var processingBanner: some View {
-        HStack(spacing: 8) {
-            ProgressView()
-                .tint(.white)
-            Text("Processing new screenshots...")
-                .font(.caption)
-                .foregroundStyle(.white)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(.accent)
-        .clipShape(Capsule())
-        .padding(.top, 4)
-        .transition(.move(edge: .top).combined(with: .opacity))
-    }
+    private var processingBanner: some View { LedgerProcessingBanner() }
 
     private var aiReviewBanner: some View {
         Button {
@@ -564,7 +722,9 @@ struct LedgerView: View {
 
         pendingAIText = text
         pendingAICallback = { approvedText in
-            Task {
+            aiReviewTask?.cancel()
+            aiReviewTask = Task {
+                defer { Task { @MainActor in aiReviewTask = nil } }
                 if let approvedText {
                     let service = ScreenshotProcessingService()
                     // In production, pass real AI endpoint
@@ -704,7 +864,9 @@ struct LedgerView: View {
         guard !isProcessing else { return }
         isProcessing = true
 
-        Task {
+        foregroundProcessTask?.cancel()
+        foregroundProcessTask = Task {
+            defer { Task { @MainActor in foregroundProcessTask = nil } }
             let processingService = ScreenshotProcessingService()
             let lastProcessed = UserDefaults(suiteName: AppConstants.appGroupIdentifier)?
                 .object(forKey: "lastProcessedDate") as? Date
@@ -741,15 +903,29 @@ struct LedgerView: View {
     private func syncIfProPlus() {
         guard subscriptionService.currentTier == .proPlus, isSignedIn, networkMonitor.isConnected else { return }
 
-        Task {
-            guard let supabaseURLString = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String,
-                  let supabaseURL = URL(string: supabaseURLString),
-                  let supabaseKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_KEY") as? String else { return }
-
-            let syncService = SyncService(supabaseURL: supabaseURL, supabaseKey: supabaseKey, authService: authService)
+        syncTask?.cancel()
+        syncTask = Task {
+            defer { Task { @MainActor in syncTask = nil } }
+            guard let cfg = AppConfiguration.supabase else { return }
+            let syncService = SyncService(supabaseURL: cfg.url, supabaseKey: cfg.anonKey, authService: authService)
+            if Task.isCancelled { return }
             try? await syncService.pullCommitments(context: modelContext)
+            if Task.isCancelled { return }
             try? await syncService.syncCommitments(context: modelContext)
         }
+    }
+
+    /// US-154: Cancels every long-running Task this view started so they don't
+    /// continue doing work after the user has moved on.
+    private func cancelInFlightTasks() {
+        foregroundProcessTask?.cancel()
+        foregroundProcessTask = nil
+        syncTask?.cancel()
+        syncTask = nil
+        scenePhaseBadgeTask?.cancel()
+        scenePhaseBadgeTask = nil
+        aiReviewTask?.cancel()
+        aiReviewTask = nil
     }
 
     private func updateDailyDigest(screenshotsProcessed: Int, commitmentsDetected: Int) {
@@ -836,29 +1012,12 @@ struct LedgerView: View {
         withAnimation { undoState = nil }
     }
 
+    // US-153: Extracted to LedgerBannerViews.
     private var undoToast: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.uturn.backward.circle.fill")
-                .foregroundStyle(.white)
-            Text(undoState?.label ?? "")
-                .font(.subheadline)
-                .foregroundStyle(.white)
-                .lineLimit(1)
-            Spacer()
-            Button("Undo") {
-                performUndo()
-            }
-            .font(.subheadline.bold())
-            .foregroundStyle(.yellow)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial.opacity(0.9))
-        .background(Color.accentColor.opacity(0.8))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-        .transition(.move(edge: .bottom).combined(with: .opacity))
+        LedgerUndoToast(
+            label: undoState?.label ?? "",
+            onUndo: { performUndo() }
+        )
     }
 }
 

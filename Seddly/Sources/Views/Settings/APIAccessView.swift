@@ -29,10 +29,10 @@ struct APIAccessView: View {
     }
 
     private var baseEndpoint: String {
-        guard let url = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String else {
+        guard let cfg = AppConfiguration.supabase else {
             return "https://your-project.supabase.co/functions/v1/api-commitments"
         }
-        return "\(url)/functions/v1/api-commitments"
+        return cfg.url.appendingPathComponent("functions/v1/api-commitments").absoluteString
     }
 
     var body: some View {

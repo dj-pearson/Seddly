@@ -23,6 +23,7 @@ struct SeddlyApp: App {
     let modelContainer: ModelContainer
     @State private var subscriptionService = SubscriptionService()
     @State private var calendarService = CalendarService()
+    @State private var biometricService = BiometricService()
     private let authService: AuthService
     @AppStorage("deepLinkCommitmentID") private var deepLinkCommitmentID: String?
     @State private var showDeepLinkNotFound = false
@@ -59,11 +60,13 @@ struct SeddlyApp: App {
         self.migrationErrorMessage = migrationError
         self.isRunningInMemory = migrationError != nil
 
-        // Read Supabase credentials from Info.plist
-        let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
-        let supabaseKey = Bundle.main.infoDictionary?["SUPABASE_KEY"] as? String ?? ""
-        let supabaseURL = URL(string: supabaseURLString) ?? URL(string: "https://placeholder.supabase.co")!
-        authService = AuthService(supabaseURL: supabaseURL, supabaseKey: supabaseKey)
+        // US-147: Route Supabase credential lookup through AppConfiguration so a
+        // missing / placeholder value is caught once (crash in DEBUG, degrade in
+        // RELEASE) instead of letting every call site silently fall back.
+        authService = AuthService(
+            supabaseURL: AppConfiguration.supabaseURLOrPlaceholder,
+            supabaseKey: AppConfiguration.supabaseAnonKeyOrEmpty
+        )
 
         if migrationError == nil {
             WatchSyncService.shared.activate(with: modelContainer)
@@ -81,6 +84,7 @@ struct SeddlyApp: App {
                 ContentView()
                     .environment(subscriptionService)
                     .environment(calendarService)
+                    .environment(biometricService)
                     .environment(\.authService, authService)
 
                 if isRunningInMemory {
@@ -169,22 +173,38 @@ struct SeddlyApp: App {
         guard let commitmentID else { return }
         deepLinkCommitmentID = commitmentID
 
-        // Search for matching commitment by ID or ID prefix
+        // US-146: Resolve the deep link with a bounded predicate fetch instead of
+        // loading every commitment into memory. Try an exact UUID match first,
+        // then fall back to a prefix scan with fetchLimit = 1 for legacy short IDs.
         let context = modelContainer.mainContext
-        let descriptor = FetchDescriptor<LocalCommitment>()
-        guard let commitments = try? context.fetch(descriptor) else {
+        let normalized = commitmentID.lowercased()
+
+        if let exactUUID = UUID(uuidString: commitmentID) {
+            var descriptor = FetchDescriptor<LocalCommitment>(
+                predicate: #Predicate { $0.id == exactUUID }
+            )
+            descriptor.fetchLimit = 1
+            if let match = try? context.fetch(descriptor).first, match != nil {
+                return // NavigationStack in LedgerView handles routing via deepLinkCommitmentID
+            }
             showDeepLinkNotFound = true
             return
         }
 
-        let match = commitments.first { commitment in
-            commitment.id.uuidString.lowercased() == commitmentID.lowercased()
-            || commitment.id.uuidString.lowercased().hasPrefix(commitmentID.lowercased())
+        // Prefix fallback: fetch a small sorted page, then scan.
+        var descriptor = FetchDescriptor<LocalCommitment>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 200
+        guard let candidates = try? context.fetch(descriptor) else {
+            showDeepLinkNotFound = true
+            return
         }
-
+        let match = candidates.first { commitment in
+            commitment.id.uuidString.lowercased().hasPrefix(normalized)
+        }
         if match == nil {
             showDeepLinkNotFound = true
         }
-        // Navigation to the matched commitment is handled by the NavigationStack in LedgerView
     }
 }

@@ -8,21 +8,48 @@ final class LedgerViewModel {
     private static let filterCategoryKey = "ledger_filterCategory"
 
     var sortOrder: SortOrder = .deadline {
-        didSet { UserDefaults.standard.set(sortOrder.rawValue, forKey: Self.sortOrderKey) }
+        didSet {
+            UserDefaults.standard.set(sortOrder.rawValue, forKey: Self.sortOrderKey)
+            cachedSortKey = nil
+        }
     }
     var filterStatus: CommitmentStatus? {
-        didSet { UserDefaults.standard.set(filterStatus?.rawValue, forKey: Self.filterStatusKey) }
+        didSet {
+            UserDefaults.standard.set(filterStatus?.rawValue, forKey: Self.filterStatusKey)
+            cachedSortKey = nil
+        }
     }
-    var filterEntityName: String?
-    var filterHasDeadlineOnly = false
-    var filterDateStart: Date?
-    var filterDateEnd: Date?
+    var filterEntityName: String? { didSet { cachedSortKey = nil } }
+    var filterHasDeadlineOnly = false { didSet { cachedSortKey = nil } }
+    var filterDateStart: Date? { didSet { cachedSortKey = nil } }
+    var filterDateEnd: Date? { didSet { cachedSortKey = nil } }
     var filterCategory: CommitmentCategory? {
-        didSet { UserDefaults.standard.set(filterCategory?.rawValue, forKey: Self.filterCategoryKey) }
+        didSet {
+            UserDefaults.standard.set(filterCategory?.rawValue, forKey: Self.filterCategoryKey)
+            cachedSortKey = nil
+        }
     }
-    var filterAmountMin: Double?
-    var filterAmountMax: Double?
-    var searchText = ""
+    var filterAmountMin: Double? { didSet { cachedSortKey = nil } }
+    var filterAmountMax: Double? { didSet { cachedSortKey = nil } }
+    /// US-149: Controls whether snoozed commitments are hidden (default),
+    /// shown exclusively, or included alongside the rest of the ledger.
+    var snoozeVisibility: SnoozeVisibility = .hideSnoozed {
+        didSet { cachedSortKey = nil }
+    }
+    var searchText = "" { didSet { cachedSortKey = nil } }
+
+    enum SnoozeVisibility: String, CaseIterable, Hashable {
+        case hideSnoozed = "Hide snoozed"
+        case snoozedOnly = "Snoozed only"
+        case showAll     = "Show all"
+    }
+
+    // MARK: - Filter/sort memoization (US-145)
+    /// Caches the last filter+sort result so repeated renders with identical inputs
+    /// skip the O(n) filter/sort/search pipeline. Invalidated whenever any filter,
+    /// sort, search, pagination, or input-identity signal changes.
+    private var cachedSortKey: Int?
+    private var cachedSortResult: [LocalCommitment] = []
 
     init() {
         if let savedSort = UserDefaults.standard.string(forKey: Self.sortOrderKey),
@@ -42,6 +69,10 @@ final class LedgerViewModel {
     // MARK: - Pagination
 
     static let pageSize = 50
+    /// Upper ceiling passed to SwiftData's FetchDescriptor.fetchLimit so we never
+    /// materialize an unbounded number of commitments during Ledger rendering.
+    /// Users who exceed this can still reach older records via search.
+    static let fetchCeiling = 1500
     var displayedCount = 50
     var isLoadingMore = false
     var hasMoreItems = false
@@ -50,6 +81,7 @@ final class LedgerViewModel {
         guard hasMoreItems, !isLoadingMore else { return }
         isLoadingMore = true
         displayedCount += Self.pageSize
+        cachedSortKey = nil
         isLoadingMore = false
     }
 
@@ -57,10 +89,23 @@ final class LedgerViewModel {
         displayedCount = Self.pageSize
         isLoadingMore = false
         hasMoreItems = false
+        cachedSortKey = nil
     }
 
     var hasActiveFilters: Bool {
         filterStatus != nil || filterEntityName != nil || filterHasDeadlineOnly || filterDateStart != nil || filterCategory != nil || filterAmountMin != nil || filterAmountMax != nil
+    }
+
+    /// US-148: Count of filters currently applied (excluding freeform search).
+    var activeFilterCount: Int {
+        var count = 0
+        if filterStatus != nil { count += 1 }
+        if filterEntityName != nil { count += 1 }
+        if filterHasDeadlineOnly { count += 1 }
+        if filterDateStart != nil || filterDateEnd != nil { count += 1 }
+        if filterCategory != nil { count += 1 }
+        if filterAmountMin != nil || filterAmountMax != nil { count += 1 }
+        return count
     }
 
     enum SortOrder: String, CaseIterable {
@@ -70,8 +115,45 @@ final class LedgerViewModel {
         case status = "Status"
     }
 
+    /// Builds a hash of inputs that affect sort/filter output. Used to short-circuit
+    /// repeated calls during SwiftUI re-renders when nothing relevant has changed.
+    private func computeSortKey(for commitments: [LocalCommitment]) -> Int {
+        var hasher = Hasher()
+        hasher.combine(commitments.count)
+        // A lightweight identity signal: first + last id + max updatedAt.
+        if let first = commitments.first { hasher.combine(first.id); hasher.combine(first.updatedAt) }
+        if let last = commitments.last { hasher.combine(last.id); hasher.combine(last.updatedAt) }
+        hasher.combine(sortOrder)
+        hasher.combine(filterStatus)
+        hasher.combine(filterEntityName)
+        hasher.combine(filterHasDeadlineOnly)
+        hasher.combine(filterDateStart)
+        hasher.combine(filterDateEnd)
+        hasher.combine(filterCategory)
+        hasher.combine(filterAmountMin)
+        hasher.combine(filterAmountMax)
+        hasher.combine(searchText)
+        hasher.combine(snoozeVisibility)
+        hasher.combine(displayedCount)
+        return hasher.finalize()
+    }
+
     func sortedCommitments(_ commitments: [LocalCommitment]) -> [LocalCommitment] {
+        let key = computeSortKey(for: commitments)
+        if cachedSortKey == key { return cachedSortResult }
+
         var filtered = commitments
+
+        // US-149: Snooze visibility (applied before other filters so the count
+        // reported by activeFilterCount stays meaningful).
+        switch snoozeVisibility {
+        case .hideSnoozed:
+            filtered = filtered.filter { !$0.isSnoozed }
+        case .snoozedOnly:
+            filtered = filtered.filter { $0.isSnoozed }
+        case .showAll:
+            break
+        }
 
         // Status filter
         if let filterStatus {
@@ -146,7 +228,11 @@ final class LedgerViewModel {
 
         // Apply pagination
         hasMoreItems = sorted.count > displayedCount
-        return Array(sorted.prefix(displayedCount))
+        let paged = Array(sorted.prefix(displayedCount))
+
+        cachedSortKey = key
+        cachedSortResult = paged
+        return paged
     }
 
     /// Applies history limits based on subscription tier.
@@ -195,6 +281,46 @@ final class LedgerViewModel {
             entityName: commitment.entityName, summary: commitment.summary,
             statusRaw: commitment.statusRaw
         )
+    }
+
+    // MARK: - Snooze (US-149)
+
+    /// Snoozes a commitment by setting `snoozedUntil` to now + `days` days.
+    /// The original deadline is untouched.
+    func snooze(_ commitment: LocalCommitment, days: Int) {
+        let target = Calendar.current.date(byAdding: .day, value: days, to: .now) ?? .now
+        snooze(commitment, until: target)
+    }
+
+    func snooze(_ commitment: LocalCommitment, until date: Date) {
+        commitment.snoozedUntil = date
+        commitment.updatedAt = .now
+        cachedSortKey = nil
+    }
+
+    /// Clears `snoozedUntil` so the commitment re-enters the active ledger.
+    func unsnooze(_ commitment: LocalCommitment) {
+        commitment.snoozedUntil = nil
+        commitment.updatedAt = .now
+        cachedSortKey = nil
+    }
+
+    /// Iterates the given commitments and clears any `snoozedUntil` that has
+    /// already passed. Intended to be called on foreground. Returns the IDs
+    /// of commitments that were woken so callers can re-schedule reminders.
+    @discardableResult
+    func wakeExpiredSnoozes(in commitments: [LocalCommitment]) -> [UUID] {
+        var woken: [UUID] = []
+        for commitment in commitments {
+            guard let until = commitment.snoozedUntil, until <= .now else { continue }
+            commitment.snoozedUntil = nil
+            commitment.updatedAt = .now
+            woken.append(commitment.id)
+        }
+        if !woken.isEmpty {
+            cachedSortKey = nil
+        }
+        return woken
     }
 
     // MARK: - Bulk Edit

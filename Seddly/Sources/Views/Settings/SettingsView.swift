@@ -5,6 +5,7 @@ import AuthenticationServices
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(SubscriptionService.self) private var subscriptionService
+    @Environment(BiometricService.self) private var biometricService
     @Environment(\.authService) private var authService
     private static let appGroupDefaults = UserDefaults(suiteName: AppConstants.appGroupIdentifier)
     @AppStorage("offlineMode", store: appGroupDefaults) private var offlineMode = false
@@ -32,6 +33,15 @@ struct SettingsView: View {
                             UIApplication.shared.open(url)
                         }
                     }
+                }
+
+                // US-150: App Lock
+                Section {
+                    appLockToggle
+                } header: {
+                    Text("Privacy")
+                } footer: {
+                    appLockFooter
                 }
 
                 if subscriptionService.currentTier >= .pro {
@@ -87,6 +97,11 @@ struct SettingsView: View {
                             ),
                             displayedComponents: .hourAndMinute
                         )
+                    }
+                    // US-152: Let users see and cancel individual scheduled
+                    // deadline reminders without dropping into iOS Settings.
+                    NavigationLink("Scheduled Reminders") {
+                        ReminderListView()
                     }
                 }
 
@@ -174,6 +189,43 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - App Lock (US-150)
+
+    @ViewBuilder
+    private var appLockToggle: some View {
+        let availability = biometricService.availability()
+        switch availability {
+        case .available(let kind):
+            @Bindable var vm = biometricService
+            Toggle("Require \(kind.displayName) to open Seddly", isOn: $vm.isAppLockEnabled)
+        case .notEnrolled:
+            HStack {
+                Text("App Lock")
+                Spacer()
+                Text("Enroll Face ID or Touch ID in Settings")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .unavailable:
+            HStack {
+                Text("App Lock")
+                Spacer()
+                Text("Unavailable on this device")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var appLockFooter: some View {
+        if biometricService.isAppLockEnabled {
+            Text("Seddly will require authentication on launch and whenever it has been in the background for more than 30 seconds.")
+        } else {
+            Text("Lock the app so commitments, entity profiles, and data exports can only be viewed after you authenticate.")
+        }
+    }
+
     private func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case .success(let authorization):
@@ -239,10 +291,10 @@ struct SettingsView: View {
             throw URLError(.userAuthenticationRequired)
         }
 
-        let supabaseURLString = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
-        guard let url = URL(string: "\(supabaseURLString)/functions/v1/delete-account") else {
+        guard let cfg = AppConfiguration.supabase else {
             throw URLError(.badURL)
         }
+        let url = cfg.url.appendingPathComponent("functions/v1/delete-account")
 
         var request = URLRequest(url: url)
         request.httpMethod = "DELETE"
