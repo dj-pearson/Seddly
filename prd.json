@@ -1,17 +1,24 @@
 {
     "project": "Seddly",
-    "branchName": "claude/review-ios-app-HUuv0",
-    "description": "Loop 8 — iOS deep-dive audit. Findings from a systematic review of the native iOS app covering navigation/layout, missing functionality, auth/security posture, performance, and code quality. Several issues flagged by the initial audit were verified as already fixed (account deletion, post-delete nav, notification permission prompt) and removed from scope. This loop focuses on the genuine gaps: in-memory pagination causing O(n) re-sorts, deep-link handler full-table fetch, missing App Transport Security hardening, and filter/search UX affordances. Remaining stories cover medium-priority work for future loops (snooze, biometric gating, Live Activities, widget expansion, view decomposition).",
+    "branchName": "claude/complete-mobile-app-setup-KC38C",
+    "description": "Loop 9 — Pre-launch readiness. An end-to-end audit found that while both iOS and Android apps are feature-complete, several non-code artifacts required for App Store / Play Store submission were missing or stubbed: real Supabase / AI-endpoint credentials baked into Info.plist, no StoreKit configuration file, no PrivacyInfo.xcprivacy manifest, Watch target absent from ExportOptions.plist, no launch screen, Android lint set to continue-on-error, and no explicit ATT / Play Store data-safety decision. This loop converts those gaps into tracked stories, partially scaffolded in-tree on the claude/complete-mobile-app-setup-KC38C branch.",
     "ralphLoop": {
-      "currentLoop": 8,
-      "lastReviewDate": "2026-04-17",
-      "passingCount": 10,
-      "totalCount": 10,
-      "completionRate": "100%",
-      "reviewer": "Claude Code iOS Audit",
-      "verdict": "Loop 8 complete — all ten stories shipped. Critical items US-145..US-148 (fetch ceiling + memoization, deep-link predicate, ATS hardening + AppConfiguration, filter-count badge). Medium items US-150 (biometric app lock), US-152 (scheduled reminder management UI), US-154 (in-flight Task cancellation). Final items US-149 (snooze with lightweight SwiftData migration), US-151 (Live Activities on Lock Screen + Dynamic Island), US-153 (extracted banner + snooze sub-views with #Preview)."
+      "currentLoop": 9,
+      "lastReviewDate": "2026-04-21",
+      "passingCount": 4,
+      "totalCount": 11,
+      "completionRate": "36%",
+      "reviewer": "Claude Code Mobile Launch Audit",
+      "verdict": "Loop 9 in-flight. Scaffolded (passing) — US-155 xcconfig-driven Supabase credentials, US-156 .storekit configuration, US-157 PrivacyInfo.xcprivacy manifest, US-158 ExportOptions.plist Watch target. Open — US-159 app icon PNG, US-160 launch screen, US-161 AI endpoint wiring, US-162 App Tracking Transparency decision, US-163 Android lint gating, US-164 push-notification signing, US-165 Android Data Safety form."
     },
     "previousLoops": [
+      {
+        "loop": 8,
+        "date": "2026-04-17",
+        "passingCount": 10,
+        "totalCount": 10,
+        "verdict": "iOS deep-dive audit — all ten stories shipped. Critical pagination, deep-link, ATS, and filter work; medium biometric, reminder UI, in-flight Task cancellation; final snooze, Live Activities, view decomposition."
+      },
       {
         "loop": 7,
         "date": "2026-04-05",
@@ -746,6 +753,171 @@
         "priority": 3,
         "passes": true,
         "notes": "Shipped. LedgerView now holds @State Task<Void, Never>? handles for each long-running operation (foregroundProcessTask for screenshot processing, syncTask for Supabase push/pull, scenePhaseBadgeTask for badge refresh, aiReviewTask for AI review approval flow). Each spawn site cancels the prior handle before starting, and each Task sets its handle back to nil in a @MainActor defer block to release memory. syncIfProPlus adds Task.isCancelled checkpoints between push and pull. A new cancelInFlightTasks() helper is called from .onDisappear and scenePhase .background transitions, so work stops the moment the user swaps tabs or backgrounds the app."
+      },
+      {
+        "id": "US-155",
+        "title": "Move Supabase credentials out of Info.plist into xcconfig wired to CI secrets",
+        "category": "iOS — Launch Readiness",
+        "description": "Info.plist shipped with literal YOUR_SUPABASE_URL / YOUR_SUPABASE_ANON_KEY placeholders baked into source. Real credentials must flow from GitHub Actions secrets into Release builds via xcconfig, never into the committed repo.",
+        "acceptanceCriteria": [
+          "Seddly/Config/Shared.xcconfig holds non-secret shared settings and placeholder values",
+          "Debug.xcconfig.sample and Release.xcconfig.sample are committed; resolved Debug.xcconfig / Release.xcconfig are gitignored",
+          "project.yml wires configFiles: { Debug, Release } to the per-configuration xcconfigs",
+          "Info.plist references $(SUPABASE_URL), $(SUPABASE_ANON_KEY), $(AI_EXTRACTION_ENDPOINT) build variables instead of literal strings",
+          "AppConfiguration.swift treats placeholder / empty / replace-me strings as nil rather than crashing, so free-tier builds keep working",
+          "release.yml materializes Release.xcconfig from SUPABASE_URL, SUPABASE_ANON_KEY, AI_EXTRACTION_ENDPOINT secrets before invoking xcodegen",
+          "ci.yml copies Debug.xcconfig.sample → Debug.xcconfig so simulator builds succeed without secrets"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Scaffolded on branch claude/complete-mobile-app-setup-KC38C. Seddly/Config/{Shared,Debug.xcconfig.sample,Release.xcconfig.sample} added, project.yml now declares configFiles at the root, Info.plist uses $(VAR) substitution, AppConfiguration.swift loosened precondition to a nil-return path and added aiExtractionEndpoint accessor. release.yml writes Release.xcconfig from secrets (escaping // in URLs to /$()/ for xcconfig safety). .gitignore blocks the resolved xcconfig files. Remaining: the maintainer must add SUPABASE_URL, SUPABASE_ANON_KEY, AI_EXTRACTION_ENDPOINT as GitHub Actions secrets in repo settings and then update call sites that read the AI endpoint to use AppConfiguration.aiExtractionEndpoint."
+      },
+      {
+        "id": "US-156",
+        "title": "Scaffold Seddly.storekit configuration for StoreKit 2 simulator testing",
+        "category": "iOS — Launch Readiness",
+        "description": "SubscriptionService references four product identifiers (pro.monthly, pro.yearly, proplus.monthly, proplus.yearly) but no local StoreKit configuration file exists, making paywall flows untestable in the simulator.",
+        "acceptanceCriteria": [
+          "Seddly/Resources/Seddly.storekit with a single 'Seddly Pro' subscription group",
+          "All four product IDs defined with placeholder display prices (4.99 / 39.99 / 9.99 / 79.99) and 1-week intro free trials on the monthly SKUs",
+          "Pro+ SKUs set familyShareable=true to match marketing",
+          "project.yml scheme wires storeKitConfiguration: Seddly/Resources/Seddly.storekit so simulator runs pick it up automatically",
+          "SubscriptionService tests (new or existing) can load products via Product.products(for:) under the .storekit config"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Scaffolded. Seddly/Resources/Seddly.storekit created with the four product IDs pulled from SharedConstants.SubscriptionProductID, grouped under a single subscription group. project.yml's Seddly target scheme now declares storeKitConfiguration pointing at the file. Maintainer still owns: updating display prices to the real price ladder once App Store Connect products are provisioned, and creating the matching subscription group + products in ASC."
+      },
+      {
+        "id": "US-157",
+        "title": "Add PrivacyInfo.xcprivacy privacy manifest",
+        "category": "iOS — Launch Readiness",
+        "description": "Apple requires a PrivacyInfo.xcprivacy manifest for apps submitted after Spring 2024 declaring tracking status, collected data types, and required-reason API usage. Seddly ships without one, which will block App Store submission.",
+        "acceptanceCriteria": [
+          "Seddly/Resources/PrivacyInfo.xcprivacy declares NSPrivacyTracking=false and an empty NSPrivacyTrackingDomains array",
+          "Collected data types reflect actual behavior — EmailAddress + OtherUserContent (linked, for Pro+ sync), CrashData (not linked) — all with purpose AppFunctionality and tracking=false",
+          "NSPrivacyAccessedAPITypes declares reasons for UserDefaults (CA92.1), FileTimestamp (C617.1), SystemBootTime (35F9.1), and DiskSpace (E174.1)",
+          "Manifest is included in the Resources bundle and copied into the .app via project.yml's existing Resources source"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Scaffolded. Seddly/Resources/PrivacyInfo.xcprivacy added. Because project.yml's Seddly target resources entry already points at Seddly/Resources, XcodeGen will pick it up without further config changes. Maintainer should revisit whenever a new SDK is added (Firebase, Mixpanel, etc.) or a new required-reason API is touched."
+      },
+      {
+        "id": "US-158",
+        "title": "Add Watch app provisioning profile to ExportOptions.plist",
+        "category": "iOS — Launch Readiness",
+        "description": "release.yml installs a SeddlyWatch_AppStore.mobileprovision from secrets and builds the Watch target, but ExportOptions.plist omits the com.pearsonmedia.Seddly.watchkitapp bundle identifier, so xcodebuild -exportArchive fails.",
+        "acceptanceCriteria": [
+          "ExportOptions.plist provisioningProfiles dict contains com.pearsonmedia.Seddly.watchkitapp → SeddlyWatch_AppStore",
+          "release.yml still installs the Watch profile from the existing PROVISIONING_PROFILE_WATCH secret",
+          "xcodebuild archive + exportArchive succeed end-to-end against a tag push"
+        ],
+        "priority": 1,
+        "passes": true,
+        "notes": "Shipped. Added the watchkitapp entry to ExportOptions.plist. release.yml Watch-profile step was already in place."
+      },
+      {
+        "id": "US-159",
+        "title": "Add 1024x1024 App Store app icon PNG",
+        "category": "iOS — Launch Readiness",
+        "description": "Seddly/Resources/Assets.xcassets/AppIcon.appiconset/Contents.json declares a 1024x1024 slot but contains no PNG, so App Store submission will bounce with ITMS-90713.",
+        "acceptanceCriteria": [
+          "AppIcon.appiconset/Contents.json filename field references the added PNG",
+          "PNG is 1024x1024, RGB, opaque (no transparency), no rounded corners",
+          "Launch-screen branding matches the icon look & feel",
+          "Home-screen variants (dark, tinted) considered for iOS 18 — or explicitly declined and noted"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "Owner-blocked: requires the design team to deliver the final master PNG. Once supplied, drop it into Seddly/Resources/Assets.xcassets/AppIcon.appiconset/ and update Contents.json to reference the filename. No code changes required."
+      },
+      {
+        "id": "US-160",
+        "title": "Add SwiftUI launch screen instead of blank white flash",
+        "category": "iOS — Launch Readiness",
+        "description": "No LaunchScreen.storyboard nor INFOPLIST_KEY_UILaunchScreen is defined, so iOS shows a blank white background during app launch — a jarring UX that undermines brand polish.",
+        "acceptanceCriteria": [
+          "INFOPLIST_KEY_UILaunchScreen_Generation=YES or a dedicated LaunchScreen.storyboard is wired via project.yml",
+          "Visual language matches OnboardingView (gradient background, Seddly wordmark)",
+          "Works correctly in light and dark mode",
+          "Verified on iPhone 16 Pro and iPhone SE simulators"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Open. Cheapest path: add INFOPLIST_KEY_UILaunchScreen_Generation=YES to project.yml Seddly target settings plus UIColorName / UIImageName keys in Info.plist. Nicer: a small LaunchScreen.storyboard referenced via UILaunchStoryboardName. Either way, still owner-blocked on brand wordmark asset."
+      },
+      {
+        "id": "US-161",
+        "title": "Wire AIExtractionService endpoint to AppConfiguration.aiExtractionEndpoint",
+        "category": "iOS — Launch Readiness",
+        "description": "AIExtractionService takes an endpointURL parameter but the injection path from configuration is undocumented. Pro / Pro+ users will silently fail AI extraction unless the endpoint is actually passed in at the call site.",
+        "acceptanceCriteria": [
+          "All constructors of AIExtractionService receive their endpoint from AppConfiguration.aiExtractionEndpoint",
+          "ScreenshotProcessingService.aiEndpoint gating uses AppConfiguration.aiExtractionEndpoint when no explicit override is provided",
+          "Unit test verifies that a nil endpoint skips the AI call and logs a telemetry event instead of crashing",
+          "README / SETUP.md documents the AI_EXTRACTION_ENDPOINT xcconfig variable"
+        ],
+        "priority": 1,
+        "passes": false,
+        "notes": "Scaffold ready — AppConfiguration.aiExtractionEndpoint added under US-155. Remaining: audit ScreenshotProcessingService + AIExtractionService constructors and any DI container entries and route them through the new accessor. Then update SETUP.md with the new xcconfig key."
+      },
+      {
+        "id": "US-162",
+        "title": "Make App Tracking Transparency decision explicit",
+        "category": "iOS / Android — Launch Readiness",
+        "description": "Info.plist has no NSUserTrackingUsageDescription and no requestTrackingAuthorization() call. Either the app does no cross-app tracking (document that) or a prompt + copy is required before the first launch on iOS 14.5+.",
+        "acceptanceCriteria": [
+          "CLAUDE.md states the tracking policy — currently 'no cross-app tracking, no ATT prompt required'",
+          "If analytics is ever added (Firebase, Mixpanel, etc.), this story reopens with a prompt + copy task",
+          "Android equivalent: AdvertisingIdClient usage audited and documented in android/README.md"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Open. Likely resolution: keep the zero-tracking stance, add a one-line policy note to CLAUDE.md and mark this story passing. No code change expected unless analytics is added."
+      },
+      {
+        "id": "US-163",
+        "title": "Tighten Android lint gating in android-ci.yml",
+        "category": "Android — Launch Readiness",
+        "description": ".github/workflows/android-ci.yml sets continue-on-error: true on the lint step, so lint failures never block CI. This risks shipping Play Store binaries with lint regressions.",
+        "acceptanceCriteria": [
+          "android-ci.yml lint step uses continue-on-error: false",
+          "Any existing lint warnings are either fixed or baseline-suppressed via lint-baseline.xml",
+          "A follow-up story covers any baseline-suppressed warnings so they are not forgotten"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Open. Quick win after the Android maintainer runs ./gradlew lint and inspects the report, then either fixes or baselines each warning."
+      },
+      {
+        "id": "US-164",
+        "title": "Validate push-notification capability end-to-end",
+        "category": "iOS — Launch Readiness",
+        "description": "Seddly.entitlements sets aps-environment=development but no APNs key / cert is verified in CI and no server-side scheduling path exists. Push may silently fail on device for Pro+ users.",
+        "acceptanceCriteria": [
+          "Provisioning profiles include Push Notifications capability",
+          "A TestFlight build on a real device receives a sample push triggered manually from APNs",
+          "Supabase Edge Function / server path for sending deadline pushes is either documented or implemented",
+          "If push is descoped for v1, aps-environment is removed from entitlements and NotificationService falls back to local notifications only"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Open. Dependency on maintainer deciding: ship with local notifications only (simplest) or light up full remote push (needs APNs auth key + Supabase function). Currently the code is wired for local UNUserNotificationCenter scheduling, so descope is low-risk."
+      },
+      {
+        "id": "US-165",
+        "title": "Complete Google Play Data Safety disclosure",
+        "category": "Android — Launch Readiness",
+        "description": "Play Store submission requires a Data Safety form analogous to Apple's privacy nutrition label. No disclosure copy currently exists in the repo, and parity with PrivacyInfo.xcprivacy should be documented.",
+        "acceptanceCriteria": [
+          "android/DATA_SAFETY.md (or the existing README) captures: data types collected, whether collection is optional, encryption in transit, data deletion path",
+          "Disclosure matches PrivacyInfo.xcprivacy content verbatim where applicable",
+          "Submission checklist in android/README.md references the doc"
+        ],
+        "priority": 2,
+        "passes": false,
+        "notes": "Open. Cheap to write once the iOS privacy manifest lands — reuse the same data type list and purposes."
       }
     ]
   }

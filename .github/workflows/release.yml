@@ -34,6 +34,24 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
+      - name: Materialize Release.xcconfig from secrets
+        run: |
+          cat > Seddly/Config/Release.xcconfig <<'EOF'
+          #include "Shared.xcconfig"
+          EOF
+          # xcconfig interprets // as a comment start, so escape every // in
+          # URLs to /$()/ before writing them out.
+          ESCAPED_SUPABASE_URL=$(echo -n "${{ secrets.SUPABASE_URL }}" | sed 's|//|/$()/|g')
+          ESCAPED_AI_ENDPOINT=$(echo -n "${{ secrets.AI_EXTRACTION_ENDPOINT }}" | sed 's|//|/$()/|g')
+          {
+            echo "SUPABASE_URL = ${ESCAPED_SUPABASE_URL}"
+            echo "SUPABASE_ANON_KEY = ${{ secrets.SUPABASE_ANON_KEY }}"
+            echo "AI_EXTRACTION_ENDPOINT = ${ESCAPED_AI_ENDPOINT}"
+          } >> Seddly/Config/Release.xcconfig
+          # Also provide a Debug.xcconfig so XcodeGen doesn't fail to resolve
+          # the #include — it is not used by the archive action.
+          cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+
       - name: Generate Xcode project
         run: xcodegen generate
 

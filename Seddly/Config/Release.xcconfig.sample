@@ -1,0 +1,13 @@
+// Release build secrets — written by CI from GitHub Actions secrets.
+//
+// The release.yml workflow generates `Release.xcconfig` in this directory
+// from `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `AI_EXTRACTION_ENDPOINT`
+// secrets before invoking xcodebuild archive. Release.xcconfig is gitignored.
+//
+// DO NOT commit real credentials to this repository.
+
+#include "Shared.xcconfig"
+
+SUPABASE_URL = https:/$()/REPLACE_WITH_CI_SECRET.supabase.co
+SUPABASE_ANON_KEY = REPLACE_WITH_CI_SECRET
+AI_EXTRACTION_ENDPOINT = https:/$()/REPLACE_WITH_CI_SECRET.supabase.co/functions/v1/extract-commitments

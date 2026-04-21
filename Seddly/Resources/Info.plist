@@ -27,10 +27,14 @@
         <string>fetch</string>
         <string>remote-notification</string>
     </array>
+    <!-- Populated from Seddly/Config/*.xcconfig. See AppConfiguration.swift for
+         the placeholder / empty-string fallback behavior. -->
     <key>SUPABASE_URL</key>
-    <string>YOUR_SUPABASE_URL</string>
+    <string>$(SUPABASE_URL)</string>
     <key>SUPABASE_KEY</key>
-    <string>YOUR_SUPABASE_ANON_KEY</string>
+    <string>$(SUPABASE_ANON_KEY)</string>
+    <key>AI_EXTRACTION_ENDPOINT</key>
+    <string>$(AI_EXTRACTION_ENDPOINT)</string>
     <!-- US-147: App Transport Security. Default-deny with an explicit TLS 1.3
          exception for Supabase. CertificatePinningService layers on top of this
          floor to enforce our SPKI pins. -->
