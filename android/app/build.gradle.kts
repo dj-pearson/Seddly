@@ -54,6 +54,16 @@ android {
         compose = true
         buildConfig = true
     }
+
+    lint {
+        // Fail the CI build on any new lint issue. Pre-existing issues are
+        // recorded in lint-baseline.xml (auto-generated on first `./gradlew
+        // lint` run) and should be addressed in a follow-up story.
+        abortOnError = true
+        warningsAsErrors = false
+        checkReleaseBuilds = true
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {

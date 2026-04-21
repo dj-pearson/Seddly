@@ -200,6 +200,13 @@ Go to **Certificates, Identifiers & Profiles → Profiles → +**
 - Profile Name: `SeddlyWidget_AppStore`
 - Download the `.mobileprovision` file
 
+**Profile 4 — Watch App**
+- Type: App Store Connect
+- App ID: `Seddly Watch (com.pearsonmedia.Seddly.watchkitapp)`
+- Certificate: Select your Apple Distribution certificate
+- Profile Name: `SeddlyWatch_AppStore`
+- Download the `.mobileprovision` file
+
 ### 4.5 Encode the Profiles
 
 ```bash
@@ -456,11 +463,38 @@ This enables the `subscription-webhook` edge function to receive real-time subsc
 
 ### 9.4 StoreKit Testing Configuration (Development)
 
-For local testing without real purchases, create a StoreKit Configuration file:
+A scaffolded StoreKit configuration ships at `Seddly/Resources/Seddly.storekit`
+and is already wired into the `Seddly` scheme via `project.yml`. When you run
+the simulator it will use this config by default so paywall flows work without
+a real App Store Connect login.
 
-1. In Xcode: File → New → File → StoreKit Configuration File
-2. Add the 4 subscription products with matching Product IDs
-3. Set the scheme to use this configuration: Edit Scheme → Run → Options → StoreKit Configuration
+If you adjust the product ladder in App Store Connect, update `Seddly.storekit`
+to match — product IDs must mirror `SharedConstants.SubscriptionProductID`
+exactly.
+
+---
+
+## 9.5 Developer xcconfig Setup
+
+Runtime secrets (Supabase URL / anon key, AI endpoint) are injected through
+per-configuration xcconfig files under `Seddly/Config/`. The resolved
+`Debug.xcconfig` and `Release.xcconfig` are gitignored; only `.sample`
+templates are committed.
+
+**First-time setup on a fresh clone:**
+
+```bash
+cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+# Edit Debug.xcconfig and replace the placeholders with your Supabase values.
+# Any "//" inside URLs must be written as "/$()/" so xcconfig does not
+# treat them as comment markers.
+xcodegen generate
+```
+
+Without secrets, `AppConfiguration.supabase` returns nil and free-tier paths
+continue to work; Pro+ sync and AI extraction silently no-op. The release CI
+materializes `Release.xcconfig` from GitHub secrets (`SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `AI_EXTRACTION_ENDPOINT`) before archiving.
 
 ---
 
@@ -559,15 +593,20 @@ After all setup is complete and the first build is verified:
 | `APPLE_CERTIFICATE_PASSWORD` | Password you set when exporting .p12 | `release.yml` |
 | `PROVISIONING_PROFILE_APP` | `base64 -i Seddly_AppStore.mobileprovision` | `release.yml` |
 | `PROVISIONING_PROFILE_SHARE_EXT` | `base64 -i SeddlyShareExt_AppStore.mobileprovision` | `release.yml` |
+| `PROVISIONING_PROFILE_WIDGET` | `base64 -i SeddlyWidget_AppStore.mobileprovision` | `release.yml` |
+| `PROVISIONING_PROFILE_WATCH` | `base64 -i SeddlyWatch_AppStore.mobileprovision` | `release.yml` |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_PRIVATE_KEY` | `base64 -i AuthKey_XXXX.p8` | `release.yml` |
+| `SUPABASE_URL` | Your Supabase instance URL (e.g., `https://supabase.yourdomain.com`) | `release.yml` → `Release.xcconfig` |
+| `SUPABASE_ANON_KEY` | Supabase Studio → Settings → API → `anon` key | `release.yml` → `Release.xcconfig` |
+| `AI_EXTRACTION_ENDPOINT` | `${SUPABASE_URL}/functions/v1/extract-commitments` | `release.yml` → `Release.xcconfig` |
 | `CLOUDFLARE_API_TOKEN` | Cloudflare → Profile → API Tokens | `deploy-website.yml` |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Overview sidebar | `deploy-website.yml` |
 | `SUPABASE_PROJECT_REF` | Supabase Studio → Settings → General | `deploy-supabase.yml` |
 | `SUPABASE_ACCESS_TOKEN` | Supabase dashboard → Account → Tokens | `deploy-supabase.yml` |
 
-**Total: 12 GitHub Secrets**
+**Total: 17 GitHub Secrets**
 
 ### Supabase Edge Function Environment Variables
 

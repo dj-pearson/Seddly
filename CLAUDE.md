@@ -50,3 +50,9 @@ xcodebuild test -project Seddly.xcodeproj -scheme Seddly \
 - Services that do I/O are `actor` types; pure logic services are `struct`
 - Privacy-first: screenshots never leave device. Only filtered OCR text sent to AI.
 - Free tier = fully on-device, no account required
+
+## Tracking & Analytics Policy
+- **No cross-app or cross-website tracking.** Seddly does not integrate analytics SDKs (Firebase, Mixpanel, Amplitude, etc.), does not read the IDFA, and does not share data with third parties for advertising.
+- Because there is no tracking, the app intentionally ships **without** `NSUserTrackingUsageDescription` and does **not** call `ATTrackingManager.requestTrackingAuthorization()`. No ATT prompt is shown at launch.
+- If analytics or advertising SDKs are ever added, this stance must reverse: add the usage description key to Info.plist, present the ATT prompt before any tracking, and update `PrivacyInfo.xcprivacy` + the Play Data Safety form accordingly.
+- The only outbound data flows are (1) Pro/Pro+ OCR text → Supabase Edge Function for Claude extraction, (2) Pro+ SwiftData sync → user's own Supabase account. Both are opt-in via subscription tier.

@@ -27,6 +27,14 @@
         <string>fetch</string>
         <string>remote-notification</string>
     </array>
+    <!-- US-160: Branded launch screen. Avoids the blank-white flash before the
+         first SwiftUI frame renders. The background matches the midpoint of
+         the OnboardingView hero gradient. -->
+    <key>UILaunchScreen</key>
+    <dict>
+        <key>UIColorName</key>
+        <string>LaunchBackground</string>
+    </dict>
     <!-- Populated from Seddly/Config/*.xcconfig. See AppConfiguration.swift for
          the placeholder / empty-string fallback behavior. -->
     <key>SUPABASE_URL</key>
