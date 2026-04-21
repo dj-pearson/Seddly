@@ -113,7 +113,9 @@ class ShareViewController: UIViewController {
             await MainActor.run {
                 if Task.isCancelled {
                     titleLabel.text = "Processing timed out"
-                    summaryLabel.text = "The screenshot took too long to process. Try again from the app."
+                    summaryLabel.text = "The screenshot took too long to process. Tap Retry, or open the app to finish."
+                    showRetryUI()
+                    return
                 } else {
                     titleLabel.text = "No commitments found"
                     summaryLabel.text = "This screenshot didn't contain detectable text."
@@ -121,9 +123,56 @@ class ShareViewController: UIViewController {
                 spinner.stopAnimating()
             }
 
-            try? await Task.sleep(for: .seconds(1.5))
-            completeRequest()
+            if Task.isCancelled == false {
+                try? await Task.sleep(for: .seconds(1.5))
+                completeRequest()
+            }
         }
+    }
+
+    /// Builds a minimal Retry / Cancel bar shown when OCR times out. Tapping
+    /// Retry restarts `processSharedItems()`; Cancel finishes the extension
+    /// without saving.
+    @MainActor
+    private func showRetryUI() {
+        spinner.stopAnimating()
+        spinner.isHidden = true
+
+        let retryButton = UIButton(type: .system)
+        retryButton.setTitle("Retry", for: .normal)
+        retryButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+        retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+
+        let cancelButton = UIButton(type: .system)
+        cancelButton.setTitle("Cancel", for: .normal)
+        cancelButton.titleLabel?.font = .systemFont(ofSize: 17)
+        cancelButton.addTarget(self, action: #selector(skipTapped), for: .touchUpInside)
+
+        buttonStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        buttonStack.axis = .horizontal
+        buttonStack.spacing = 12
+        buttonStack.distribution = .fillEqually
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+        buttonStack.addArrangedSubview(cancelButton)
+        buttonStack.addArrangedSubview(retryButton)
+
+        if buttonStack.superview == nil {
+            containerStack.addArrangedSubview(buttonStack)
+            NSLayoutConstraint.activate([
+                buttonStack.widthAnchor.constraint(equalTo: containerStack.widthAnchor)
+            ])
+        } else {
+            buttonStack.isHidden = false
+        }
+    }
+
+    @objc private func retryTapped() {
+        buttonStack.isHidden = true
+        titleLabel.text = "Processing screenshot..."
+        summaryLabel.text = nil
+        spinner.isHidden = false
+        spinner.startAnimating()
+        processSharedItems()
     }
 
     private func showConfirmUI(text: String, summary: String?) {

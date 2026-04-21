@@ -147,4 +147,64 @@ struct ScreenshotProcessingServiceTests {
         #expect(items[0].processingStatus == .skipped)
         #expect(items[0].classifierResult == "ui_screenshot")
     }
+
+    // MARK: - US-161: AI review approval wiring
+    //
+    // processReviewedItem is the path that LedgerView's approval callback now
+    // invokes when the user greenlights OCR text for Claude extraction. We
+    // can't hit the real Supabase endpoint from a unit test, but we can pin
+    // the contract that (a) calling it with an unreachable endpoint fails
+    // gracefully (returns 0 commitments), and (b) the queue item's status
+    // transitions to .completed regardless.
+
+    @Test("processReviewedItem marks the queue item completed even when AI fails")
+    func reviewedItemStatusTransitionsOnAIFailure() async throws {
+        let context = try makeContext()
+        let queueItem = ProcessingQueue(screenshotAssetID: "reviewed-asset")
+        queueItem.extractedText = "Unreachable endpoint — this will fail"
+        queueItem.processingStatus = .awaitingReview
+        context.insert(queueItem)
+        try context.save()
+
+        let service = ScreenshotProcessingService()
+        // RFC 5737 TEST-NET-1 — guaranteed unroutable, so the actor falls
+        // through to the error path without a real network call.
+        let unreachable = URL(string: "https://192.0.2.1/functions/v1/extract-commitments")!
+
+        let count = await service.processReviewedItem(
+            queueItem,
+            approvedText: "I will send the files tomorrow",
+            aiEndpoint: unreachable,
+            authToken: nil,
+            context: context
+        )
+
+        #expect(count == 0, "Unreachable endpoint should yield zero commitments")
+        #expect(queueItem.processingStatus == .completed,
+                "Queue item must still transition to completed so the review banner clears")
+    }
+
+    @Test("processReviewedItem is safe to call with empty approvedText")
+    func reviewedItemWithEmptyText() async throws {
+        let context = try makeContext()
+        let queueItem = ProcessingQueue(screenshotAssetID: "empty-reviewed")
+        queueItem.processingStatus = .awaitingReview
+        context.insert(queueItem)
+        try context.save()
+
+        let service = ScreenshotProcessingService()
+        let endpoint = URL(string: "https://192.0.2.1/functions/v1/extract-commitments")!
+
+        // Must not crash on empty input; the AI actor will sanitize + return 0.
+        let count = await service.processReviewedItem(
+            queueItem,
+            approvedText: "",
+            aiEndpoint: endpoint,
+            authToken: nil,
+            context: context
+        )
+
+        #expect(count == 0)
+        #expect(queueItem.processingStatus == .completed)
+    }
 }
