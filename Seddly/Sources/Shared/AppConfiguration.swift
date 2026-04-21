@@ -18,30 +18,19 @@ enum AppConfiguration {
     }
 
     /// Reads Supabase credentials from the app's Info.plist, validates them,
-    /// and logs a fault in release builds if they are missing. In DEBUG builds
-    /// a precondition fires to catch misconfigured local builds early.
+    /// and returns `nil` when the build was produced without secrets injected
+    /// (CI simulator builds, free-tier local builds). Free-tier paths continue
+    /// to work; Pro+ code paths are expected to gracefully no-op on `nil`.
     static var supabase: Supabase? {
         let rawURL = Bundle.main.infoDictionary?["SUPABASE_URL"] as? String ?? ""
         let rawKey = Bundle.main.infoDictionary?["SUPABASE_KEY"] as? String ?? ""
 
         if isPlaceholder(rawURL) || isPlaceholder(rawKey) {
-            #if DEBUG
-            preconditionFailure(
-                "Supabase credentials are unset. Populate SUPABASE_URL and SUPABASE_KEY in Info.plist (or inject via xcconfig) before running Pro+ flows."
-            )
-            #else
-            // Release builds should not crash — sync is a Pro+ feature and the
-            // app's free tier keeps working without a Supabase connection.
             return nil
-            #endif
         }
 
         guard let url = URL(string: rawURL), url.scheme == "https" else {
-            #if DEBUG
-            preconditionFailure("SUPABASE_URL must be a valid https:// URL.")
-            #else
             return nil
-            #endif
         }
 
         return Supabase(url: url, anonKey: rawKey)
@@ -57,7 +46,18 @@ enum AppConfiguration {
         supabase?.anonKey ?? ""
     }
 
+    /// AI-extraction Edge Function endpoint injected via xcconfig. Returns nil
+    /// when the build is not wired to a Supabase project — callers should
+    /// gracefully disable AI extraction rather than crash.
+    static var aiExtractionEndpoint: URL? {
+        let raw = Bundle.main.infoDictionary?["AI_EXTRACTION_ENDPOINT"] as? String ?? ""
+        guard !isPlaceholder(raw), let url = URL(string: raw), url.scheme == "https" else {
+            return nil
+        }
+        return url
+    }
+
     private static func isPlaceholder(_ value: String) -> Bool {
-        value.isEmpty || value.hasPrefix("YOUR_")
+        value.isEmpty || value.hasPrefix("YOUR_") || value.contains("REPLACE_") || value.contains("placeholder.supabase.co")
     }
 }

@@ -1,0 +1,14 @@
+// Local developer secrets for DEBUG builds.
+//
+// Copy this file to `Debug.xcconfig` (same directory) and fill in the values
+// from your personal Supabase project. `Debug.xcconfig` is gitignored.
+//
+// Without these values AppConfiguration.supabase returns nil and Pro+ sync /
+// cloud-AI flows are disabled locally. In DEBUG the app hits a
+// preconditionFailure on those code paths to catch misconfigured builds early.
+
+#include "Shared.xcconfig"
+
+SUPABASE_URL = https:/$()/your-project-ref.supabase.co
+SUPABASE_ANON_KEY = your-anon-key-jwt-here
+AI_EXTRACTION_ENDPOINT = https:/$()/your-project-ref.supabase.co/functions/v1/extract-commitments

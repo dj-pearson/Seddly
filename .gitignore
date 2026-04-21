@@ -57,6 +57,11 @@ fastlane/test_output
 *.mobileprovision
 *.cer
 
+# Resolved xcconfig files contain Supabase URLs, anon keys, and AI endpoint
+# secrets. Only the *.sample templates are committed.
+Seddly/Config/Debug.xcconfig
+Seddly/Config/Release.xcconfig
+
 # Android
 android/.gradle/
 android/app/build/

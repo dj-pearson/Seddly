@@ -630,11 +630,14 @@ struct LedgerView: View {
                 .object(forKey: "lastProcessedDate") as? Date
 
             let effectiveOffline = offlineMode || !networkMonitor.isConnected
+            let aiEndpoint = effectiveOffline ? nil : AppConfiguration.aiExtractionEndpoint
+            let authToken = aiEndpoint != nil ? await authService.validAccessToken() : nil
 
             let result = await processingService.processNewScreenshots(
                 since: lastProcessed,
                 context: modelContext,
-                aiEndpoint: nil,
+                aiEndpoint: aiEndpoint,
+                authToken: authToken,
                 subscriptionTier: subscriptionService.currentTier,
                 autoAnalyze: autoAnalyze,
                 offlineMode: effectiveOffline
@@ -726,14 +729,26 @@ struct LedgerView: View {
             aiReviewTask = Task {
                 defer { Task { @MainActor in aiReviewTask = nil } }
                 if let approvedText {
-                    let service = ScreenshotProcessingService()
-                    // In production, pass real AI endpoint
-                    // For now, mark as completed after approval
-                    item.processingStatus = .completed
-                    try? modelContext.save()
-
-                    @AppStorage("approvedExtractionCount", store: LedgerView.appGroupDefaults) var count = 0
-                    count += 1
+                    if let endpoint = AppConfiguration.aiExtractionEndpoint, networkMonitor.isConnected {
+                        let service = ScreenshotProcessingService()
+                        let token = await authService.validAccessToken()
+                        _ = await service.processReviewedItem(
+                            item,
+                            approvedText: approvedText,
+                            aiEndpoint: endpoint,
+                            authToken: token,
+                            context: modelContext
+                        )
+                        @AppStorage("approvedExtractionCount", store: LedgerView.appGroupDefaults) var count = 0
+                        count += 1
+                    } else {
+                        // No AI endpoint configured (or offline) — preserve the
+                        // user's approval by marking completed; the on-device
+                        // rule-based path in processNewScreenshots already
+                        // created a fallback LocalCommitment for this asset.
+                        item.processingStatus = .completed
+                        try? modelContext.save()
+                    }
                 } else {
                     // User skipped — mark as completed without AI
                     item.processingStatus = .skipped
@@ -872,11 +887,14 @@ struct LedgerView: View {
                 .object(forKey: "lastProcessedDate") as? Date
 
             let effectiveOffline = offlineMode || !networkMonitor.isConnected
+            let aiEndpoint = effectiveOffline ? nil : AppConfiguration.aiExtractionEndpoint
+            let authToken = aiEndpoint != nil ? await authService.validAccessToken() : nil
 
             let result = await processingService.processNewScreenshots(
                 since: lastProcessed,
                 context: modelContext,
-                aiEndpoint: nil,
+                aiEndpoint: aiEndpoint,
+                authToken: authToken,
                 subscriptionTier: subscriptionService.currentTier,
                 autoAnalyze: autoAnalyze,
                 offlineMode: effectiveOffline

@@ -1,0 +1,19 @@
+// Shared build settings for all Seddly configurations.
+//
+// Runtime secrets (Supabase URL / anon key, AI endpoint) are injected through
+// Debug.xcconfig / Release.xcconfig, which override the placeholders below.
+// The release CI pipeline writes Release.xcconfig from GitHub Actions secrets
+// before invoking xcodebuild; local developers copy Debug.xcconfig.sample
+// to Debug.xcconfig and fill in their personal Supabase project values.
+//
+// Do NOT commit real secrets — the sample files are checked in, the resolved
+// xcconfigs are gitignored.
+
+// Supabase project — placeholders, override in per-configuration xcconfigs.
+// The "//" in https:// must be escaped to "/$()/" so xcconfig does not treat
+// it as a comment.
+SUPABASE_URL = https:/$()/placeholder.supabase.co
+SUPABASE_ANON_KEY = REPLACE_ME
+
+// Claude-powered Edge Function endpoint consumed by AIExtractionService.
+AI_EXTRACTION_ENDPOINT = https:/$()/placeholder.supabase.co/functions/v1/extract-commitments

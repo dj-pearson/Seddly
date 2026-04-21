@@ -44,8 +44,19 @@ jobs:
         run: chmod +x gradlew || true
 
       - name: Lint
+        # abortOnError=true + a lint-baseline.xml in app/build.gradle.kts means
+        # only newly-introduced issues fail the job. The baseline is
+        # regenerated with `./gradlew updateLintBaseline` when an existing
+        # issue is fixed.
         run: ./gradlew lint --no-daemon
-        continue-on-error: true
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lint-report
+          path: android/app/build/reports/lint-results-*.html
+          retention-days: 14
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --no-daemon

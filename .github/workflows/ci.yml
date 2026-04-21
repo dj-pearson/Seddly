@@ -39,6 +39,13 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen@2.42.0 || brew install xcodegen
 
+      - name: Materialize Debug.xcconfig
+        # CI builds never hit the Supabase / AI code paths (they run simulator
+        # Debug), so we stamp in placeholder values. AppConfiguration.swift
+        # recognizes these as placeholders and returns nil to disable the
+        # network-dependent flows.
+        run: cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+
       - name: Cache Xcode derived data
         uses: actions/cache@v4
         with:
