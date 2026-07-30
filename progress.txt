@@ -1415,3 +1415,17 @@ never built. Supabase and website deploys have never completed. Every prior
           temperature, top_p, top_k, or a thinking budget — all rejected
           with a 400 on this model — so no other request-shape change was
           needed. anthropic-version and the raw-HTTP call shape unchanged.
+
+  ✓ US-175 Provide the Android lint baseline referenced by the build
+          build.gradle.kts referenced lint-baseline.xml with abortOnError =
+          true, but the file didn't exist. AGP creates a missing baseline
+          and then FAILS the build to tell you it did — so the first CI
+          lint run failed by design, every time. The in-code comment said
+          it was "auto-generated on first run", which was true but omitted
+          the failure. Committed a valid, deliberately EMPTY baseline
+          (format 6, zero suppressed issues): it hides nothing, lint still
+          reports everything, abortOnError stays a real gate — it only
+          removes the bootstrap failure. Couldn't run lint locally to
+          confirm zero findings (dl.google.com blocked here); if CI
+          surfaces pre-existing errors the answer is to fix them, not
+          baseline them.

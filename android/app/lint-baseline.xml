@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  US-175: build.gradle.kts sets `baseline = file("lint-baseline.xml")` with
+  abortOnError = true, but this file did not exist. When the baseline is
+  missing, the Android Gradle Plugin creates it and then *fails* the build to
+  report that it did — so the very first CI lint invocation failed by design,
+  every time.
+
+  This baseline is intentionally empty: it suppresses nothing, so lint reports
+  every issue it finds and abortOnError stays a real gate. It exists only to
+  remove the bootstrap failure.
+
+  If CI surfaces pre-existing error-severity issues, fix them rather than
+  baselining them. To record genuinely deferred issues, run
+  `./gradlew updateLintBaseline` and commit the regenerated file.
+-->
+<issues format="6">
+</issues>

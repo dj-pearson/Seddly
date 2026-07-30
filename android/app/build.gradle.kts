@@ -88,9 +88,15 @@ android {
     }
 
     lint {
-        // Fail the CI build on any new lint issue. Pre-existing issues are
-        // recorded in lint-baseline.xml (auto-generated on first `./gradlew
-        // lint` run) and should be addressed in a follow-up story.
+        // Fail the CI build on any new lint issue.
+        //
+        // US-175: the previous comment claimed lint-baseline.xml was
+        // "auto-generated on first ./gradlew lint run". AGP does create it — and
+        // then fails the build to tell you it did, so the first CI lint run
+        // failed by design and the file was never committed. It is now checked
+        // in and deliberately empty, suppressing nothing. Regenerate with
+        // `./gradlew updateLintBaseline` only to record genuinely deferred
+        // issues, and commit the result.
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true
