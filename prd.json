@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 7,
-    "totalCount": 20,
-    "completionRate": "35%",
+    "passingCount": 8,
+    "totalCount": 21,
+    "completionRate": "38%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -93,7 +93,7 @@
       ],
       "priority": 1,
       "passes": true,
-      "notes": "Removed the invalid 'info:' block from the Seddly target — XcodeGen's Plist type requires a 'path:' key, so the block failed spec decoding and took 'xcodegen generate' (CI step 1) down with it. The 'configs:' mapping nested under 'info:' moved to 'settings.configs' where XcodeGen reads per-configuration overrides, restoring Debug=Automatic / Release=Manual code signing on the app target. CFBundleURLTypes with the seddly scheme moved into Seddly/Resources/Info.plist. Also removed the redundant target-level 'entitlements:' blocks from Seddly and SeddlyWatch: both already set CODE_SIGN_ENTITLEMENTS in settings.base, and XcodeGen's 'entitlements' key generates the referenced file, which would have overwritten the checked-in entitlements with an empty plist. Share Extension and Widget already used the settings-only form; all four targets are now consistent."
+      "notes": "Removed the invalid 'info:' block from the Seddly target — XcodeGen's Plist type requires a 'path:' key, so the block failed spec decoding and would take 'xcodegen generate' down with it. CORRECTION after reading the first real CI log: this was never the observed failure, because the job died two steps earlier at the Docker-based secret scan (see US-189). The spec defect is real and would have surfaced the moment the job got that far, but it was not the cause of the 56-run streak. The 'configs:' mapping nested under 'info:' moved to 'settings.configs' where XcodeGen reads per-configuration overrides, restoring Debug=Automatic / Release=Manual code signing on the app target. CFBundleURLTypes with the seddly scheme moved into Seddly/Resources/Info.plist. Also removed the redundant target-level 'entitlements:' blocks from Seddly and SeddlyWatch: both already set CODE_SIGN_ENTITLEMENTS in settings.base, and XcodeGen's 'entitlements' key generates the referenced file, which would have overwritten the checked-in entitlements with an empty plist. Share Extension and Widget already used the settings-only form; all four targets are now consistent."
     },
     {
       "id": "US-170",
@@ -397,6 +397,22 @@
       "priority": 20,
       "passes": true,
       "notes": "ci.yml declared \"push: branches: ['*']\". A single asterisk in a GitHub Actions branch filter does not match a slash, so pushes to this project's claude/<name> branches never triggered CI. Confirmed against the run history: every feature-branch run was a pull_request event and every push event was on main — meaning developers got zero build feedback until opening a PR, a large part of why 56 consecutive failures went unnoticed across nine loops. Changed to '**', which matches slashes. The pull_request trigger against main and the cancel-in-progress concurrency group keyed on github.ref are both unchanged."
+    },
+    {
+      "id": "US-189",
+      "title": "Run the secret scan on Linux instead of the macOS build job",
+      "category": "CI/CD — iOS",
+      "description": "As a developer, I need the iOS CI job to reach the build. The 'Scan for secrets' step used trufflesecurity/trufflehog, a Docker action, inside a job running on macos-15 — and GitHub's macOS runners ship no Docker daemon. The first live log captured for this project shows the step failing with 'docker: command not found' and exit 127, twelve seconds into the run, at step 2 — before Xcode selection, before xcodegen, before any compilation. This is the actual root cause of the 56-run failure streak: no iOS job has ever reached a compiler. android-ci.yml already runs its scan as a separate ubuntu-latest job; ci.yml should match.",
+      "acceptanceCriteria": [
+        "Secret scanning runs in its own job on ubuntu-latest, where Docker is available",
+        "The macOS build job no longer contains a Docker-based step",
+        "A verified-secret finding still fails the workflow",
+        "The build job proceeds past the point where the scan used to abort it",
+        "The layout matches the secrets-scan job already present in android-ci.yml"
+      ],
+      "priority": 21,
+      "passes": true,
+      "notes": "Root cause of the 56-run failure streak, found by reading the first live CI log this project has ever produced. ci.yml ran 'Scan for secrets' via trufflesecurity/trufflehog — a Docker action — as step 2 of a job on macos-15. GitHub's macOS runners ship no Docker daemon, so the step failed with 'docker: command not found' and exit 127 twelve seconds into the run, before Xcode selection, before xcodegen, before a single file was compiled. No iOS CI job has ever reached a compiler. Moved secret scanning into its own ubuntu-latest job, matching the layout android-ci.yml already used, so the macOS job now proceeds to the build. Also dropped the redundant '--fail' from extra_args: the action's own invocation already passes --fail, so a verified finding still fails the workflow."
     }
   ]
 }

@@ -1386,3 +1386,21 @@ never built. Supabase and website deploys have never completed. Every prior
           so the artifact upload can't sweep it up), verifies the AAB
           carries a META-INF signature block, and removes the keystore in
           an always() step.
+
+  ✓ US-189 Run the secret scan on Linux, not in the macOS build job
+                                                        [added mid-loop]
+          *** ROOT CAUSE of the 56-run failure streak. *** Found by reading
+          the first live CI log this project has ever produced (US-188 made
+          push-triggered runs possible). ci.yml ran "Scan for secrets" via
+          trufflesecurity/trufflehog — a DOCKER action — as step 2 of a job
+          on macos-15. GitHub's macOS runners ship no Docker daemon, so it
+          failed with `docker: command not found`, exit 127, twelve seconds
+          in: before Xcode selection, before xcodegen, before a single file
+          was compiled. No iOS CI job has ever reached a compiler in the
+          history of this repository. Moved the scan to its own
+          ubuntu-latest job, matching the layout android-ci.yml already had.
+
+          NOTE: this corrects the US-169 write-up. The malformed XcodeGen
+          spec is a real defect that would have failed the build the moment
+          the job got that far — but it was never the observed failure,
+          because the job never got that far.

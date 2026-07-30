@@ -16,10 +16,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    runs-on: macos-15
-    timeout-minutes: 30
-
+  # US-189: TruffleHog is a Docker action and GitHub's macOS runners ship no
+  # Docker daemon, so running it inside the macOS build job failed with
+  # "docker: command not found" (exit 127) on every single run — step 2 of 2
+  # dozen, before Xcode selection, before xcodegen, before any compilation.
+  # It now runs in its own Linux job, matching the layout android-ci.yml
+  # already uses, so it scans and the build job actually gets to build.
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,7 +35,17 @@ jobs:
       - name: Scan for secrets
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified --fail
+          extra_args: --only-verified
+
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode 16.3
         uses: maxim-lobanov/setup-xcode@v1
