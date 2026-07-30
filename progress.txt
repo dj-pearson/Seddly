@@ -1696,3 +1696,14 @@ been, and every remaining failure is now visible in a real log.
           Widened the push filter to '**'. Verified the release job keeps its
           own `if: github.ref == 'refs/heads/main'` gate, so feature branches
           run build/lint/test but can never publish to Play Console.
+
+  ✓ US-194 Reconcile declared toolchain versions  [added mid-loop]
+          Three files disagreed. project.yml declared xcodeVersion "26.3" —
+          not a real Xcode version; ci.yml pins 16.3; CLAUDE.md claimed
+          "Xcode 16.3 / Swift 6.2" while the live build log reports Xcode
+          16.3 and Apple Swift 6.1. Set xcodeVersion to 16.3, and corrected
+          CLAUDE.md to distinguish the Swift 6 *language mode*
+          (SWIFT_VERSION = 6.0, correct and unchanged) from the *compiler*
+          version 6.1 — conflating those is what produced the bogus 6.2
+          claim. Not a blocker: XcodeGen tolerated the invalid value, which
+          is exactly why nine loops never noticed it.

@@ -5,8 +5,8 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 22,
-    "totalCount": 25,
+    "passingCount": 23,
+    "totalCount": 26,
     "completionRate": "88%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 — 21/24 shipped. The loop's real finding: 56 of 56 prior CI runs had failed and nothing in this repository had ever been built by machine. Root cause was a Docker-based secret scan on a macOS runner (US-189) failing at step 2 of every run, compounded by a branch filter that never matched this project's branch names (US-188), so nobody saw it. With those removed, five further blockers surfaced from real logs and were fixed in sequence: a malformed XcodeGen spec, a missing Release.xcconfig, hardcoded simulator destinations, plus an Astro dynamic route that had blocked every website deploy and a stub gradlew that had blocked every Android build. xcodegen generate and the website build now both succeed for the first time. Also shipped: production APNs entitlement, export compliance, bundle versions, watchOS compilation and a real complication target, Android signing and Play publishing, a SwiftLint config, StoreKit drift tests, and migration off a retired Claude model that would have 404'd every Pro extraction. NOT DONE and carried to Loop 11: US-182 Android sync merge, US-183 Android widget data, US-187 Room schema export — all three need an environment where the Android build runs, which this one is not (dl.google.com is blocked by network policy). iOS CI is progressing step by step but is not yet green; the compile itself has not been reached."
@@ -477,6 +477,21 @@
       "priority": 25,
       "passes": true,
       "notes": "android-ci.yml triggered only on push to main and PRs to main, so every Android change in this loop went unvalidated — US-172 (real Gradle wrapper), US-173 (dependencyResolutionManagement), US-174 (release signing), US-175 (lint baseline), and US-186 (version codes + Play publishing) were all reasoned about and locally checked but never machine-built. Widened the push branch filter to '**', matching what US-188 did for ci.yml. Verified the release job keeps its own gate — `if: github.event_name == 'push' && github.ref == 'refs/heads/main'` — so widening the trigger runs build/lint/test on feature branches without ever letting one publish to Play Console. Path filters and the pull_request trigger are unchanged."
+    },
+    {
+      "id": "US-194",
+      "title": "Reconcile declared toolchain versions with the one actually used",
+      "category": "Build — Configuration",
+      "description": "As a developer, I need the repository to state which toolchain it targets, consistently. Three files disagreed: project.yml declared xcodeVersion \"26.3\" (not a real Xcode version), ci.yml pins '16.3', and CLAUDE.md claimed 'Xcode 16.3 / Swift 6.2' while the live build log reports Xcode 16.3 and Apple Swift 6.1. None of this broke the build — XcodeGen tolerated the bogus value — but it misleads anyone reading the spec, and the Swift claim would send someone chasing a compiler version this project has never used.",
+      "acceptanceCriteria": [
+        "project.yml declares the same Xcode version CI pins",
+        "CLAUDE.md states the actual compiler version reported by the build",
+        "The distinction between Swift language mode and compiler version is explicit",
+        "project.yml still parses and the spec remains valid"
+      ],
+      "priority": 26,
+      "passes": true,
+      "notes": "project.yml declared xcodeVersion \"26.3\" — not a real Xcode version — while ci.yml pins 16.3 and the live CI log reports 'Xcode 16.3 / Build version 16E140 / Apple Swift version 6.1'. CLAUDE.md separately claimed Swift 6.2. Set xcodeVersion to 16.3 to match CI, and corrected CLAUDE.md to distinguish the Swift 6 *language mode* (SWIFT_VERSION = 6.0, which is correct and unchanged) from the *compiler* version 6.1 that actually builds it — these are different things and conflating them is what produced the bogus 6.2 claim. Not a build blocker: XcodeGen tolerated the invalid value, which is why nine loops never noticed. Verified project.yml still parses and both settings read back correctly."
     }
   ]
 }

@@ -4,7 +4,11 @@ options:
   deploymentTarget:
     iOS: "17.0"
     watchOS: "10.0"
-  xcodeVersion: "26.3"
+  # US-194: this said "26.3", which is not a real Xcode version. CI pins 16.3
+  # and the live build log confirms "Xcode 16.3 (Build version 16E140)".
+  # XcodeGen tolerated the bogus value, so it never broke the build — but it
+  # misleads anyone reading the spec about which toolchain this project targets.
+  xcodeVersion: "16.3"
   createIntermediateGroups: true
   generateEmptyDirectories: true
   groupSortPosition: top
