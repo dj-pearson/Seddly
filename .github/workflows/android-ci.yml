@@ -122,13 +122,40 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # US-174: ANDROID_KEYSTORE_FILE was passed straight through as KEYSTORE_FILE,
+      # but a secret holds the keystore's *contents*, not a path. Decode it to a
+      # real file outside the workspace first and point the build at that path.
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set — the release AAB would be unsigned."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
       - name: Build Release AAB
         run: ./gradlew bundleRelease --no-daemon
         env:
-          KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+      - name: Verify the AAB is signed
+        run: |
+          AAB=$(find app/build/outputs/bundle/release -name '*.aab' | head -1)
+          if [ -z "$AAB" ]; then echo "::error::No AAB produced"; exit 1; fi
+          if ! unzip -l "$AAB" | grep -qi 'META-INF/.*\.\(RSA\|DSA\|EC\)'; then
+            echo "::error::$AAB has no signature block — Play Console will reject it."
+            exit 1
+          fi
+          echo "Signed AAB: $AAB"
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

@@ -1370,3 +1370,19 @@ never built. Supabase and website deploys have never completed. Every prior
           every push event was on main. Developers therefore got zero build
           feedback until opening a PR — a large part of why 56 consecutive
           failures went unnoticed across nine loops. Changed to '**'.
+
+  ✓ US-174 Add Android release signing configuration
+          build.gradle.kts had NO signingConfigs block and the release
+          buildType declared no signingConfig — `bundleRelease` produced an
+          unsigned AAB that Play Console rejects. Worse, android-ci.yml
+          passed ANDROID_KEYSTORE_FILE through as KEYSTORE_FILE, but a
+          secret holds the keystore's *contents*, not a path — and nothing
+          in the build read any of the four env vars regardless. Added a
+          release signingConfig created only when KEYSTORE_FILE is set and
+          the file exists; absent that, release builds stay unsigned but
+          still compile (with a lifecycle warning) so contributors without
+          the keystore aren't blocked. CI now base64-decodes
+          ANDROID_KEYSTORE_BASE64 into $RUNNER_TEMP (outside the workspace,
+          so the artifact upload can't sweep it up), verifies the AAB
+          carries a META-INF signature block, and removes the keystore in
+          an always() step.

@@ -26,10 +26,42 @@ android {
         }
     }
 
+    // US-174: there was no signingConfigs block at all, and the release build
+    // type declared no signingConfig — so `bundleRelease` produced an unsigned
+    // AAB that Play Console rejects. The CI release job passed keystore secrets
+    // as environment variables that nothing in the build ever read.
+    //
+    // Credentials come from the environment so nothing sensitive is committed.
+    // When they are absent (local builds, pull-request CI) the config is simply
+    // not created and the release build stays unsigned but still succeeds, so
+    // contributors without the keystore can verify a release build compiles.
+    val keystorePath: String? = System.getenv("KEYSTORE_FILE")
+    val hasReleaseKeystore = !keystorePath.isNullOrBlank() && file(keystorePath).exists()
+
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(keystorePath!!)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                logger.lifecycle(
+                    "No release keystore configured (KEYSTORE_FILE unset or missing) — " +
+                        "the release build will be unsigned and cannot be uploaded to Play."
+                )
+                null
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

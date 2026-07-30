@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 6,
+    "passingCount": 7,
     "totalCount": 20,
-    "completionRate": "30%",
+    "completionRate": "35%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -173,8 +173,8 @@
         "No keystore, password, or alias value is committed to the repository"
       ],
       "priority": 6,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "android/app/build.gradle.kts had no signingConfigs block at all and the release buildType declared no signingConfig, so 'bundleRelease' produced an unsigned AAB that Play Console rejects. Compounding it, android-ci.yml passed ANDROID_KEYSTORE_FILE straight through as KEYSTORE_FILE — but a GitHub secret holds the keystore's contents, not a path — and nothing in the build read any of the four env vars anyway. Added a release signingConfig sourced from KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD, created only when KEYSTORE_FILE is set and the file actually exists. When it is absent the config is not created and the release build stays unsigned but still succeeds, so contributors without the keystore can verify a release build compiles; the build logs a lifecycle warning in that case rather than failing silently. On the CI side, a new step base64-decodes ANDROID_KEYSTORE_BASE64 into $RUNNER_TEMP (outside the workspace, so it cannot be picked up by the artifact upload) and exports the path via GITHUB_ENV; a verification step greps the AAB's zip index for a META-INF signature block and fails the job if the bundle is unsigned; and an always() step removes the decoded keystore. No keystore, password, or alias value is committed."
     },
     {
       "id": "US-175",
