@@ -1756,3 +1756,28 @@ been, and every remaining failure is now visible in a real log.
           exactly as designed: "No release keystore configured (KEYSTORE_FILE
           unset or missing) — the release build will be unsigned" (US-174).
           17 tasks executed before the icon failure.
+
+  ✓ US-197 Fix the first real Swift compile errors  [added mid-loop]
+          *** THE COMPILER RAN. *** 358s, 5x longer than any run in this
+          repo's history. Nine loops of Swift, ~14,700 lines, type-checked
+          for the first time — and it reported real errors.
+
+          (1) "enum with raw type cannot have cases with arguments" on
+          MigrationError. Misleading diagnostic: SharedModelContainer.swift
+          imported only SwiftData and os, so LocalizedError was UNRESOLVED,
+          and when Swift can't resolve an enum's inherited type it falls back
+          to treating it as a raw type. Real defect: missing `import
+          Foundation`. Audited the whole tree for the pattern and found three
+          more files (NotificationService, ScreenshotService,
+          AddCommitmentIntent). Fixed all four; audit now clean.
+
+          (2) Swift 6 rejected `static let shared` on WatchSyncService as
+          non-Sendable shared mutable state. The diagnostic was RIGHT — it's
+          @Observable with unguarded state read by SwiftUI. Rather than
+          silence it with nonisolated(unsafe), checked what the code actually
+          does: all six WCSessionDelegate callbacks ALREADY wrap their bodies
+          in `Task { @MainActor in }`. So the state was already main-actor
+          confined; declared the class @MainActor to make that checkable and
+          marked the six witnesses nonisolated. No body changed.
+
+          More compile errors likely remain — the log tail was truncated.
