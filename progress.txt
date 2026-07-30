@@ -1550,3 +1550,20 @@ never built. Supabase and website deploys have never completed. Every prior
           cross-checking every `-scheme <name>` across all five workflow
           files against the targets declaring schemes: both sets are exactly
           {Seddly, SeddlyWatch}, nothing referenced-but-undeclared.
+
+  ✓ US-186 Add Play Store publishing and version-code management
+          The release job built an AAB, uploaded it as a GitHub artifact,
+          and stopped — nothing reached Play Console, so shipping meant a
+          human downloading the artifact and uploading it by hand. And
+          versionCode was hardcoded to 1, so two consecutive releases would
+          collide and Play would reject the second even in that manual flow.
+          versionCode now comes from github.run_number (monotonic per
+          workflow) with a local fallback of 1 — a value that can never
+          reach Play, since only CI holds the keystore. Added a Play Console
+          publish to the *internal* track: upload automated, promotion to
+          production still a deliberate human action. Runs after the
+          existing needs: [build-and-test, secrets-scan] gate AND after the
+          US-174 signature check, so an unsigned bundle can't publish.
+          Documented all five Android secrets in SETUP.md §12 — they were
+          consumed by android-ci.yml but never documented at all. Verified
+          no workflow secret is left undocumented.

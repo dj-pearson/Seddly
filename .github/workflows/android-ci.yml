@@ -142,6 +142,9 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # US-186: versionCode was hardcoded to 1, so consecutive releases
+          # collided. github.run_number is monotonic per workflow.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
 
       - name: Verify the AAB is signed
         run: |
@@ -163,3 +166,16 @@ jobs:
           name: release-aab
           path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
+
+      # US-186: the job previously stopped at the artifact upload, so a release
+      # never reached the Play Console — someone had to download the AAB and
+      # upload it by hand. Publishing to the internal track keeps a human in the
+      # loop for promotion to production while automating the upload itself.
+      - name: Publish to Play Console (internal track)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.pearsonmedia.seddly
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed

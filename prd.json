@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 18,
+    "passingCount": 19,
     "totalCount": 23,
-    "completionRate": "78%",
+    "completionRate": "83%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -364,8 +364,8 @@
         "Required repository secrets are documented in SETUP.md"
       ],
       "priority": 18,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "The release job built an AAB, uploaded it as a GitHub artifact, and stopped — nothing ever reached the Play Console, so shipping required a human to download the artifact and upload it by hand. versionCode was also hardcoded to 1, so two consecutive releases would collide and Play would reject the second even in that manual flow. versionCode now reads ANDROID_VERSION_CODE, which CI sets from github.run_number (monotonic per workflow), falling back to 1 locally — a value that can never reach Play because only the CI release job holds the signing keystore. versionName still tracks the marketing version. Added a Play Console publishing step targeting the internal track with status completed, so the upload is automated while promotion to production stays a deliberate human action. It runs after the existing 'needs: [build-and-test, secrets-scan]' gate and after the US-174 signature verification, so an unsigned or unverified bundle can never be published. Documented all five Android secrets in SETUP.md section 12 — they were consumed by android-ci.yml but had never been documented at all — plus the watch complication profile from US-171, and flagged the ANDROID_KEYSTORE_FILE to ANDROID_KEYSTORE_BASE64 rename for anyone migrating. Verified by diffing every 'secrets.*' reference across all five workflow files against the documented names: nothing is used-but-undocumented."
     },
     {
       "id": "US-187",

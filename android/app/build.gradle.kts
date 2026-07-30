@@ -15,7 +15,13 @@ android {
         applicationId = "com.pearsonmedia.seddly"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
+
+        // US-186: versionCode was hardcoded to 1, so two consecutive releases
+        // would collide and Play Console would reject the second. It now tracks
+        // the CI run number, which is monotonic per workflow. Local builds fall
+        // back to 1 — that value never reaches Play because only the CI release
+        // job holds the signing keystore.
+        versionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInt()
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -635,6 +635,7 @@ After all setup is complete and the first build is verified:
 | `PROVISIONING_PROFILE_SHARE_EXT` | `base64 -i SeddlyShareExt_AppStore.mobileprovision` | `release.yml` |
 | `PROVISIONING_PROFILE_WIDGET` | `base64 -i SeddlyWidget_AppStore.mobileprovision` | `release.yml` |
 | `PROVISIONING_PROFILE_WATCH` | `base64 -i SeddlyWatch_AppStore.mobileprovision` | `release.yml` |
+| `PROVISIONING_PROFILE_WATCH_COMPLICATION` | `base64 -i SeddlyWatchComplication_AppStore.mobileprovision` | `release.yml` |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_PRIVATE_KEY` | `base64 -i AuthKey_XXXX.p8` | `release.yml` |
@@ -646,7 +647,25 @@ After all setup is complete and the first build is verified:
 | `SUPABASE_PROJECT_REF` | Supabase Studio → Settings → General | `deploy-supabase.yml` |
 | `SUPABASE_ACCESS_TOKEN` | Supabase dashboard → Account → Tokens | `deploy-supabase.yml` |
 
-**Total: 17 GitHub Secrets**
+#### Android release secrets
+
+These were consumed by `android-ci.yml` but had never been documented here.
+
+| Secret Name | Value Source | Used By |
+|-------------|-------------|---------|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i release.keystore` — the keystore **contents**, not a path | `android-ci.yml` |
+| `ANDROID_KEYSTORE_PASSWORD` | Password set when the keystore was created | `android-ci.yml` |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key inside the keystore | `android-ci.yml` |
+| `ANDROID_KEY_PASSWORD` | Password for that key (often the same as the store password) | `android-ci.yml` |
+| `ANDROID_PLAY_SERVICE_ACCOUNT_JSON` | Google Cloud → IAM → Service Accounts → JSON key, granted release access in Play Console | `android-ci.yml` |
+
+> **US-174:** the workflow previously passed `ANDROID_KEYSTORE_FILE` straight
+> through as a file path. A GitHub secret holds the keystore's *contents*, so
+> the secret is now named `ANDROID_KEYSTORE_BASE64` and the workflow decodes it
+> to a real file under `$RUNNER_TEMP` before building. If you are migrating from
+> the old name, re-add it under the new one.
+
+**Total: 23 GitHub Secrets** (17 Apple/Supabase/Cloudflare + 1 watch complication profile + 5 Android)
 
 ### Supabase Edge Function Environment Variables
 
