@@ -1452,3 +1452,20 @@ never built. Supabase and website deploys have never completed. Every prior
           §4.7 and flagged as a legal attestation to revisit if custom
           encryption is ever added. Also documented the new watch
           complication provisioning profile from US-171 in §4.4.
+
+  ✓ US-181 Pin and harden the Supabase lint / type-check steps
+          Added supabase/functions/deno.json with explicit lint rules and
+          strict compiler options; both `deno lint` and `deno check` now run
+          against it instead of unpinned defaults, so a type error strict
+          mode would catch can no longer deploy. Type-check step rewritten
+          to enable globstar, expand entrypoints into an array, and assert
+          the count matches a `find` of the function directories before
+          invoking deno — a partial or empty match now fails loudly.
+
+          CORRECTION to this story's original premise: I assumed `**` failed
+          to expand and deno got a literal pattern. Wrong — with globstar
+          off bash degrades `**` to `*`, and that matches all six functions.
+          Verified: the old form expands to exactly the same six paths. The
+          glob worked by accident; it would only break on a nested layout.
+          The real gap was the missing pinned config. The historical Deploy
+          Supabase failures remain unexplained — those logs are 410 Gone.
