@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 1,
+    "passingCount": 2,
     "totalCount": 19,
-    "completionRate": "5%",
+    "completionRate": "11%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -109,8 +109,8 @@
         "Passing CURRENT_PROJECT_VERSION on the xcodebuild command line changes the built CFBundleVersion"
       ],
       "priority": 2,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added CFBundleShortVersionString = $(MARKETING_VERSION) and CFBundleVersion = $(CURRENT_PROJECT_VERSION) to all four Info.plists (app, Share Extension, Widget, Watch). Xcode's Process Info.plist step injects CFBundleIdentifier / CFBundleExecutable / CFBundleName automatically but not the version keys — those require GENERATE_INFOPLIST_FILE, which is off whenever INFOPLIST_FILE names a hand-authored plist. Before this, the MARKETING_VERSION and CURRENT_PROJECT_VERSION set in project.yml reached no bundle, so release.yml's 'CURRENT_PROJECT_VERSION=${{ github.run_number }}' archive override silently did nothing and App Store validation would reject the archive for missing versions. All four targets resolve the same two variables, so extension versions always match the host app as App Store Connect requires. Verified all four plists parse with plistlib and expose both keys."
     },
     {
       "id": "US-171",

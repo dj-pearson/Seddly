@@ -3,6 +3,19 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- US-170: Xcode's "Process Info.plist" step injects CFBundleIdentifier,
+         CFBundleExecutable, and CFBundleName automatically, but NOT the two
+         version keys — those only appear when GENERATE_INFOPLIST_FILE is on,
+         which it is not when INFOPLIST_FILE names a hand-authored plist. Without
+         them, MARKETING_VERSION / CURRENT_PROJECT_VERSION from project.yml never
+         reach any bundle, the release workflow's build-number override is a
+         no-op, and App Store validation rejects the archive. All four targets
+         resolve the same two variables so their versions always match, which
+         App Store Connect requires of app extensions. -->
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Seddly reads only your Screenshots album to find commitments, promises, and deadlines. Your personal photos and videos are never accessed.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>

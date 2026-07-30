@@ -1305,3 +1305,15 @@ never built. Supabase and website deploys have never completed. Every prior
           named there, which would have overwritten both checked-in
           entitlements files with empty plists. All four targets now use the
           settings-only CODE_SIGN_ENTITLEMENTS form the extensions already had.
+
+  ✓ US-170 Add bundle version keys to all four Info.plists
+          Xcode auto-injects CFBundleIdentifier / CFBundleExecutable /
+          CFBundleName during Process Info.plist, but NOT the version keys —
+          those need GENERATE_INFOPLIST_FILE, which is off whenever
+          INFOPLIST_FILE names a hand-authored plist. So the MARKETING_VERSION
+          and CURRENT_PROJECT_VERSION declared in project.yml reached no
+          bundle at all: release.yml's build-number override was a no-op and
+          App Store validation would have rejected the archive outright.
+          All four targets (app, Share Extension, Widget, Watch) now resolve
+          $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION), keeping extension
+          versions matched to the host app as App Store Connect requires.

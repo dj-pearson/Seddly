@@ -3,6 +3,12 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- US-170: must match the companion iOS app exactly — App Store Connect
+         rejects a submission whose watch app version differs from the app's. -->
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.pearsonmedia.Seddly</string>
 </dict>
