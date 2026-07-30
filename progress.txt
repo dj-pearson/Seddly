@@ -1517,3 +1517,25 @@ never built. Supabase and website deploys have never completed. Every prior
           updated titles/descriptions/keywords, Requirements (Android 10+,
           matching minSdk 29), the homepage, and neutralised "Download for
           iOS" CTAs across 10 pages.
+
+  ✓ US-179 Make SwiftLint pass in CI
+          No .swiftlint.yml existed, so `swiftlint lint --strict` ran the
+          full default rule set with every warning promoted to an error
+          across ~14,700 lines — a guaranteed failure once the build got
+          that far. The invocation also passed an explicit `Seddly/Sources/`
+          path, which OVERRIDES a config's included: list, silently skipping
+          the Share Extension, Widget, Watch, complication, and test
+          targets. Added a config with thresholds measured from the real
+          source, not a template: line_length 200/400 (longest actual line
+          is a 370-char template literal; 14 lines exceed 200), file_length
+          800/1200 (LedgerView 1046, CommitmentDetailView 707 — both already
+          decomposed in Loop 8). Disabled 7 rules that measure SwiftUI's
+          declarative verbosity rather than complexity, each with the reason
+          inline; relaxed identifier_name's 3-char minimum (fires on
+          idiomatic id/db/ok); opted into 16 correctness rules the defaults
+          omit. Also removed `|| true` from the brew install, which would
+          have let a missing SwiftLint pass silently.
+
+          NOT VERIFIED LOCALLY: no Swift toolchain in this environment, so
+          the "zero violations under --strict" criterion is first exercised
+          in CI.

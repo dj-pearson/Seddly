@@ -114,9 +114,14 @@ jobs:
             | xcbeautify --quiet
 
       - name: SwiftLint
+        # US-179: this passed an explicit `Seddly/Sources/` path, which overrides
+        # the config's `included:` list and silently skipped the Share
+        # Extension, Widget, Watch, complication, and test targets. Dropping the
+        # path lets .swiftlint.yml decide the scope, so every target is linted.
         run: |
-          brew install swiftlint || true
-          swiftlint lint --strict --reporter github-actions-logging Seddly/Sources/
+          brew install swiftlint
+          swiftlint version
+          swiftlint lint --strict --reporter github-actions-logging
 
       - name: Run unit tests with coverage
         run: |

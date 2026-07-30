@@ -1,0 +1,104 @@
+# SwiftLint configuration for Seddly.
+#
+# US-179: there was no configuration file at all, so `swiftlint lint --strict`
+# ran the full default rule set and promoted every default warning to an error
+# across ~14,700 lines of Swift. The invocation also linted only
+# Seddly/Sources/, silently excluding the Share Extension, Widget, Watch,
+# complication, and test targets.
+#
+# Thresholds below are set from the actual shape of this codebase, not copied
+# from a template. Where a default would fire on existing, deliberate code, the
+# rule is tuned or disabled with the reason stated — not silenced wholesale.
+
+included:
+  - Seddly/Sources
+  - SeddlyShareExtension
+  - SeddlyWidget
+  - SeddlyWatch
+  - SeddlyWatchComplication
+  - SeddlyTests
+  - SeddlyUITests
+
+excluded:
+  - Seddly/Resources/Preview Content
+  - build
+  - DerivedData
+  - .build
+  - Seddly.xcodeproj
+
+disabled_rules:
+  # SwiftUI view bodies are declarative trees; nesting depth and body length
+  # are a property of the UI being described, not of code complexity.
+  - type_body_length
+  - function_body_length
+  - closure_body_length
+  - cyclomatic_complexity
+  # SwiftUI modifier chains and #Predicate macros routinely exceed any sane
+  # nesting threshold without being hard to read.
+  - nesting
+  # Trailing commas in multi-line literals are a deliberate style here.
+  - trailing_comma
+  # `#Preview` blocks and SwiftUI property wrappers trip this constantly.
+  - no_grouping_extension
+
+opt_in_rules:
+  - empty_count
+  - empty_string
+  - first_where
+  - last_where
+  - contains_over_first_not_nil
+  - contains_over_filter_count
+  - toggle_bool
+  - unneeded_parentheses_in_closure_argument
+  - redundant_nil_coalescing
+  - explicit_init
+  - joined_default_parameter
+  - literal_expression_end_indentation
+  - operator_usage_whitespace
+  - sorted_first_last
+  - unavailable_function
+  - yoda_condition
+
+# Measured against the committed source: the longest line is 370 characters
+# (an escalation-letter template literal) and 14 lines exceed 200. A warning at
+# 200 flags genuinely unreadable lines; the error threshold sits above the
+# longest legitimate literal so a template string is not a build failure.
+line_length:
+  warning: 200
+  error: 400
+  ignores_comments: true
+  ignores_urls: true
+  ignores_function_declarations: true
+  ignores_interpolated_strings: true
+
+# LedgerView is 1046 lines and CommitmentDetailView 707. Both were already
+# decomposed once in Loop 8 (US-153) and remain large because SwiftUI view
+# hierarchies are verbose. The error threshold is set above the current worst
+# case so the gate is meaningful without failing on the existing tree.
+file_length:
+  warning: 800
+  error: 1200
+  ignore_comment_only_lines: true
+
+type_name:
+  min_length: 3
+  max_length:
+    warning: 50
+    error: 60
+
+# Short names are idiomatic in this codebase: `id`, `db`, `ok`, and SwiftUI
+# generic parameters. The default 3-character minimum would fire on all of them.
+identifier_name:
+  min_length:
+    warning: 1
+    error: 1
+  max_length:
+    warning: 60
+    error: 80
+  allowed_symbols: ["_"]
+
+large_tuple:
+  warning: 3
+  error: 4
+
+reporter: "xcode"
