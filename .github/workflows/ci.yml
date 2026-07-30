@@ -97,32 +97,43 @@ jobs:
       - name: Resolve simulator destinations
         shell: bash
         run: |
-          set -euo pipefail
-          # Picks the newest available runtime matching $1 and prints one device UDID.
-          PICK='import json,sys; d=json.load(sys.stdin)["devices"]; c=sorted((r,x["name"],x["udid"]) for r,e in d.items() if sys.argv[1] in r for x in e if x.get("isAvailable")); print(c[-1][2] if c else "")'
+          set -uo pipefail
 
-          resolve() { xcrun simctl list devices available -j | python3 -c "$PICK" "$1"; }
+          # Ask xcodebuild what IT will accept for the scheme, and read only the
+          # "Available destinations" section. `simctl list devices available` is
+          # the wrong signal: it happily reports a device whose platform Xcode
+          # has not installed, so a UDID taken from it is then rejected with
+          # "Unable to find a destination matching the provided destination
+          # specifier" while the ineligible list says "iOS 18.4 is not
+          # installed". Gating on xcodebuild's own view avoids that mismatch.
+          avail() {
+            xcodebuild -project Seddly.xcodeproj -scheme "$1" -showdestinations 2>/dev/null \
+              | sed -n '/Available destinations/,/Ineligible destinations/p' \
+              | grep "platform:$2 Simulator" \
+              | grep -oE 'id:[0-9A-Fa-f-]{36}' \
+              | head -1 | cut -c4-
+          }
 
-          IOS_SIM=$(resolve iOS)
-          if [ -z "$IOS_SIM" ]; then
-            echo "No iOS simulator runtime on this image — downloading the platform."
-            xcodebuild -downloadPlatform iOS
-            IOS_SIM=$(resolve iOS)
-          fi
-          [ -n "$IOS_SIM" ] || { echo "::error::No iOS simulator available after download"; exit 1; }
+          resolve() { # $1 scheme, $2 platform, $3 env var name
+            local udid
+            udid=$(avail "$1" "$2")
+            if [ -z "$udid" ]; then
+              echo "No $2 simulator destination for scheme $1 — downloading the platform (this can take a few minutes)."
+              xcodebuild -downloadPlatform "$2" || echo "::warning::-downloadPlatform $2 returned non-zero; re-checking anyway"
+              udid=$(avail "$1" "$2")
+            fi
+            if [ -z "$udid" ]; then
+              echo "::error::No $2 simulator destination available for scheme $1 even after -downloadPlatform."
+              echo "Destinations xcodebuild reported:"
+              xcodebuild -project Seddly.xcodeproj -scheme "$1" -showdestinations 2>&1 | head -40
+              exit 1
+            fi
+            echo "Resolved $2 simulator for $1: $udid"
+            echo "$3=$udid" >> "$GITHUB_ENV"
+          }
 
-          WATCH_SIM=$(resolve watchOS)
-          if [ -z "$WATCH_SIM" ]; then
-            echo "No watchOS simulator runtime on this image — downloading the platform."
-            xcodebuild -downloadPlatform watchOS
-            WATCH_SIM=$(resolve watchOS)
-          fi
-          [ -n "$WATCH_SIM" ] || { echo "::error::No watchOS simulator available after download"; exit 1; }
-
-          echo "Resolved iOS simulator:     $IOS_SIM"
-          echo "Resolved watchOS simulator: $WATCH_SIM"
-          echo "IOS_SIM=$IOS_SIM" >> "$GITHUB_ENV"
-          echo "WATCH_SIM=$WATCH_SIM" >> "$GITHUB_ENV"
+          resolve Seddly      iOS     IOS_SIM
+          resolve SeddlyWatch watchOS WATCH_SIM
 
       - name: Build for testing
         run: |

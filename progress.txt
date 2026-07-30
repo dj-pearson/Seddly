@@ -1661,3 +1661,16 @@ been, and every remaining failure is now visible in a real log.
 
 — Claude, Loop 10
 ================================================================================
+
+  ↻ US-192 follow-up — gated on the wrong signal the first time
+          The first fix resolved a UDID from `simctl list devices available`
+          and the build STILL failed: simctl happily reports devices whose
+          platform Xcode has not installed. CI showed IOS_SIM resolved to a
+          real UDID while the ineligible list said "iOS 18.4 is not
+          installed" — so the download fallback never fired. Rewritten to
+          parse `xcodebuild -showdestinations` and read only the "Available
+          destinations" section, which is xcodebuild's own view of what it
+          will accept. Falls back to -downloadPlatform and dumps the full
+          destination list on failure. Parser verified against a populated
+          section, an empty one, and the dvtdevice placeholder id (which the
+          36-hex-char pattern correctly never matches).
