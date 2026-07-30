@@ -1781,3 +1781,21 @@ been, and every remaining failure is now visible in a real log.
           marked the six witnesses nonisolated. No body changed.
 
           More compile errors likely remain — the log tail was truncated.
+
+  ✓ US-198 Fix the first real Kotlin compile errors  [added mid-loop]
+          US-196's icon fix let resource linking pass, so
+          :app:compileDebugKotlin ran for the FIRST TIME — and reported
+          errors in Compose UI code from Loops 7-8 that had never compiled.
+          (1) SeddlyNavHost.kt imported ImageVector TWICE verbatim (lines 27
+          and 34) — "Conflicting import: imported name 'ImageVector' is
+          ambiguous". (2) LedgerScreen.kt imported
+          androidx.compose.foundation.lazy.item, which doesn't exist: `item`
+          is a member of LazyListScope, available on the receiver inside a
+          LazyColumn block, not a top-level declaration. Easy mistake, since
+          the sibling `items` IS a real extension — that one is needed and
+          was preserved. Swept the whole Kotlin tree for both patterns: no
+          other duplicates, no other bogus lazy.item.
+
+  ALSO CONFIRMED this run: US-195 worked — "Secrets Scanning" dropped out
+          of the failed-jobs list entirely, and US-196 worked — resource
+          linking passed and the build advanced from 17 to 19 tasks.

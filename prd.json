@@ -5,8 +5,8 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 26,
-    "totalCount": 29,
+    "passingCount": 27,
+    "totalCount": 30,
     "completionRate": "90%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 — 21/24 shipped. The loop's real finding: 56 of 56 prior CI runs had failed and nothing in this repository had ever been built by machine. Root cause was a Docker-based secret scan on a macOS runner (US-189) failing at step 2 of every run, compounded by a branch filter that never matched this project's branch names (US-188), so nobody saw it. With those removed, five further blockers surfaced from real logs and were fixed in sequence: a malformed XcodeGen spec, a missing Release.xcconfig, hardcoded simulator destinations, plus an Astro dynamic route that had blocked every website deploy and a stub gradlew that had blocked every Android build. xcodegen generate and the website build now both succeed for the first time. Also shipped: production APNs entitlement, export compliance, bundle versions, watchOS compilation and a real complication target, Android signing and Play publishing, a SwiftLint config, StoreKit drift tests, and migration off a retired Claude model that would have 404'd every Pro extraction. NOT DONE and carried to Loop 11: US-182 Android sync merge, US-183 Android widget data, US-187 Room schema export — all three need an environment where the Android build runs, which this one is not (dl.google.com is blocked by network policy). iOS CI is progressing step by step but is not yet green; the compile itself has not been reached."
@@ -539,6 +539,22 @@
       "priority": 29,
       "passes": true,
       "notes": "Two errors, one of them systemic. (1) SharedModelContainer.swift imported only SwiftData and os, so LocalizedError was unresolved — and when Swift cannot resolve an enum's inherited type it falls back to treating it as a RAW type, producing the misleading 'enum with raw type cannot have cases with arguments' against 'case migrationFailed(underlying: Error)'. The real defect was a missing 'import Foundation'. Audited the whole tree for the same pattern — files using Foundation types while importing neither Foundation nor a re-exporting module (SwiftUI/UIKit/WatchKit) — and found three more: NotificationService.swift (UserNotifications only), ScreenshotService.swift (Photos only), and AddCommitmentIntent.swift (AppIntents + SwiftData). Fixed all four; re-ran the audit clean. (2) Swift 6 rejected 'static let shared' on WatchSyncService as non-Sendable shared mutable state. The diagnostic was correct — the type is @Observable with unguarded mutable state read by SwiftUI. Rather than silence it with nonisolated(unsafe), which would have been dishonest, I checked what the code actually does: every one of the six WCSessionDelegate callbacks ALREADY wraps its body in 'Task { @MainActor in ... }', so the state was already main-actor-confined in practice. Declared the class @MainActor to make that contract explicit and checkable, and marked the six delegate witnesses nonisolated since WCSessionDelegate is not main-actor-isolated. No method body changed. Verified all six still hop. NOT COMPILED LOCALLY — no Swift toolchain here; CI is the check. The full error list was truncated in the log tail, so more compile errors likely remain beyond these two."
+    },
+    {
+      "id": "US-198",
+      "title": "Fix the first real Kotlin compile errors",
+      "category": "Android — Compilation",
+      "description": "As a developer, I need the Android Kotlin to compile. With the launcher icon added (US-196), resource linking passed and :app:compileDebugKotlin ran for the first time, reporting errors in UI code written during Loops 7 and 8 that had never been compiled.",
+      "acceptanceCriteria": [
+        "SeddlyNavHost.kt has no conflicting imports",
+        "LedgerScreen.kt imports only declarations that exist",
+        "The LazyColumn `items` extension import is preserved",
+        "The repository is swept for other instances of both defects",
+        ":app:compileDebugKotlin proceeds past these errors"
+      ],
+      "priority": 30,
+      "passes": true,
+      "notes": "Two errors, both in Compose UI code from Loops 7-8 that had never been compiled. (1) SeddlyNavHost.kt imported 'androidx.compose.ui.graphics.vector.ImageVector' twice verbatim, at lines 27 and 34; Kotlin rejects the duplicate with \"Conflicting import: imported name 'ImageVector' is ambiguous\" (reported once per occurrence). Removed the later, out-of-order one and kept the alphabetically-placed import. (2) LedgerScreen.kt imported 'androidx.compose.foundation.lazy.item', which does not exist — 'item' is a member function of LazyListScope, available on the scope receiver inside a LazyColumn block, not a top-level declaration. This is an easy mistake because the sibling 'items' IS a real extension function; that import is genuinely needed and was preserved. Swept the whole Kotlin tree for both patterns: no other file has duplicate imports, and no other file imports the non-existent lazy.item. NOT COMPILED LOCALLY — dl.google.com is blocked by this environment's network policy so AGP cannot resolve; CI is the check. More Kotlin errors may remain beyond the tail of the log I could read."
     }
   ]
 }

@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pearsonmedia.seddly.service.HapticsService
 import com.pearsonmedia.seddly.ui.theme.SeddlyPremium
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavType
 import androidx.compose.animation.core.spring
