@@ -1361,3 +1361,12 @@ never built. Supabase and website deploys have never completed. Every prior
           `env PATH=/usr/bin:/bin ./gradlew --version` — no system Gradle
           reachable — which downloaded the distribution and reported
           Gradle 8.11.1.
+
+  ✓ US-188 Make CI actually run on feature-branch pushes  [added mid-loop]
+          ci.yml declared `push: branches: ['*']`. A single asterisk in a
+          branch filter does NOT match a slash, so pushes to this project's
+          claude/<name> branches never triggered CI at all. Verified against
+          run history: every feature-branch run was a pull_request event,
+          every push event was on main. Developers therefore got zero build
+          feedback until opening a PR — a large part of why 56 consecutive
+          failures went unnoticed across nine loops. Changed to '**'.

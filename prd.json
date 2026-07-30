@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 5,
-    "totalCount": 19,
-    "completionRate": "26%",
+    "passingCount": 6,
+    "totalCount": 20,
+    "completionRate": "30%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -381,6 +381,22 @@
       "priority": 19,
       "passes": false,
       "notes": ""
+    },
+    {
+      "id": "US-188",
+      "title": "Make CI actually run on feature-branch pushes",
+      "category": "CI/CD — Triggers",
+      "description": "As a developer, I need CI to run when I push to a feature branch. ci.yml declares `push: branches: ['*']`, but a single asterisk in a GitHub Actions branch filter matches only branch names containing no slash. Every branch this project uses is named `claude/<something>`, so no push to a feature branch has ever triggered CI — confirmed against the run history, where every feature-branch run was a `pull_request` event and every `push` event was on main. Developers get zero build feedback until they open a pull request, which is a large part of why 56 consecutive failures went unnoticed.",
+      "acceptanceCriteria": [
+        "ci.yml uses a branch pattern that matches slash-containing branch names",
+        "Pushing to a claude/* branch triggers the CI workflow",
+        "The existing pull_request trigger against main is preserved",
+        "Concurrency grouping still cancels superseded runs for the same ref",
+        "A run appears for this branch on the next push, confirming the fix end to end"
+      ],
+      "priority": 20,
+      "passes": true,
+      "notes": "ci.yml declared \"push: branches: ['*']\". A single asterisk in a GitHub Actions branch filter does not match a slash, so pushes to this project's claude/<name> branches never triggered CI. Confirmed against the run history: every feature-branch run was a pull_request event and every push event was on main — meaning developers got zero build feedback until opening a PR, a large part of why 56 consecutive failures went unnoticed across nine loops. Changed to '**', which matches slashes. The pull_request trigger against main and the cancel-in-progress concurrency group keyed on github.ref are both unchanged."
     }
   ]
 }

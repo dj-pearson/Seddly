@@ -2,7 +2,12 @@ name: CI — Build & Test
 
 on:
   push:
-    branches: ['*']
+    # US-188: this was ['*']. A single asterisk in a branch filter does not
+    # match a '/', so no push to a claude/* branch ever triggered CI — the run
+    # history shows every feature-branch run arriving as a pull_request event.
+    # '**' matches slashes, so feature branches now get build feedback on push
+    # instead of only once a pull request is opened.
+    branches: ['**']
   pull_request:
     branches: [main]
 
