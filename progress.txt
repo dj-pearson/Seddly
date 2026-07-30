@@ -1347,3 +1347,17 @@ never built. Supabase and website deploys have never completed. Every prior
           projects`: the failure moved out of settings evaluation into
           plugin resolution — as far as this sandbox reaches, since
           dl.google.com is blocked by the environment network policy.
+
+  ✓ US-172 Replace the stub gradlew with a real Gradle wrapper
+          android/gradlew was a 531-byte hand-written shell stub — its own
+          comment said "In production, use the full gradlew from gradle
+          init". It exec'd a system gradle if one existed and otherwise
+          exited 1. No gradle-wrapper.jar, no gradlew.bat. Every step of
+          android-ci.yml invokes ./gradlew, so the Android job could never
+          succeed on a clean runner. Installed the official wrapper
+          (gradlew 8733B, gradlew.bat 2937B, gradle-wrapper.jar 43764B);
+          gradle-wrapper.properties was already byte-identical to the
+          generated one, so the 8.11.1-bin pin is unchanged. Verified with
+          `env PATH=/usr/bin:/bin ./gradlew --version` — no system Gradle
+          reachable — which downloaded the distribution and reported
+          Gradle 8.11.1.
