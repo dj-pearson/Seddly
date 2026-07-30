@@ -1605,3 +1605,59 @@ never built. Supabase and website deploys have never completed. Every prior
           devices, returns empty for an empty set). An earlier draft used a
           multi-line heredoc that broke the YAML block scalar — caught by
           parsing the file, rewritten as single-line invocations.
+
+──────────────────────────────────────────
+LOOP 10 SUMMARY
+──────────────────────────────────────────
+  Stories:    21/24 shipped, 3 carried to Loop 11
+  Added mid-loop from live CI logs: US-188 .. US-192 (5 stories that could
+  only be found by actually running the pipelines)
+
+THE FINDING: 56 of 56 prior CI runs had failed. Nothing in this repository
+had ever been built by a machine — not the iOS app, not Android, not the
+website. Nine loops of "Ship it" verdicts rested entirely on reading source.
+
+Why nobody saw it:
+  - ci.yml used `push: branches: ['*']`, which does not match a slash, so
+    pushes to claude/* branches never triggered CI (US-188).
+  - The remaining runs died at step 2 on a Docker-based secret scan running
+    on a macOS runner, which has no Docker daemon (US-189).
+
+Once those two were gone, each push surfaced the next real blocker:
+  xcodegen spec validation (US-169) -> missing Release.xcconfig (US-190)
+  -> hardcoded simulator destinations (US-192).
+
+  *** xcodegen generate now SUCCEEDS. The website now BUILDS (17 pages). ***
+
+Three pipelines that had never once succeeded, now unblocked:
+  iOS      — reaches the compiler; not yet green
+  Android  — gradlew was a 531-byte stub with no wrapper JAR (US-172), and
+             settings.gradle.kts had a DSL typo that failed configuration
+             (US-173). Both fixed and verified locally.
+  Website  — c/[id].astro was a dynamic route with no getStaticPaths, so
+             `astro build` always failed (US-191). Fixed; builds clean.
+
+Also shipped: production APNs entitlement, export-compliance key, bundle
+versions across all four targets, watchOS compilation + a real complication
+extension, Android release signing + Play publishing + version codes, a
+SwiftLint config, StoreKit drift tests, and migration off a Claude model
+whose retirement date had passed — which would have 404'd every single Pro
+and Pro+ AI extraction in production.
+
+CARRIED TO LOOP 11 (not started, and honestly so):
+  US-182  Android remote-to-local sync merge  — Pro+ sync is push-only
+  US-183  Android widget real data            — ships as a static tile
+  US-187  Room schema export                  — no migration safety net
+
+All three need an environment where the Android Gradle build actually runs.
+This one cannot: dl.google.com is blocked by the network policy, so the
+Android Gradle Plugin cannot be resolved. US-187 in particular was
+deliberately NOT faked — Room schema JSON carries identity hashes generated
+by KSP, and a hand-written file would make Room believe a migration had
+already applied. An absent schema is safer than a wrong one.
+
+iOS CI is not green yet. It is several blockers deeper than it has ever
+been, and every remaining failure is now visible in a real log.
+
+— Claude, Loop 10
+================================================================================
