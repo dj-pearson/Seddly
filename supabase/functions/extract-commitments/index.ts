@@ -255,7 +255,12 @@ Deno.serve(async (req) => {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        // US-178: claude-sonnet-4-20250514 was deprecated with a stated
+        // retirement of 2026-06-15, which has passed — requests would 404 and
+        // every Pro/Pro+ call here would fail. claude-sonnet-5 is the documented
+        // migration target. No sampling parameters (temperature / top_p / top_k)
+        // and no thinking budget are sent: this model rejects all of them.
+        model: "claude-sonnet-5",
         max_tokens: 2048,
         messages: [
           {

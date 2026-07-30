@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 8,
+    "passingCount": 9,
     "totalCount": 21,
-    "completionRate": "38%",
+    "completionRate": "43%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -236,8 +236,8 @@
         "A comment records the model choice so future migrations are traceable"
       ],
       "priority": 10,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Both Edge Functions requested 'claude-sonnet-4-20250514'. That ID is deprecated with a stated retirement of 2026-06-15 — already past — so every request would 404 and the entire Pro/Pro+ value proposition (AI extraction and dispute summaries) was dead on arrival. Migrated both to 'claude-sonnet-5', the documented migration target. Verified the migration is clean: neither function sends temperature, top_p, top_k, or a thinking budget, all of which this model rejects with a 400, so no other request-shape change was required. anthropic-version stays 2023-06-01 and the raw-HTTP call shape (correct for a Deno edge runtime with no SDK dependency) is otherwise untouched. Left an inline comment recording the deprecation and the target so the next migration is traceable."
     },
     {
       "id": "US-179",

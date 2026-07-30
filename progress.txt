@@ -1404,3 +1404,14 @@ never built. Supabase and website deploys have never completed. Every prior
           spec is a real defect that would have failed the build the moment
           the job got that far — but it was never the observed failure,
           because the job never got that far.
+
+  ✓ US-178 Migrate Edge Functions off the deprecated Claude model
+          extract-commitments and generate-dispute-summary both requested
+          claude-sonnet-4-20250514 — deprecated, with a stated retirement of
+          2026-06-15 that has already passed. Every request would 404,
+          meaning the entire Pro/Pro+ value proposition (AI extraction and
+          dispute summaries) was dead on arrival. Migrated both to
+          claude-sonnet-5. Verified clean: neither function sends
+          temperature, top_p, top_k, or a thinking budget — all rejected
+          with a 400 on this model — so no other request-shape change was
+          needed. anthropic-version and the raw-HTTP call shape unchanged.
