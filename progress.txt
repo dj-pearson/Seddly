@@ -1281,3 +1281,27 @@ swipe, and screen transition feels cohesive, tactile, and premium.
 
 — Claude, Loop 7
 ================================================================================
+
+════════════════════════════════════════════════════════════════════════════════
+LOOP 10 — PRODUCTION READINESS DEEP DIVE                            2026-07-30
+════════════════════════════════════════════════════════════════════════════════
+
+Audit finding that reframes all nine prior loops: 56 of 56 GitHub Actions
+runs have FAILED. The iOS app has never compiled in CI. The Android app has
+never built. Supabase and website deploys have never completed. Every prior
+"Ship it" verdict was source-read only, with no green build behind it.
+
+  ✓ US-169 Fix malformed XcodeGen target spec
+          project.yml declared an `info:` block with no `path:`. XcodeGen's
+          Plist type requires it, so spec decoding failed and `xcodegen
+          generate` — the first step of every CI job — could not run. Prime
+          suspect for the 56-run failure streak. Removed the block; moved
+          the `configs:` mapping that was nested under it to
+          `settings.configs` (restoring Debug=Automatic / Release=Manual
+          signing); moved CFBundleURLTypes into Seddly/Resources/Info.plist
+          so the seddly:// deep-link scheme reaches the built bundle for the
+          first time. Also dropped the redundant target-level `entitlements:`
+          blocks on Seddly and SeddlyWatch — XcodeGen *generates* the file
+          named there, which would have overwritten both checked-in
+          entitlements files with empty plists. All four targets now use the
+          settings-only CODE_SIGN_ENTITLEMENTS form the extensions already had.

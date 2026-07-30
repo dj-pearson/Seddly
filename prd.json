@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 0,
+    "passingCount": 1,
     "totalCount": 19,
-    "completionRate": "0%",
+    "completionRate": "5%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -92,8 +92,8 @@
         "CI reaches the build step rather than failing at project generation"
       ],
       "priority": 1,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Removed the invalid 'info:' block from the Seddly target — XcodeGen's Plist type requires a 'path:' key, so the block failed spec decoding and took 'xcodegen generate' (CI step 1) down with it. The 'configs:' mapping nested under 'info:' moved to 'settings.configs' where XcodeGen reads per-configuration overrides, restoring Debug=Automatic / Release=Manual code signing on the app target. CFBundleURLTypes with the seddly scheme moved into Seddly/Resources/Info.plist. Also removed the redundant target-level 'entitlements:' blocks from Seddly and SeddlyWatch: both already set CODE_SIGN_ENTITLEMENTS in settings.base, and XcodeGen's 'entitlements' key generates the referenced file, which would have overwritten the checked-in entitlements with an empty plist. Share Extension and Widget already used the settings-only form; all four targets are now consistent."
     },
     {
       "id": "US-170",

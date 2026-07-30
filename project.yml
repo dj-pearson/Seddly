@@ -43,18 +43,11 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    info:
-      properties:
-        CFBundleURLTypes:
-          - CFBundleURLSchemes:
-              - seddly
       configs:
         Debug:
           CODE_SIGN_STYLE: Automatic
         Release:
           CODE_SIGN_STYLE: Manual
-    entitlements:
-      path: Seddly/Resources/Seddly.entitlements
     dependencies:
       - target: SeddlyShareExtension
       - target: SeddlyWidget
@@ -129,8 +122,6 @@ targets:
           CODE_SIGN_STYLE: Automatic
         Release:
           CODE_SIGN_STYLE: Manual
-    entitlements:
-      path: SeddlyWatch/SeddlyWatch.entitlements
 
   SeddlyTests:
     type: bundle.unit-test
