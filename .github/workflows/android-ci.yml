@@ -94,9 +94,14 @@ jobs:
           fetch-depth: 0
 
       - name: TruffleHog Secrets Scan
+        # US-195: extra_args passed `--fail`, but the action's own invocation
+        # already passes it, and trufflehog rejects a repeated flag:
+        # "trufflehog: error: flag 'fail' cannot be repeated, try --help".
+        # This job therefore failed on every run it ever had — the same defect
+        # US-189 removed from ci.yml. A verified finding still fails the job.
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified --fail
+          extra_args: --only-verified
 
   release:
     name: Release Build
