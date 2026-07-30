@@ -1469,3 +1469,17 @@ never built. Supabase and website deploys have never completed. Every prior
           glob worked by accident; it would only break on a nested layout.
           The real gap was the missing pinned config. The historical Deploy
           Supabase failures remain unexplained — those logs are 410 Gone.
+
+  ✓ US-190 Materialize Release.xcconfig in the CI build job  [added mid-loop]
+          With the Docker blocker gone (US-189), CI reached `xcodegen
+          generate` for the first time in project history — and failed with
+          "Spec validation error: Invalid config file
+          Seddly/Config/Release.xcconfig for config Release". project.yml
+          declares configFiles for BOTH Debug and Release, and XcodeGen
+          validates every referenced file at spec-load time regardless of
+          which configuration is being built; ci.yml copied only the Debug
+          sample and Release.xcconfig is gitignored. Now copies both. Safe:
+          the Release sample carries REPLACE_WITH_CI_SECRET placeholders
+          that AppConfiguration.isPlaceholder resolves to nil, and it
+          #includes the committed Shared.xcconfig. release.yml still writes
+          the real Release.xcconfig from secrets and is unaffected.

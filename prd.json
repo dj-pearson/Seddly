@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 13,
-    "totalCount": 21,
-    "completionRate": "62%",
+    "passingCount": 14,
+    "totalCount": 22,
+    "completionRate": "64%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -414,6 +414,22 @@
       "priority": 21,
       "passes": true,
       "notes": "Root cause of the 56-run failure streak, found by reading the first live CI log this project has ever produced. ci.yml ran 'Scan for secrets' via trufflesecurity/trufflehog — a Docker action — as step 2 of a job on macos-15. GitHub's macOS runners ship no Docker daemon, so the step failed with 'docker: command not found' and exit 127 twelve seconds into the run, before Xcode selection, before xcodegen, before a single file was compiled. No iOS CI job has ever reached a compiler. Moved secret scanning into its own ubuntu-latest job, matching the layout android-ci.yml already used, so the macOS job now proceeds to the build. Also dropped the redundant '--fail' from extra_args: the action's own invocation already passes --fail, so a verified finding still fails the workflow."
+    },
+    {
+      "id": "US-190",
+      "title": "Materialize Release.xcconfig in the CI build job",
+      "category": "CI/CD — iOS",
+      "description": "As a developer, I need `xcodegen generate` to succeed in the CI build job. project.yml declares configFiles for both Debug and Release, and XcodeGen validates every referenced file when it loads the spec — regardless of which configuration is being built. ci.yml materialized only Debug.xcconfig from its sample; Release.xcconfig is gitignored and was never created, so generation aborted with 'Spec validation error: Invalid config file \"Seddly/Config/Release.xcconfig\" for config \"Release\"'. Found in the first CI run that ever reached the xcodegen step, after US-189 removed the Docker blocker.",
+      "acceptanceCriteria": [
+        "ci.yml materializes both Debug.xcconfig and Release.xcconfig from their committed samples",
+        "xcodegen generate completes without a spec validation error",
+        "Only placeholder credentials are used — AppConfiguration treats REPLACE_ values as absent",
+        "release.yml continues to write the real Release.xcconfig from GitHub secrets",
+        "No real credential is committed or written by the CI build job"
+      ],
+      "priority": 22,
+      "passes": true,
+      "notes": "project.yml declares configFiles for both Debug and Release, and XcodeGen validates every referenced config file at spec-load time no matter which configuration is being built. ci.yml copied only Debug.xcconfig.sample, and Release.xcconfig is gitignored, so 'xcodegen generate' aborted with 'Spec validation error: Invalid config file \"Seddly/Config/Release.xcconfig\" for config \"Release\"'. Now copies both samples. Safe: Release.xcconfig.sample carries REPLACE_WITH_CI_SECRET placeholders, which AppConfiguration.isPlaceholder catches via its 'REPLACE_' check and resolves to nil, and it #includes the committed Shared.xcconfig so it is self-sufficient. release.yml still writes the real Release.xcconfig from GitHub secrets and is unaffected. Found by reading the first CI run in this project's history that reached the xcodegen step at all."
     }
   ]
 }

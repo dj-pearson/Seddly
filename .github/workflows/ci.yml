@@ -60,12 +60,21 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen@2.42.0 || brew install xcodegen
 
-      - name: Materialize Debug.xcconfig
+      - name: Materialize xcconfigs
         # CI builds never hit the Supabase / AI code paths (they run simulator
         # Debug), so we stamp in placeholder values. AppConfiguration.swift
         # recognizes these as placeholders and returns nil to disable the
         # network-dependent flows.
-        run: cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+        #
+        # US-190: only Debug was materialized here, but project.yml declares
+        # configFiles for BOTH Debug and Release, and XcodeGen validates every
+        # referenced file at spec-load time regardless of which configuration is
+        # being built. The missing Release.xcconfig aborted `xcodegen generate`
+        # with "Spec validation error: Invalid config file". Real Release
+        # secrets are still written only by release.yml, from GitHub secrets.
+        run: |
+          cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+          cp Seddly/Config/Release.xcconfig.sample Seddly/Config/Release.xcconfig
 
       - name: Cache Xcode derived data
         uses: actions/cache@v4
