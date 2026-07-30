@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 14,
-    "totalCount": 22,
-    "completionRate": "64%",
+    "passingCount": 16,
+    "totalCount": 23,
+    "completionRate": "70%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -333,8 +333,8 @@
         "The Astro build succeeds and the page still passes the deploy workflow's HTML validation"
       ],
       "priority": 16,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "download.astro advertised iOS only and told Android visitors 'Android version coming soon', and support.astro's FAQ stated outright: 'Not yet. Seddly is currently iOS-only. An Android version is planned if the iOS app proves the model.' Both were flatly false — the Android app has been feature-complete since Loop 6 with OCR, AI extraction, billing, sync, notifications, and a widget at parity. Corrected site-wide. Since NEITHER store listing is live (the iOS button was already a placeholder href='#'), the honest framing is symmetric pre-launch rather than swapping one false claim for another: download.astro now shows both an App Store and a Google Play button, both styled as pre-launch, with one accurate note that both apps are built and in final release testing. Platform detection now emphasises the visitor's own platform instead of telling Android users the app does not exist. A STORE_URLS map at the top of the script flips either button to a live store link by setting one value. Also updated the page title, description, and keywords to cover both platforms; the Requirements list to include Android 10+ (matching minSdk 29); the homepage title, description, and closing CTA; and neutralised 'Download for iOS' CTAs across 10 blog, use-case, and share pages. Verified by building: 17 pages emitted, all passing the deploy workflow's DOCTYPE and closing-tag validation."
     },
     {
       "id": "US-185",
@@ -430,6 +430,22 @@
       "priority": 22,
       "passes": true,
       "notes": "project.yml declares configFiles for both Debug and Release, and XcodeGen validates every referenced config file at spec-load time no matter which configuration is being built. ci.yml copied only Debug.xcconfig.sample, and Release.xcconfig is gitignored, so 'xcodegen generate' aborted with 'Spec validation error: Invalid config file \"Seddly/Config/Release.xcconfig\" for config \"Release\"'. Now copies both samples. Safe: Release.xcconfig.sample carries REPLACE_WITH_CI_SECRET placeholders, which AppConfiguration.isPlaceholder catches via its 'REPLACE_' check and resolves to nil, and it #includes the committed Shared.xcconfig so it is self-sufficient. release.yml still writes the real Release.xcconfig from GitHub secrets and is unaffected. Found by reading the first CI run in this project's history that reached the xcodegen step at all."
+    },
+    {
+      "id": "US-191",
+      "title": "Fix the Astro build failure that has blocked every website deploy",
+      "category": "Website — Build",
+      "description": "As a developer, I need `astro build` to succeed. src/pages/c/[id].astro is a dynamic route with no getStaticPaths(), which a static Astro build requires, so the build failed with GetStaticPathsRequired and the website has never deployed — the third pipeline in this project that has never once succeeded. Enumerating the paths is impossible by nature: these are share links keyed by commitment UUID, created by users long after the site is built.",
+      "acceptanceCriteria": [
+        "astro build completes and emits every page",
+        "/c/<id> share links still resolve and still offer the seddly://c/<id> deep link",
+        "The commitment id is read at runtime and validated before use",
+        "A crafted path cannot inject markup or a foreign scheme into the deep link",
+        "The build output passes the deploy workflow's HTML validation"
+      ],
+      "priority": 23,
+      "passes": true,
+      "notes": "src/pages/c/[id].astro was a dynamic route with no getStaticPaths(), which a static Astro build requires — 'astro build' failed with GetStaticPathsRequired, so the website has never deployed. Confirmed pre-existing by stashing my changes and rebuilding. Enumerating paths is impossible here: /c/<id> links are keyed by commitment UUID and created by users long after the site is built. Converted the route to a single static shell at src/pages/c/index.astro that reads the id from window.location.pathname at runtime, and added public/_redirects with '/c/*  /c/index.html  200' — a Cloudflare Pages rewrite, not a redirect, so the visitor's URL stays /c/<id> and the link remains shareable. The id is validated against /^[A-Za-z0-9-]{1,64}$/ before being written into the DOM or the seddly:// href, and set via textContent and setAttribute rather than innerHTML. Verified with 8 cases including path traversal (/c/../../etc), encoded markup (/c/%3Cscript%3E), attribute-breakout (/c/a%22onload%3D1), and an over-length id — all rejected. Also replaced the hardcoded placeholder App Store URL (id0000000000) on that page with /download. Build now emits 17 pages and passes the deploy workflow's DOCTYPE and closing-tag validation."
     }
   ]
 }

@@ -1,0 +1,10 @@
+# Cloudflare Pages routing rules.
+#
+# US-191: /c/<id> share links are keyed by commitment UUID and are created by
+# users long after the site is built, so they cannot be enumerated by
+# getStaticPaths at build time. Rewrite every /c/<id> path to the static shell
+# at /c/, which reads the id from the URL at runtime.
+#
+# Status 200 is a rewrite, not a redirect: the visitor's URL stays /c/<id>, so
+# the page can still read the id and the shared link remains shareable.
+/c/*  /c/index.html  200

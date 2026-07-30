@@ -1483,3 +1483,37 @@ never built. Supabase and website deploys have never completed. Every prior
           that AppConfiguration.isPlaceholder resolves to nil, and it
           #includes the committed Shared.xcconfig. release.yml still writes
           the real Release.xcconfig from secrets and is unaffected.
+
+  ✓ US-191 Fix the Astro build failure blocking every website deploy
+                                                        [added mid-loop]
+          *** THIRD pipeline that has never once succeeded. ***
+          src/pages/c/[id].astro was a dynamic route with no
+          getStaticPaths(), which a static Astro build requires — `astro
+          build` failed with GetStaticPathsRequired, so the website has
+          never deployed. Confirmed pre-existing by stashing my changes and
+          rebuilding. Enumerating paths is impossible by nature: /c/<id>
+          links are keyed by commitment UUID and created by users long
+          after the site is built. Converted to a single static shell at
+          c/index.astro that reads the id from location.pathname at
+          runtime, plus public/_redirects `/c/* /c/index.html 200` — a
+          Cloudflare rewrite, not a redirect, so the URL stays /c/<id> and
+          links remain shareable. The id is validated against
+          ^[A-Za-z0-9-]{1,64}$ before touching the DOM or the seddly://
+          href, and written via textContent/setAttribute, never innerHTML.
+          Verified 8 cases: traversal, encoded markup, attribute breakout,
+          over-length — all rejected. Build now emits 17 pages.
+
+  ✓ US-184 Correct the website's Android availability claim
+          download.astro said "Android version coming soon"; support.astro
+          stated outright "Seddly is currently iOS-only. An Android version
+          is planned if the iOS app proves the model." Both flatly false —
+          Android has been feature-complete since Loop 6 at full parity.
+          Since NEITHER listing is live (the iOS button was already
+          href="#"), corrected to symmetric pre-launch rather than swapping
+          one false claim for another: both store buttons shown, both marked
+          pre-launch, one accurate note. Platform detection now emphasises
+          the visitor's platform instead of denying their app exists; a
+          STORE_URLS map flips either button live with one value. Also
+          updated titles/descriptions/keywords, Requirements (Android 10+,
+          matching minSdk 29), the homepage, and neutralised "Download for
+          iOS" CTAs across 10 pages.
