@@ -122,6 +122,35 @@ targets:
           CODE_SIGN_STYLE: Automatic
         Release:
           CODE_SIGN_STYLE: Manual
+    dependencies:
+      - target: SeddlyWatchComplication
+    scheme:
+      gatherCoverageData: false
+
+  # US-171: the complication used to live inside the SeddlyWatch app target with
+  # no @main WidgetBundle. WidgetKit only discovers widgets vended by a widget
+  # extension's principal bundle, so it compiled but could never be added to a
+  # watch face. It now has its own extension target, embedded in the watch app.
+  SeddlyWatchComplication:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: SeddlyWatchComplication
+        excludes:
+          - "**/.gitkeep"
+      - path: Seddly/Sources/Shared
+      - path: Seddly/Sources/Models
+    settings:
+      base:
+        INFOPLIST_FILE: SeddlyWatchComplication/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SeddlyWatchComplication/SeddlyWatchComplication.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.watchkitapp.complication
+        TARGETED_DEVICE_FAMILY: "4"
+      configs:
+        Debug:
+          CODE_SIGN_STYLE: Automatic
+        Release:
+          CODE_SIGN_STYLE: Manual
 
   SeddlyTests:
     type: bundle.unit-test

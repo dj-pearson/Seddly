@@ -1,4 +1,12 @@
 import Foundation
+
+// US-171: Sources/Shared is compiled into the watchOS targets as well as the
+// iOS app and its extensions, but ActivityKit ships only on iOS — an
+// unconditional import broke every watchOS build. Live Activities are an iOS
+// feature, so the whole file is conditional. Nothing in the watch targets
+// references CommitmentActivityAttributes; the only consumers are
+// LiveActivityService (app) and CommitmentLiveActivityWidget (widget), both iOS.
+#if canImport(ActivityKit)
 import ActivityKit
 
 /// US-151: Live Activity attributes for the next-due pending commitment.
@@ -30,3 +38,5 @@ struct CommitmentActivityAttributes: ActivityAttributes {
         self.entityName = entityName
     }
 }
+
+#endif

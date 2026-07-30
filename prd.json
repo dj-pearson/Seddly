@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 2,
+    "passingCount": 3,
     "totalCount": 19,
-    "completionRate": "11%",
+    "completionRate": "16%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -125,8 +125,8 @@
         "No duplicate @main declarations exist within any single target"
       ],
       "priority": 3,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Three defects fixed. (1) Seddly/Sources/Shared/CommitmentLiveActivity.swift imported ActivityKit unconditionally, and Shared/ is compiled into the watchOS targets — ActivityKit is iOS-only, so every watch build failed at that import. Wrapped the file in '#if canImport(ActivityKit)'; verified no watch code references CommitmentActivityAttributes (only LiveActivityService and CommitmentLiveActivityWidget, both iOS). (2) SeddlyWatch/Info.plist now declares WKApplication=true, required for a single-target watchOS app. (3) SeddlyWatchComplication was a complete, working WidgetKit Widget sitting inside the SeddlyWatch app target with no @main WidgetBundle — WidgetKit only discovers widgets vended by a widget extension's principal bundle, so it compiled but could never be added to a watch face. Moved it to a new SeddlyWatchComplication/ extension target (Info.plist with the widgetkit-extension point, App Group entitlements for SharedModelContainer, new SeddlyWatchComplicationBundle @main), embedded it in the watch app via a target dependency, and registered its provisioning profile in ExportOptions.plist and release.yml. Also registered the seddly-watch:// URL scheme in the Watch Info.plist — WatchLedgerView.onOpenURL already parsed those links and the complication's widgetURL already emitted them, but the scheme was unregistered so complication taps ignored the requested filter. Verified project.yml parses, all seven targets are well-formed, and every shippable bundle ID has exactly one matching provisioning profile."
     },
     {
       "id": "US-172",

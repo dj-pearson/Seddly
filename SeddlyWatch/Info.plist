@@ -9,7 +9,27 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- US-171: required for a single-target watchOS app. Without it the bundle
+         is treated as a legacy WatchKit app with a missing extension and fails
+         to launch or validate. -->
+    <key>WKApplication</key>
+    <true/>
     <key>WKCompanionAppBundleIdentifier</key>
     <string>com.pearsonmedia.Seddly</string>
+    <!-- US-171: WatchLedgerView.onOpenURL already parses seddly-watch:// links,
+         and the complication's widgetURL emits them, but the scheme was never
+         registered — so tapping a complication opened the app to the default
+         view instead of the requested filter. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.pearsonmedia.Seddly.watchkitapp</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>seddly-watch</string>
+            </array>
+        </dict>
+    </array>
 </dict>
 </plist>
