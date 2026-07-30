@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 10,
+    "passingCount": 12,
     "totalCount": 21,
-    "completionRate": "48%",
+    "completionRate": "57%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -204,8 +204,8 @@
         "The approach is documented in SETUP.md so the next release engineer does not regress it"
       ],
       "priority": 8,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Seddly.entitlements hardcoded 'aps-environment = development'. An App Store build signed with a development APNs entitlement cannot receive production pushes, so the Pro+ silent-push sync driven by the send-silent-push Edge Function would have failed silently in production — the app installs and runs, it just never syncs. Rather than fork the entitlements into two near-identical files that can drift, the value is now $(APS_ENVIRONMENT), resolved from a per-configuration build setting in project.yml (Debug=development, Release=production). Xcode expands build settings in entitlements files during the code-signing step, the same mechanism that resolves $(AppIdentifierPrefix). One file serves both configurations. ExportOptions.plist and release.yml are unaffected because they never referenced the APNs environment. Documented in SETUP.md section 4.6, including why hardcoding a literal back into the file would be a regression."
     },
     {
       "id": "US-177",
@@ -219,8 +219,8 @@
         "The claim is consistent with CertificatePinningService and the App Transport Security configuration"
       ],
       "priority": 9,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Added ITSAppUsesNonExemptEncryption = false to Seddly/Resources/Info.plist. Without the key, App Store Connect holds every build behind a manual export-compliance questionnaire, so the automated TestFlight upload in release.yml would never finish processing without a human answering a form. The exemption is legitimate and consistent with the rest of the app: the only cryptography is standard HTTPS/TLS to Supabase (see the NSAppTransportSecurity block in the same file, which default-denies and pins TLS 1.3 for supabase.co) plus Apple-provided platform cryptography via CertificatePinningService and the Keychain — no proprietary or non-standard encryption ships. Recorded the reasoning inline and in SETUP.md section 4.7, flagging that this is a legal attestation to revisit if custom encryption is ever added."
     },
     {
       "id": "US-178",

@@ -16,6 +16,15 @@
     <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- US-177: without this key, App Store Connect holds every build behind a
+         manual export-compliance questionnaire, so automated TestFlight uploads
+         never finish processing. Seddly qualifies for the exemption: the only
+         cryptography it uses is standard HTTPS/TLS to Supabase (see the
+         NSAppTransportSecurity block below) and Apple-provided platform
+         cryptography via CertificatePinningService and the Keychain. It ships
+         no proprietary or non-standard encryption. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Seddly reads only your Screenshots album to find commitments, promises, and deadlines. Your personal photos and videos are never accessed.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>

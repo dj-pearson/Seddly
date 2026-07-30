@@ -1429,3 +1429,26 @@ never built. Supabase and website deploys have never completed. Every prior
           confirm zero findings (dl.google.com blocked here); if CI
           surfaces pre-existing errors the answer is to fix them, not
           baseline them.
+
+  ✓ US-176 Set aps-environment to production for App Store distribution
+          Seddly.entitlements hardcoded `aps-environment = development`. An
+          App Store build with a development APNs entitlement cannot receive
+          production pushes — the Pro+ silent-push sync would have failed
+          silently in production: app installs, runs fine, never syncs.
+          Rather than fork into two near-identical entitlements files that
+          drift, the value is now $(APS_ENVIRONMENT), resolved from a
+          per-config build setting in project.yml (Debug=development,
+          Release=production). Xcode expands build settings in entitlements
+          during code signing — the same mechanism behind
+          $(AppIdentifierPrefix). Documented in SETUP.md §4.6.
+
+  ✓ US-177 Declare export-compliance status in Info.plist
+          Added ITSAppUsesNonExemptEncryption = false. Without it App Store
+          Connect holds every build behind a manual export-compliance
+          questionnaire, so release.yml's automated TestFlight upload could
+          never finish without a human answering a form. Exemption is
+          legitimate: only standard HTTPS/TLS to Supabase plus Apple
+          platform cryptography (pinning, Keychain). Documented in SETUP.md
+          §4.7 and flagged as a legal attestation to revisit if custom
+          encryption is ever added. Also documented the new watch
+          complication provisioning profile from US-171 in §4.4.

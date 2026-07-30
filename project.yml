@@ -46,8 +46,13 @@ targets:
       configs:
         Debug:
           CODE_SIGN_STYLE: Automatic
+          # US-176: resolved into aps-environment in Seddly.entitlements.
+          # A Release build must declare "production" or App Store pushes —
+          # including the Pro+ silent-push sync — are delivered to nothing.
+          APS_ENVIRONMENT: development
         Release:
           CODE_SIGN_STYLE: Manual
+          APS_ENVIRONMENT: production
     dependencies:
       - target: SeddlyShareExtension
       - target: SeddlyWidget

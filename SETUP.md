@@ -207,6 +207,14 @@ Go to **Certificates, Identifiers & Profiles → Profiles → +**
 - Profile Name: `SeddlyWatch_AppStore`
 - Download the `.mobileprovision` file
 
+**Profile 5 — Watch Complication** *(US-171)*
+- Type: App Store Connect
+- App ID: `Seddly Watch Complication (com.pearsonmedia.Seddly.watchkitapp.complication)`
+- Certificate: Select your Apple Distribution certificate
+- Profile Name: `SeddlyWatchComplication_AppStore`
+- Download the `.mobileprovision` file
+- Encode into the `PROVISIONING_PROFILE_WATCH_COMPLICATION` secret
+
 ### 4.5 Encode the Profiles
 
 ```bash
@@ -218,6 +226,38 @@ base64 -i SeddlyShareExt_AppStore.mobileprovision | pbcopy
 ```
 
 **Important:** The profile names `Seddly_AppStore` and `SeddlyShareExt_AppStore` must match what's in `ExportOptions.plist`. If you name them differently in the portal, update `ExportOptions.plist` to match.
+
+### 4.6 APNs Environment — do not hardcode it
+
+`Seddly/Resources/Seddly.entitlements` declares `aps-environment` as
+`$(APS_ENVIRONMENT)`, resolved from a per-configuration build setting in
+`project.yml`:
+
+| Configuration | `APS_ENVIRONMENT` |
+| ------------- | ----------------- |
+| Debug         | `development`     |
+| Release       | `production`      |
+
+This split matters. An App Store build signed with a *development* APNs
+entitlement cannot receive production pushes, which silently breaks the Pro+
+silent-push sync driven by the `send-silent-push` Edge Function — the app
+installs and runs fine, it just never syncs.
+
+If you ever need to change this, change the build setting in `project.yml`. Do
+not hardcode a literal value back into the entitlements file: a single file
+covering both configurations is what stops the two from drifting apart.
+
+### 4.7 Export Compliance
+
+`Info.plist` declares `ITSAppUsesNonExemptEncryption = false`. Without that key,
+App Store Connect holds every build behind a manual export-compliance
+questionnaire and automated TestFlight uploads never finish processing.
+
+The exemption applies because the only cryptography Seddly uses is standard
+HTTPS/TLS to Supabase and Apple-provided platform cryptography (certificate
+pinning, Keychain). **If you ever add proprietary or non-standard encryption,
+this declaration must be revisited** — it is a legal attestation, not a
+convenience flag.
 
 ---
 
