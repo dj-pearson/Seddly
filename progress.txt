@@ -1707,3 +1707,19 @@ been, and every remaining failure is now visible in a real log.
           version 6.1 — conflating those is what produced the bogus 6.2
           claim. Not a blocker: XcodeGen tolerated the invalid value, which
           is exactly why nine loops never noticed it.
+
+  ↻ US-192 follow-up 3 — decouple compiling from bootable devices
+          The diagnostic dump paid off: "Available destinations" on this
+          image lists ONLY placeholders — "Any iOS Device" and "Any iOS
+          Simulator Device" — with no concrete simulator devices at all, and
+          -downloadPlatform produced none. But compiling needs a matching
+          SDK, not a bootable device, and those placeholders are exactly
+          what `generic/platform=iOS Simulator` targets. So build-for-testing
+          and the Watch build now use generic destinations unconditionally.
+          Concrete-device resolution is kept only for the test run, which
+          genuinely needs one; when none exists the resolver warns and
+          leaves IOS_SIM empty, and the test + coverage steps are gated on
+          `env.IOS_SIM != ''` so they SKIP VISIBLY rather than silently
+          passing. This decouples the compile — the single most valuable
+          signal in this pipeline, never once produced in this repo — from
+          whatever runtimes a runner image happens to ship.
