@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 17,
+    "passingCount": 18,
     "totalCount": 23,
-    "completionRate": "74%",
+    "completionRate": "78%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -268,8 +268,8 @@
         "The Seddly scheme keeps its existing test targets, coverage gathering, and StoreKit configuration"
       ],
       "priority": 12,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "ci.yml runs 'xcodebuild -scheme SeddlyWatch', but only the Seddly target declared a 'scheme:' block in project.yml. XcodeGen emits shared schemes only for targets that ask for one, so the watch build step depended on Xcode's scheme autocreation rather than a scheme committed to the repository — fragile, and invisible to anyone reading project.yml. Added a scheme block to SeddlyWatch (implemented alongside US-171, since a buildable watch target and a usable watch scheme are the same problem). Verified by cross-checking every '-scheme <name>' occurrence across all five workflow files against the targets declaring a scheme in project.yml: both sets are exactly {Seddly, SeddlyWatch}, with nothing referenced-but-undeclared. The Seddly scheme keeps its existing testTargets (SeddlyTests, SeddlyUITests), gatherCoverageData, and storeKitConfiguration. The 'xcodebuild -list' criterion is confirmed transitively by CI: the watch build step invokes the scheme by name and would fail with 'scheme not found' if it were missing."
     },
     {
       "id": "US-181",

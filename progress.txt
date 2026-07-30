@@ -1539,3 +1539,14 @@ never built. Supabase and website deploys have never completed. Every prior
           NOT VERIFIED LOCALLY: no Swift toolchain in this environment, so
           the "zero violations under --strict" criterion is first exercised
           in CI.
+
+  ✓ US-180 Declare explicit shared schemes for every buildable target
+          ci.yml runs `xcodebuild -scheme SeddlyWatch`, but only the Seddly
+          target declared a `scheme:` block. XcodeGen emits shared schemes
+          only for targets that ask for one, so the watch build depended on
+          Xcode's scheme autocreation rather than anything committed.
+          Scheme added alongside US-171 (a buildable watch target and a
+          usable watch scheme are the same problem). Verified by
+          cross-checking every `-scheme <name>` across all five workflow
+          files against the targets declaring schemes: both sets are exactly
+          {Seddly, SeddlyWatch}, nothing referenced-but-undeclared.
