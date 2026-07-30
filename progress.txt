@@ -1336,3 +1336,14 @@ never built. Supabase and website deploys have never completed. Every prior
           seddly-watch:// scheme: WatchLedgerView.onOpenURL already parsed
           those links and the complication already emitted them, but the
           scheme was unregistered so taps ignored the requested filter.
+
+  ✓ US-173 Fix settings.gradle.kts dependencyResolutionManagement typo
+          settings.gradle.kts declared `dependencyResolution { }`, which is
+          not a Gradle settings DSL method — settings evaluation failed with
+          an unresolved-method error, so NO Android task could run. Renamed
+          to `dependencyResolutionManagement` and added
+          repositoriesMode = FAIL_ON_PROJECT_REPOS so a stray project-level
+          repository declaration fails loudly. Verified with `gradle
+          projects`: the failure moved out of settings evaluation into
+          plugin resolution — as far as this sandbox reaches, since
+          dl.google.com is blocked by the environment network policy.
