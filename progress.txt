@@ -1685,3 +1685,14 @@ been, and every remaining failure is now visible in a real log.
           Added a trailing `|| true` to the pipeline. Reproduced the exact
           failure locally under the same shell flags and verified the fixed
           version reaches the download branch and exits 0.
+
+  ✓ US-193 Run Android CI on feature-branch pushes  [added mid-loop]
+          android-ci.yml triggered only on push to main and PRs to main, so
+          EVERY Android change in this loop went unvalidated: the real Gradle
+          wrapper (US-172), the settings DSL fix (US-173), release signing
+          (US-174), the lint baseline (US-175), and version codes + Play
+          publishing (US-186) were all reasoned about and locally checked but
+          never machine-built. Same blind spot US-188 fixed for ci.yml.
+          Widened the push filter to '**'. Verified the release job keeps its
+          own `if: github.ref == 'refs/heads/main'` gate, so feature branches
+          run build/lint/test but can never publish to Play Console.

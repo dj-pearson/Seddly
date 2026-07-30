@@ -5,8 +5,8 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 21,
-    "totalCount": 24,
+    "passingCount": 22,
+    "totalCount": 25,
     "completionRate": "88%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 — 21/24 shipped. The loop's real finding: 56 of 56 prior CI runs had failed and nothing in this repository had ever been built by machine. Root cause was a Docker-based secret scan on a macOS runner (US-189) failing at step 2 of every run, compounded by a branch filter that never matched this project's branch names (US-188), so nobody saw it. With those removed, five further blockers surfaced from real logs and were fixed in sequence: a malformed XcodeGen spec, a missing Release.xcconfig, hardcoded simulator destinations, plus an Astro dynamic route that had blocked every website deploy and a stub gradlew that had blocked every Android build. xcodegen generate and the website build now both succeed for the first time. Also shipped: production APNs entitlement, export compliance, bundle versions, watchOS compilation and a real complication target, Android signing and Play publishing, a SwiftLint config, StoreKit drift tests, and migration off a retired Claude model that would have 404'd every Pro extraction. NOT DONE and carried to Loop 11: US-182 Android sync merge, US-183 Android widget data, US-187 Room schema export — all three need an environment where the Android build runs, which this one is not (dl.google.com is blocked by network policy). iOS CI is progressing step by step but is not yet green; the compile itself has not been reached."
@@ -462,6 +462,21 @@
       "priority": 24,
       "passes": true,
       "notes": "ci.yml hardcoded 'name=iPhone 16' and 'name=Apple Watch Series 10 (46mm)'. The macos-15 image reported no iOS simulator runtime at all — the only eligible destination was the 'Any iOS Device' placeholder with 'iOS 18.4 is not installed' — so xcodebuild exited 70 with 'Unable to find a destination matching the provided destination specifier'. Replaced with a 'Resolve simulator destinations' step that parses 'xcrun simctl list devices available -j', sorts by runtime identifier so the newest runtime wins, and exports one UDID per platform to GITHUB_ENV; the three build/test steps then use -destination \"id=$IOS_SIM\" / \"id=$WATCH_SIM\". If no runtime is present the step runs 'xcodebuild -downloadPlatform' and re-resolves, and fails with an explicit ::error:: if still empty. Resolved UDIDs are echoed for diagnosability. Verified locally: extracted the exact PICK expression back out of the committed YAML and ran it against sample simctl JSON — it selects the iOS-18-4 device over iOS-18-2, selects the watchOS device, ignores isAvailable:false entries, and returns empty (triggering the download branch) for an empty device set. An earlier draft used a multi-line embedded heredoc that broke the YAML block scalar; caught by parsing the file and rewritten as single-line invocations. FOLLOW-UP after the next CI run: the first version of this fix gated on 'xcrun simctl list devices available', which resolved a UDID successfully — but xcodebuild still rejected it, because simctl reports devices whose platform Xcode has not actually installed. The run showed IOS_SIM resolved to a real UDID and the build still failing with 'Unable to find a destination matching' while the ineligible list said 'iOS 18.4 is not installed'. So the download branch never fired: I was gating on the wrong signal. Rewritten to parse 'xcodebuild -showdestinations' for the scheme and read only the 'Available destinations' section — xcodebuild's own view of what it will accept — falling back to -downloadPlatform and dumping the full destination list on failure. Verified the parser against all three shapes: a populated available section (picks the first simulator), an empty one (returns empty, triggering the download), and the placeholder 'dvtdevice-DVTiPhonePlaceholder' id, which the 36-hex-char pattern correctly never matches."
+    },
+    {
+      "id": "US-193",
+      "title": "Run Android CI on feature-branch pushes",
+      "category": "CI/CD — Triggers",
+      "description": "As a developer, I need Android CI to validate Android changes before they reach main. android-ci.yml triggered only on `push: branches: [main]` and PRs to main, so none of this loop's Android work — the real Gradle wrapper (US-172), the settings DSL fix (US-173), release signing (US-174), the lint baseline (US-175), or version codes and Play publishing (US-186) — has ever been validated by a machine. Same blind spot US-188 fixed for ci.yml.",
+      "acceptanceCriteria": [
+        "A push to a feature branch touching android/** runs Android CI",
+        "The release job remains restricted to main so no feature branch can publish to Play",
+        "The existing pull_request trigger and path filters are preserved",
+        "An Android CI run appears for this branch, validating the loop's Gradle changes"
+      ],
+      "priority": 25,
+      "passes": true,
+      "notes": "android-ci.yml triggered only on push to main and PRs to main, so every Android change in this loop went unvalidated — US-172 (real Gradle wrapper), US-173 (dependencyResolutionManagement), US-174 (release signing), US-175 (lint baseline), and US-186 (version codes + Play publishing) were all reasoned about and locally checked but never machine-built. Widened the push branch filter to '**', matching what US-188 did for ci.yml. Verified the release job keeps its own gate — `if: github.event_name == 'push' && github.ref == 'refs/heads/main'` — so widening the trigger runs build/lint/test on feature branches without ever letting one publish to Play Console. Path filters and the pull_request trigger are unchanged."
     }
   ]
 }

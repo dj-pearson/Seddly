@@ -2,7 +2,12 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    # US-193: this was [main], so a push to a feature branch never ran Android
+    # CI — the same blind spot US-188 fixed for ci.yml, and the reason the
+    # gradlew, Gradle-settings, signing, lint-baseline, and version-code fixes
+    # in this loop were never machine-validated. '**' matches slash-containing
+    # branch names; the release job stays gated on main by its own `if`.
+    branches: ['**']
     paths:
       - 'android/**'
       - '.github/workflows/android-ci.yml'
