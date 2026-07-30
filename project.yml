@@ -164,6 +164,11 @@ targets:
       - path: SeddlyTests
         excludes:
           - "**/.gitkeep"
+      # US-185: StoreKitConfigurationTests reads this to assert the product
+      # identifiers in Seddly.storekit and AppConstants.SubscriptionProductID
+      # cannot drift apart.
+      - path: Seddly/Resources/Seddly.storekit
+        buildPhase: resources
     dependencies:
       - target: Seddly
     settings:

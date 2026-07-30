@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 19,
+    "passingCount": 20,
     "totalCount": 23,
-    "completionRate": "83%",
+    "completionRate": "87%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -348,8 +348,8 @@
         "A test asserts the product identifiers used in code match those in the StoreKit configuration"
       ],
       "priority": 17,
-      "passes": false,
-      "notes": ""
+      "passes": true,
+      "notes": "Seddly.storekit had empty '_applicationInternalID' and '_developerTeamID' and a placeholder subscription group ID (21345678) that read like a real value. More importantly, the four product IDs in Seddly.storekit and the four in AppConstants.SubscriptionProductID were two independent lists with nothing connecting them: renaming a product in one and not the other would surface as a purchase silently failing at runtime, not as a test failure. The pre-existing coverage only asserted the constants contained the substrings 'pro' and 'proplus', which stays true through any rename. Replaced the blank and placeholder identity fields with explicit REPLACE_WITH_ sentinels so a half-configured file is obvious rather than looking like a deliberate blank. Added SeddlyTests/SharedTests/StoreKitConfigurationTests.swift with four Swift Testing cases: every code product ID exists in the configuration; the configuration defines no product the code cannot resolve (catches orphans in both directions); tier-detection substrings are unambiguous, which guards the load-bearing ordering in SubscriptionService where 'contains(\"proplus\")' is checked before 'contains(\"pro\")'; and the identity fields are never silently blank. Wired Seddly.storekit into the SeddlyTests target as a resource in project.yml so the test can load it from its own bundle. Verified statically that both sets are exactly the same four identifiers with no orphans. Documented the fields to fill in, and the parity requirement, in SETUP.md section 9.0. NOT COMPILED: no Swift toolchain here, so the new test file is first built in CI."
     },
     {
       "id": "US-186",

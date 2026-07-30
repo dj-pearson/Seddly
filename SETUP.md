@@ -466,6 +466,29 @@ Go to **Settings → Actions → General**
 
 ## 9. StoreKit Product Registration
 
+### 9.0 Fill in the local StoreKit configuration
+
+`Seddly/Resources/Seddly.storekit` drives StoreKit 2 testing in the simulator.
+Three fields are shipped as `REPLACE_WITH_…` placeholders and must be filled in
+from App Store Connect before local purchase testing mirrors production:
+
+| Field | Where to find it |
+| ----- | ---------------- |
+| `settings._applicationInternalID` | App Store Connect → App → App Information → Apple ID |
+| `settings._developerTeamID` | Apple Developer → Membership → Team ID |
+| `subscriptionGroups[].id` and each `subscriptionGroupID` | App Store Connect → Subscriptions → the group's ID |
+
+They are deliberately `REPLACE_WITH_…` strings rather than empty values, so a
+half-configured file is obvious rather than looking like a blank setting.
+`StoreKitConfigurationTests` fails if any of them is blanked out.
+
+The four `productID` values must stay identical to
+`AppConstants.SubscriptionProductID` in `Seddly/Sources/Shared/SharedConstants.swift`.
+`StoreKitConfigurationTests` asserts this in both directions — a product in the
+code with no configuration entry, or a configured product the code never
+resolves, both fail the test suite.
+
+
 ### 9.1 Create the App in App Store Connect
 
 1. Go to https://appstoreconnect.apple.com → My Apps → +

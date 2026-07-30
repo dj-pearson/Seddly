@@ -1567,3 +1567,21 @@ never built. Supabase and website deploys have never completed. Every prior
           Documented all five Android secrets in SETUP.md §12 — they were
           consumed by android-ci.yml but never documented at all. Verified
           no workflow secret is left undocumented.
+
+  ✓ US-185 Complete the StoreKit configuration metadata
+          Seddly.storekit had empty _applicationInternalID /
+          _developerTeamID and a placeholder group ID (21345678) that read
+          like a real value. Worse: the four product IDs in the .storekit
+          file and the four in AppConstants.SubscriptionProductID were two
+          independent lists with nothing connecting them — rename one and
+          not the other and a purchase silently fails at runtime, never at
+          build time. The pre-existing test only checked the constants
+          contained "pro"/"proplus", which survives any rename. Replaced
+          blanks with explicit REPLACE_WITH_ sentinels, and added
+          StoreKitConfigurationTests with four cases: code→config coverage,
+          config→code orphan detection, tier-substring unambiguity (guards
+          the load-bearing "proplus"-before-"pro" ordering in
+          SubscriptionService), and non-blank identity fields. Wired the
+          .storekit file into the test target as a resource. Verified
+          statically: both sets are the same four IDs, no orphans.
+          NOT COMPILED — no Swift toolchain here; first built in CI.

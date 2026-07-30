@@ -1,126 +1,126 @@
 {
-  "identifier" : "B3E4B8A3-5F1D-4D0C-9A11-C3A7E0D5E6F2",
-  "nonRenewingSubscriptions" : [],
-  "products" : [],
-  "settings" : {
-    "_applicationInternalID" : "",
-    "_developerTeamID" : "",
-    "_failTransactionsEnabled" : false,
-    "_lastSynchronizedDate" : 0,
-    "_locale" : "en_US",
-    "_storefront" : "USA",
-    "_storeKitErrors" : [],
-    "_timeRate" : 0
+  "identifier": "B3E4B8A3-5F1D-4D0C-9A11-C3A7E0D5E6F2",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+    "_developerTeamID": "REPLACE_WITH_APPLE_TEAM_ID",
+    "_failTransactionsEnabled": false,
+    "_lastSynchronizedDate": 0,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": [],
+    "_timeRate": 0
   },
-  "subscriptionGroups" : [
+  "subscriptionGroups": [
     {
-      "id" : "21345678",
-      "localizations" : [
+      "id": "REPLACE_WITH_SUBSCRIPTION_GROUP_ID",
+      "localizations": [
         {
-          "description" : "Unlock Claude-powered extraction, unlimited commitments, and the Pro feature set.",
-          "displayName" : "Seddly Pro",
-          "locale" : "en_US"
+          "description": "Unlock Claude-powered extraction, unlimited commitments, and the Pro feature set.",
+          "displayName": "Seddly Pro",
+          "locale": "en_US"
         }
       ],
-      "name" : "Seddly Pro",
-      "subscriptions" : [
+      "name": "Seddly Pro",
+      "subscriptions": [
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "4.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "P001",
-          "introductoryOffer" : {
-            "internalID" : "P001-INTRO",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "4.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "P001",
+          "introductoryOffer": {
+            "internalID": "P001-INTRO",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
           },
-          "localizations" : [
+          "localizations": [
             {
-              "description" : "Claude-powered extraction and full ledger access, billed monthly.",
-              "displayName" : "Pro — Monthly",
-              "locale" : "en_US"
+              "description": "Claude-powered extraction and full ledger access, billed monthly.",
+              "displayName": "Pro — Monthly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.pearsonmedia.Seddly.pro.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Pro Monthly",
-          "subscriptionGroupID" : "21345678",
-          "type" : "RecurringSubscription"
+          "productID": "com.pearsonmedia.Seddly.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Pro Monthly",
+          "subscriptionGroupID": "REPLACE_WITH_SUBSCRIPTION_GROUP_ID",
+          "type": "RecurringSubscription"
         },
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "39.99",
-          "familyShareable" : false,
-          "groupNumber" : 2,
-          "internalID" : "P002",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "39.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "P002",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "Claude-powered extraction and full ledger access, billed yearly.",
-              "displayName" : "Pro — Yearly",
-              "locale" : "en_US"
+              "description": "Claude-powered extraction and full ledger access, billed yearly.",
+              "displayName": "Pro — Yearly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.pearsonmedia.Seddly.pro.yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Pro Yearly",
-          "subscriptionGroupID" : "21345678",
-          "type" : "RecurringSubscription"
+          "productID": "com.pearsonmedia.Seddly.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Pro Yearly",
+          "subscriptionGroupID": "REPLACE_WITH_SUBSCRIPTION_GROUP_ID",
+          "type": "RecurringSubscription"
         },
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "9.99",
-          "familyShareable" : true,
-          "groupNumber" : 3,
-          "internalID" : "P003",
-          "introductoryOffer" : {
-            "internalID" : "P003-INTRO",
-            "paymentMode" : "free",
-            "subscriptionPeriod" : "P1W"
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "9.99",
+          "familyShareable": true,
+          "groupNumber": 3,
+          "internalID": "P003",
+          "introductoryOffer": {
+            "internalID": "P003-INTRO",
+            "paymentMode": "free",
+            "subscriptionPeriod": "P1W"
           },
-          "localizations" : [
+          "localizations": [
             {
-              "description" : "Everything in Pro plus cloud sync, Watch + Widget, and priority support.",
-              "displayName" : "Pro+ — Monthly",
-              "locale" : "en_US"
+              "description": "Everything in Pro plus cloud sync, Watch + Widget, and priority support.",
+              "displayName": "Pro+ — Monthly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.pearsonmedia.Seddly.proplus.monthly",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Pro+ Monthly",
-          "subscriptionGroupID" : "21345678",
-          "type" : "RecurringSubscription"
+          "productID": "com.pearsonmedia.Seddly.proplus.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Pro+ Monthly",
+          "subscriptionGroupID": "REPLACE_WITH_SUBSCRIPTION_GROUP_ID",
+          "type": "RecurringSubscription"
         },
         {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "79.99",
-          "familyShareable" : true,
-          "groupNumber" : 4,
-          "internalID" : "P004",
-          "introductoryOffer" : null,
-          "localizations" : [
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "79.99",
+          "familyShareable": true,
+          "groupNumber": 4,
+          "internalID": "P004",
+          "introductoryOffer": null,
+          "localizations": [
             {
-              "description" : "Everything in Pro plus cloud sync, Watch + Widget, and priority support, billed yearly.",
-              "displayName" : "Pro+ — Yearly",
-              "locale" : "en_US"
+              "description": "Everything in Pro plus cloud sync, Watch + Widget, and priority support, billed yearly.",
+              "displayName": "Pro+ — Yearly",
+              "locale": "en_US"
             }
           ],
-          "productID" : "com.pearsonmedia.Seddly.proplus.yearly",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Pro+ Yearly",
-          "subscriptionGroupID" : "21345678",
-          "type" : "RecurringSubscription"
+          "productID": "com.pearsonmedia.Seddly.proplus.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Pro+ Yearly",
+          "subscriptionGroupID": "REPLACE_WITH_SUBSCRIPTION_GROUP_ID",
+          "type": "RecurringSubscription"
         }
       ]
     }
   ],
-  "version" : {
-    "major" : 4,
-    "minor" : 0
+  "version": {
+    "major": 4,
+    "minor": 0
   }
 }
