@@ -2,7 +2,12 @@ name: CI — Build & Test
 
 on:
   push:
-    branches: ['*']
+    # US-188: this was ['*']. A single asterisk in a branch filter does not
+    # match a '/', so no push to a claude/* branch ever triggered CI — the run
+    # history shows every feature-branch run arriving as a pull_request event.
+    # '**' matches slashes, so feature branches now get build feedback on push
+    # instead of only once a pull request is opened.
+    branches: ['**']
   pull_request:
     branches: [main]
 
@@ -11,10 +16,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-and-test:
-    runs-on: macos-15
-    timeout-minutes: 30
-
+  # US-189: TruffleHog is a Docker action and GitHub's macOS runners ship no
+  # Docker daemon, so running it inside the macOS build job failed with
+  # "docker: command not found" (exit 127) on every single run — step 2 of 2
+  # dozen, before Xcode selection, before xcodegen, before any compilation.
+  # It now runs in its own Linux job, matching the layout android-ci.yml
+  # already uses, so it scans and the build job actually gets to build.
+  secrets-scan:
+    name: Secrets Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +35,17 @@ jobs:
       - name: Scan for secrets
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified --fail
+          extra_args: --only-verified
+
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode 16.3
         uses: maxim-lobanov/setup-xcode@v1
@@ -39,12 +60,21 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen@2.42.0 || brew install xcodegen
 
-      - name: Materialize Debug.xcconfig
+      - name: Materialize xcconfigs
         # CI builds never hit the Supabase / AI code paths (they run simulator
         # Debug), so we stamp in placeholder values. AppConfiguration.swift
         # recognizes these as placeholders and returns nil to disable the
         # network-dependent flows.
-        run: cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+        #
+        # US-190: only Debug was materialized here, but project.yml declares
+        # configFiles for BOTH Debug and Release, and XcodeGen validates every
+        # referenced file at spec-load time regardless of which configuration is
+        # being built. The missing Release.xcconfig aborted `xcodegen generate`
+        # with "Spec validation error: Invalid config file". Real Release
+        # secrets are still written only by release.yml, from GitHub secrets.
+        run: |
+          cp Seddly/Config/Debug.xcconfig.sample Seddly/Config/Debug.xcconfig
+          cp Seddly/Config/Release.xcconfig.sample Seddly/Config/Release.xcconfig
 
       - name: Cache Xcode derived data
         uses: actions/cache@v4
@@ -57,13 +87,75 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      # US-192: the build steps hardcoded 'name=iPhone 16' and 'name=Apple Watch
+      # Series 10 (46mm)'. Runner images rotate which simulator runtimes are
+      # preinstalled, and this one reported no iOS runtime at all ("iOS 18.4 is
+      # not installed"), so xcodebuild exited 70 with "Unable to find a
+      # destination matching the provided destination specifier". Discover a
+      # real device at runtime instead of asserting one exists, and download the
+      # platform if the image genuinely ships without it.
+      - name: Resolve simulator destinations
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          # Ask xcodebuild what IT will accept for the scheme, and read only the
+          # "Available destinations" section. `simctl list devices available` is
+          # the wrong signal: it happily reports a device whose platform Xcode
+          # has not installed, so a UDID taken from it is then rejected with
+          # "Unable to find a destination matching the provided destination
+          # specifier" while the ineligible list says "iOS 18.4 is not
+          # installed". Gating on xcodebuild's own view avoids that mismatch.
+          # The trailing `|| true` is load-bearing. GitHub runs `shell: bash` as
+          # `bash --noprofile --norc -e -o pipefail`, so when grep matches
+          # nothing it exits 1, pipefail propagates that, and errexit kills the
+          # whole step — before the download fallback or any diagnostic can run.
+          # "No match" is an expected outcome here, not an error.
+          avail() {
+            xcodebuild -project Seddly.xcodeproj -scheme "$1" -showdestinations 2>/dev/null \
+              | sed -n '/Available destinations/,/Ineligible destinations/p' \
+              | grep "platform:$2 Simulator" \
+              | grep -oE 'id:[0-9A-Fa-f-]{36}' \
+              | head -1 | cut -c4- || true
+          }
+
+          echo "--- installed simulator runtimes ---"
+          xcrun simctl list runtimes || true
+
+          resolve() { # $1 scheme, $2 platform, $3 env var name
+            local udid
+            udid=$(avail "$1" "$2")
+            if [ -z "$udid" ]; then
+              echo "No concrete $2 simulator device for scheme $1 — attempting to install the platform."
+              xcodebuild -downloadPlatform "$2" || echo "::warning::-downloadPlatform $2 returned non-zero"
+              udid=$(avail "$1" "$2")
+            fi
+            if [ -z "$udid" ]; then
+              # Compilation does not need a bootable device — only a matching SDK,
+              # which the generic destination selects. Tests do need one, so the
+              # test step is gated on this variable being a real UDID.
+              echo "::warning::No bootable $2 simulator on this image. Compiling against the generic destination; tests on $2 will be skipped."
+              echo "$3=" >> "$GITHUB_ENV"
+              return 0
+            fi
+            echo "Resolved $2 simulator for $1: $udid"
+            echo "$3=$udid" >> "$GITHUB_ENV"
+          }
+
+          resolve Seddly      iOS     IOS_SIM
+          resolve SeddlyWatch watchOS WATCH_SIM
+
+      # Compiling needs a matching SDK, not a bootable device, so this always
+      # uses the generic simulator destination. That keeps the compile — the
+      # single most important signal in this pipeline, and one this repository
+      # has never produced — independent of which runtimes the image ships.
       - name: Build for testing
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
             -project Seddly.xcodeproj \
             -scheme Seddly \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -76,7 +168,7 @@ jobs:
           xcodebuild build \
             -project Seddly.xcodeproj \
             -scheme SeddlyWatch \
-            -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm),OS=latest' \
+            -destination 'generic/platform=watchOS Simulator' \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -84,23 +176,30 @@ jobs:
             | xcbeautify --quiet
 
       - name: SwiftLint
+        # US-179: this passed an explicit `Seddly/Sources/` path, which overrides
+        # the config's `included:` list and silently skipped the Share
+        # Extension, Widget, Watch, complication, and test targets. Dropping the
+        # path lets .swiftlint.yml decide the scope, so every target is linted.
         run: |
-          brew install swiftlint || true
-          swiftlint lint --strict --reporter github-actions-logging Seddly/Sources/
+          brew install swiftlint
+          swiftlint version
+          swiftlint lint --strict --reporter github-actions-logging
 
       - name: Run unit tests with coverage
+        if: env.IOS_SIM != ''
         run: |
           set -o pipefail
           xcodebuild test-without-building \
             -project Seddly.xcodeproj \
             -scheme Seddly \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "id=$IOS_SIM" \
             -configuration Debug \
             -resultBundlePath TestResults.xcresult \
             -enableCodeCoverage YES \
             | xcbeautify --quiet
 
       - name: Check test coverage
+        if: env.IOS_SIM != ''
         run: |
           COVERAGE=$(xcrun xccov view --report --json TestResults.xcresult \
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'{d[\"lineCoverage\"]*100:.1f}')")

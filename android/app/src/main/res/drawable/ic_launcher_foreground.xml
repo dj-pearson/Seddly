@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  US-196: adaptive-icon foreground — the Seddly checkmark, matching the iOS app
+  icon and the website favicon.
+
+  Adaptive icons are 108x108dp, but launchers may mask anything outside the
+  central 72x72dp "safe zone". The stroke below is drawn between roughly x=34
+  and x=74, well inside that zone, so no launcher shape can clip it.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M36,55 L47,67 L72,40"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

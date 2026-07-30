@@ -3,27 +3,47 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout
-  title="Download Seddly — Free Promise Tracker for iOS"
-  description="Download Seddly for iPhone. Turn screenshots into tracked commitments with on-device AI. Free tier available, no account required."
-  keywords="download seddly, seddly app, promise tracker download, screenshot tracker iOS, accountability app download"
+  title="Download Seddly — Free Promise Tracker for iOS and Android"
+  description="Seddly for iPhone and Android. Turn screenshots into tracked commitments with on-device AI. Free tier available, no account required."
+  keywords="download seddly, seddly app, promise tracker download, screenshot tracker iOS, screenshot tracker Android, accountability app download"
 >
   <section class="download-hero">
     <div class="download-inner">
       <h1>Download Seddly</h1>
-      <p class="subtitle">Turn screenshots into accountability. Available for iOS.</p>
+      <!--
+        US-184: this page previously advertised iOS only and told Android
+        visitors the "Android version [is] coming soon". The Android app has
+        been feature-complete since Loop 6 — same OCR, AI extraction, billing,
+        sync, notifications, and widget as iOS. The page was understating the
+        product and routing Android traffic to a notification signup.
+
+        Neither store listing is live yet, and the iOS button was already a
+        placeholder href="#". So both platforms are presented equally and both
+        are honestly marked as pre-launch. When a listing goes live, set the
+        corresponding URL in STORE_URLS below and the button activates itself.
+      -->
+      <p class="subtitle">Turn screenshots into accountability. Built for iPhone and Android.</p>
 
       <div class="store-buttons" id="store-buttons">
-        <a href="#" id="ios-btn" class="store-btn ios-btn" aria-label="Download on the App Store">
+        <a href="/support" id="ios-btn" class="store-btn" data-platform="ios" aria-label="Seddly for iPhone — coming to the App Store">
           <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
           <div>
-            <span class="store-label">Download on the</span>
+            <span class="store-label">Coming to the</span>
             <span class="store-name">App Store</span>
+          </div>
+        </a>
+        <a href="/support" id="android-btn" class="store-btn" data-platform="android" aria-label="Seddly for Android — coming to Google Play">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true"><path d="M3.61 1.81 13.79 12 3.61 22.19a1.7 1.7 0 0 1-.5-1.2V3.01c0-.47.19-.89.5-1.2zm11.6 11.6 2.58 2.58-10.3 5.88 7.72-8.46zm3.86-3.86 2.42 1.38c.68.39.68 1.35 0 1.74l-2.42 1.38-2.83-2.62 2.83-2.63zM7.49 3.75l10.3 5.88-2.58 2.58-7.72-8.46z"/></svg>
+          <div>
+            <span class="store-label">Coming to</span>
+            <span class="store-name">Google Play</span>
           </div>
         </a>
       </div>
 
-      <p class="coming-soon-note" id="android-note" style="display:none;">
-        Android version coming soon. <a href="/support">Get notified</a> when it launches.
+      <p class="prelaunch-note">
+        Both apps are built and in final release testing — neither store listing is
+        live yet. <a href="/support">Get notified</a> the moment they launch.
       </p>
 
       <div class="plan-summary">
@@ -47,7 +67,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     <div class="download-inner">
       <h2>Requirements</h2>
       <ul>
-        <li>iPhone running iOS 17 or later</li>
+        <li>iPhone running iOS 17 or later, or Android 10 or later</li>
         <li>No account required for Free and Pro tiers</li>
         <li>Screenshots album access (photos and personal images are never accessed)</li>
       </ul>
@@ -55,23 +75,44 @@ import BaseLayout from '../layouts/BaseLayout.astro';
   </section>
 
   <script>
-    // Platform detection for app store routing
+    // US-184: platform detection now emphasises the visitor's own platform on a
+    // page that offers both, rather than telling Android visitors the app does
+    // not exist yet.
+    //
+    // To go live, put the real listing URL in the matching entry below. A
+    // non-null value flips that button from the pre-launch state to a real
+    // store link automatically — no other edit needed.
     (function() {
+      const STORE_URLS = {
+        ios: null,     // e.g. 'https://apps.apple.com/app/seddly/id0000000000'
+        android: null, // e.g. 'https://play.google.com/store/apps/details?id=com.pearsonmedia.seddly'
+      };
+
       const ua = navigator.userAgent || '';
-      const isAndroid = /android/i.test(ua);
-      const androidNote = document.getElementById('android-note');
+      const platform = /android/i.test(ua)
+        ? 'android'
+        : /iPad|iPhone|iPod/.test(ua)
+          ? 'ios'
+          : null;
 
-      if (isAndroid && androidNote) {
-        androidNote.style.display = 'block';
+      for (const btn of document.querySelectorAll('.store-btn')) {
+        const key = btn.dataset.platform;
+        const url = STORE_URLS[key];
+
+        if (url) {
+          btn.href = url;
+          const label = btn.querySelector('.store-label');
+          if (label) {
+            label.textContent = key === 'ios' ? 'Download on the' : 'Get it on';
+          }
+        } else {
+          btn.classList.add('is-prelaunch');
+        }
+
+        if (key === platform) {
+          btn.classList.add('is-current-platform');
+        }
       }
-
-      // When iOS App Store link is live, replace '#' with the actual App Store URL:
-      // const iosBtn = document.getElementById('ios-btn');
-      // if (iosBtn) iosBtn.href = 'https://apps.apple.com/app/seddly/idAPPSTORE_ID';
-
-      // Auto-redirect mobile visitors to app store (uncomment when app is live):
-      // const isIOS = /iPad|iPhone|iPod/.test(ua);
-      // if (isIOS) window.location.href = 'https://apps.apple.com/app/seddly/idAPPSTORE_ID';
     })();
   </script>
 </BaseLayout>
@@ -141,10 +182,28 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     line-height: 1.2;
   }
 
-  .coming-soon-note {
+  .prelaunch-note {
     color: var(--color-text-muted);
     font-size: 0.9rem;
     margin-bottom: 2rem;
+  }
+
+  /* A button with no live listing yet reads as informational rather than as a
+     download call to action. */
+  .store-btn.is-prelaunch {
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    border: 1px dashed var(--color-border);
+  }
+
+  .store-btn.is-prelaunch:hover {
+    color: var(--color-text-muted);
+  }
+
+  /* Emphasise the visitor's own platform without hiding the other. */
+  .store-btn.is-current-platform {
+    border-color: var(--color-accent);
+    border-style: solid;
   }
 
   .plan-summary {

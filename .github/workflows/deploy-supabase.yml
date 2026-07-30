@@ -22,10 +22,27 @@ jobs:
           deno-version: v2.x
 
       - name: Deno lint
-        run: deno lint supabase/functions/
+        run: deno lint --config supabase/functions/deno.json supabase/functions/
 
+      # US-181: this was `deno check supabase/functions/**/index.ts`, which only
+      # worked by accident — with globstar off bash degrades `**` to `*`, and
+      # that happens to match the current flat one-directory-per-function
+      # layout. It would silently stop covering anything nested. Enable globstar
+      # for real recursion and assert the expansion covers every function
+      # directory, so a partial or empty match fails loudly instead of passing.
       - name: Deno type check
-        run: deno check supabase/functions/**/index.ts
+        shell: bash
+        run: |
+          shopt -s globstar nullglob
+          entrypoints=(supabase/functions/**/index.ts)
+          expected=$(find supabase/functions -mindepth 2 -maxdepth 2 -name index.ts | wc -l)
+          if [ "${#entrypoints[@]}" -ne "$expected" ] || [ "${#entrypoints[@]}" -eq 0 ]; then
+            echo "::error::Expected $expected function entrypoints, matched ${#entrypoints[@]}"
+            exit 1
+          fi
+          printf 'Type-checking %d functions:\n' "${#entrypoints[@]}"
+          printf '  %s\n' "${entrypoints[@]}"
+          deno check --config supabase/functions/deno.json "${entrypoints[@]}"
 
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1

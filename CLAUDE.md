@@ -4,7 +4,7 @@
 Native iOS app (Swift/SwiftUI) that extracts commitments from screenshots using on-device OCR + AI.
 
 ## Tech Stack
-- **Language:** Swift 6 (Xcode 16.3 / Swift 6.2)
+- **Language:** Swift 6 language mode (`SWIFT_VERSION = 6.0`), built with Xcode 16.3 / Swift compiler 6.1
 - **UI:** SwiftUI, iOS 17+ minimum
 - **Architecture:** MVVM with `@Observable` and Swift Concurrency
 - **Storage:** SwiftData with App Group shared container

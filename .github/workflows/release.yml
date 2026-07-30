@@ -82,6 +82,11 @@ jobs:
           PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
           echo "${{ secrets.PROVISIONING_PROFILE_WATCH }}" | base64 --decode > "$PP_PATH/SeddlyWatch_AppStore.mobileprovision"
 
+      - name: Install provisioning profile — Watch Complication
+        run: |
+          PP_PATH="$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "${{ secrets.PROVISIONING_PROFILE_WATCH_COMPLICATION }}" | base64 --decode > "$PP_PATH/SeddlyWatchComplication_AppStore.mobileprovision"
+
       - name: Determine build number
         id: build_number
         run: |

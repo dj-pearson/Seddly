@@ -2,7 +2,12 @@ name: Android CI
 
 on:
   push:
-    branches: [main]
+    # US-193: this was [main], so a push to a feature branch never ran Android
+    # CI — the same blind spot US-188 fixed for ci.yml, and the reason the
+    # gradlew, Gradle-settings, signing, lint-baseline, and version-code fixes
+    # in this loop were never machine-validated. '**' matches slash-containing
+    # branch names; the release job stays gated on main by its own `if`.
+    branches: ['**']
     paths:
       - 'android/**'
       - '.github/workflows/android-ci.yml'
@@ -89,9 +94,14 @@ jobs:
           fetch-depth: 0
 
       - name: TruffleHog Secrets Scan
+        # US-195: extra_args passed `--fail`, but the action's own invocation
+        # already passes it, and trufflehog rejects a repeated flag:
+        # "trufflehog: error: flag 'fail' cannot be repeated, try --help".
+        # This job therefore failed on every run it ever had — the same defect
+        # US-189 removed from ci.yml. A verified finding still fails the job.
         uses: trufflesecurity/trufflehog@main
         with:
-          extra_args: --only-verified --fail
+          extra_args: --only-verified
 
   release:
     name: Release Build
@@ -122,13 +132,43 @@ jobs:
           restore-keys: |
             gradle-${{ runner.os }}-
 
+      # US-174: ANDROID_KEYSTORE_FILE was passed straight through as KEYSTORE_FILE,
+      # but a secret holds the keystore's *contents*, not a path. Decode it to a
+      # real file outside the workspace first and point the build at that path.
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set — the release AAB would be unsigned."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.keystore"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+
       - name: Build Release AAB
         run: ./gradlew bundleRelease --no-daemon
         env:
-          KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # US-186: versionCode was hardcoded to 1, so consecutive releases
+          # collided. github.run_number is monotonic per workflow.
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+
+      - name: Verify the AAB is signed
+        run: |
+          AAB=$(find app/build/outputs/bundle/release -name '*.aab' | head -1)
+          if [ -z "$AAB" ]; then echo "::error::No AAB produced"; exit 1; fi
+          if ! unzip -l "$AAB" | grep -qi 'META-INF/.*\.\(RSA\|DSA\|EC\)'; then
+            echo "::error::$AAB has no signature block — Play Console will reject it."
+            exit 1
+          fi
+          echo "Signed AAB: $AAB"
+
+      - name: Remove decoded keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.keystore"
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
@@ -136,3 +176,16 @@ jobs:
           name: release-aab
           path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
+
+      # US-186: the job previously stopped at the artifact upload, so a release
+      # never reached the Play Console — someone had to download the AAB and
+      # upload it by hand. Publishing to the internal track keeps a human in the
+      # loop for promotion to production while automating the upload itself.
+      - name: Publish to Play Console (internal track)
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.ANDROID_PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.pearsonmedia.seddly
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed

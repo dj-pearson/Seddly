@@ -1,7 +1,16 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 
-const { id } = Astro.params;
+// US-191: this file used to be `c/[id].astro`. A dynamic route in a static
+// Astro build requires getStaticPaths() to enumerate every path at build time,
+// and it had none — so `astro build` failed outright with
+// GetStaticPathsRequired, and the website has never deployed.
+//
+// Enumerating paths is impossible here by nature: these are share links keyed
+// by commitment UUID, created by users long after the site is built. So the
+// page is now a single static shell that reads the id from the URL at runtime,
+// paired with a Cloudflare Pages rewrite (public/_redirects) that serves it for
+// any /c/<id> path. Same URLs, same deep link, no build-time enumeration.
 ---
 
 <BaseLayout title="Seddly — Commitment Shared" description="View this commitment in the Seddly app.">
@@ -15,16 +24,44 @@ const { id } = Astro.params;
       </div>
       <h1>Open in Seddly</h1>
       <p class="share-sub">Someone shared a commitment record with you.</p>
-      <p class="share-id">Reference: <code>{id}</code></p>
+      <p class="share-id" id="share-ref" hidden>Reference: <code id="share-id"></code></p>
 
-      <a href={`seddly://c/${id}`} class="cta">Open in App</a>
+      <a href="#" id="open-in-app" class="cta" hidden>Open in App</a>
+      <p class="share-sub" id="no-ref">This link is missing a commitment reference.</p>
 
       <div class="fallback">
         <p>Don't have Seddly?</p>
-        <a href="https://apps.apple.com/app/seddly/id0000000000" class="cta-secondary">Download for iOS</a>
+        <a href="/download" class="cta-secondary">Get Seddly</a>
       </div>
     </div>
   </section>
+
+  <script>
+    // Resolve the commitment id from /c/<id> at runtime. Accepts only the
+    // characters a Seddly commitment id can contain, so a crafted path cannot
+    // inject anything into the deep link or the rendered reference.
+    (function () {
+      const raw = decodeURIComponent(window.location.pathname)
+        .replace(/^\/c\/?/, '')
+        .replace(/\/$/, '');
+      const id = /^[A-Za-z0-9-]{1,64}$/.test(raw) ? raw : null;
+
+      if (!id) return;
+
+      const ref = document.getElementById('share-ref');
+      const idEl = document.getElementById('share-id');
+      const openBtn = document.getElementById('open-in-app');
+      const noRef = document.getElementById('no-ref');
+
+      if (idEl) idEl.textContent = id;
+      if (ref) ref.hidden = false;
+      if (openBtn) {
+        openBtn.setAttribute('href', `seddly://c/${id}`);
+        openBtn.hidden = false;
+      }
+      if (noRef) noRef.hidden = true;
+    })();
+  </script>
 </BaseLayout>
 
 <style>

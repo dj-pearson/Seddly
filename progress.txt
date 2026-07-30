@@ -1281,3 +1281,521 @@ swipe, and screen transition feels cohesive, tactile, and premium.
 
 — Claude, Loop 7
 ================================================================================
+
+════════════════════════════════════════════════════════════════════════════════
+LOOP 10 — PRODUCTION READINESS DEEP DIVE                            2026-07-30
+════════════════════════════════════════════════════════════════════════════════
+
+Audit finding that reframes all nine prior loops: 56 of 56 GitHub Actions
+runs have FAILED. The iOS app has never compiled in CI. The Android app has
+never built. Supabase and website deploys have never completed. Every prior
+"Ship it" verdict was source-read only, with no green build behind it.
+
+  ✓ US-169 Fix malformed XcodeGen target spec
+          project.yml declared an `info:` block with no `path:`. XcodeGen's
+          Plist type requires it, so spec decoding failed and `xcodegen
+          generate` — the first step of every CI job — could not run. Prime
+          suspect for the 56-run failure streak. Removed the block; moved
+          the `configs:` mapping that was nested under it to
+          `settings.configs` (restoring Debug=Automatic / Release=Manual
+          signing); moved CFBundleURLTypes into Seddly/Resources/Info.plist
+          so the seddly:// deep-link scheme reaches the built bundle for the
+          first time. Also dropped the redundant target-level `entitlements:`
+          blocks on Seddly and SeddlyWatch — XcodeGen *generates* the file
+          named there, which would have overwritten both checked-in
+          entitlements files with empty plists. All four targets now use the
+          settings-only CODE_SIGN_ENTITLEMENTS form the extensions already had.
+
+  ✓ US-170 Add bundle version keys to all four Info.plists
+          Xcode auto-injects CFBundleIdentifier / CFBundleExecutable /
+          CFBundleName during Process Info.plist, but NOT the version keys —
+          those need GENERATE_INFOPLIST_FILE, which is off whenever
+          INFOPLIST_FILE names a hand-authored plist. So the MARKETING_VERSION
+          and CURRENT_PROJECT_VERSION declared in project.yml reached no
+          bundle at all: release.yml's build-number override was a no-op and
+          App Store validation would have rejected the archive outright.
+          All four targets (app, Share Extension, Widget, Watch) now resolve
+          $(MARKETING_VERSION) / $(CURRENT_PROJECT_VERSION), keeping extension
+          versions matched to the host app as App Store Connect requires.
+
+  ✓ US-171 Fix watchOS target compilation and packaging
+          Three defects. (1) Shared/CommitmentLiveActivity.swift imported
+          ActivityKit unconditionally, and Sources/Shared is compiled into
+          the watchOS targets — ActivityKit is iOS-only, so every watch
+          build died at that import. Wrapped in #if canImport(ActivityKit);
+          no watch code references the type. (2) Watch Info.plist was
+          missing WKApplication, required for a single-target watchOS app.
+          (3) SeddlyWatchComplication was complete, working WidgetKit code
+          sitting in the app target with no @main WidgetBundle — WidgetKit
+          only discovers widgets vended by a widget extension's principal
+          bundle, so it compiled but could never be added to a watch face.
+          Gave it a real extension target (widgetkit-extension point, App
+          Group entitlements for SharedModelContainer, @main bundle),
+          embedded via target dependency, and registered its provisioning
+          profile in ExportOptions.plist + release.yml. Also registered the
+          seddly-watch:// scheme: WatchLedgerView.onOpenURL already parsed
+          those links and the complication already emitted them, but the
+          scheme was unregistered so taps ignored the requested filter.
+
+  ✓ US-173 Fix settings.gradle.kts dependencyResolutionManagement typo
+          settings.gradle.kts declared `dependencyResolution { }`, which is
+          not a Gradle settings DSL method — settings evaluation failed with
+          an unresolved-method error, so NO Android task could run. Renamed
+          to `dependencyResolutionManagement` and added
+          repositoriesMode = FAIL_ON_PROJECT_REPOS so a stray project-level
+          repository declaration fails loudly. Verified with `gradle
+          projects`: the failure moved out of settings evaluation into
+          plugin resolution — as far as this sandbox reaches, since
+          dl.google.com is blocked by the environment network policy.
+
+  ✓ US-172 Replace the stub gradlew with a real Gradle wrapper
+          android/gradlew was a 531-byte hand-written shell stub — its own
+          comment said "In production, use the full gradlew from gradle
+          init". It exec'd a system gradle if one existed and otherwise
+          exited 1. No gradle-wrapper.jar, no gradlew.bat. Every step of
+          android-ci.yml invokes ./gradlew, so the Android job could never
+          succeed on a clean runner. Installed the official wrapper
+          (gradlew 8733B, gradlew.bat 2937B, gradle-wrapper.jar 43764B);
+          gradle-wrapper.properties was already byte-identical to the
+          generated one, so the 8.11.1-bin pin is unchanged. Verified with
+          `env PATH=/usr/bin:/bin ./gradlew --version` — no system Gradle
+          reachable — which downloaded the distribution and reported
+          Gradle 8.11.1.
+
+  ✓ US-188 Make CI actually run on feature-branch pushes  [added mid-loop]
+          ci.yml declared `push: branches: ['*']`. A single asterisk in a
+          branch filter does NOT match a slash, so pushes to this project's
+          claude/<name> branches never triggered CI at all. Verified against
+          run history: every feature-branch run was a pull_request event,
+          every push event was on main. Developers therefore got zero build
+          feedback until opening a PR — a large part of why 56 consecutive
+          failures went unnoticed across nine loops. Changed to '**'.
+
+  ✓ US-174 Add Android release signing configuration
+          build.gradle.kts had NO signingConfigs block and the release
+          buildType declared no signingConfig — `bundleRelease` produced an
+          unsigned AAB that Play Console rejects. Worse, android-ci.yml
+          passed ANDROID_KEYSTORE_FILE through as KEYSTORE_FILE, but a
+          secret holds the keystore's *contents*, not a path — and nothing
+          in the build read any of the four env vars regardless. Added a
+          release signingConfig created only when KEYSTORE_FILE is set and
+          the file exists; absent that, release builds stay unsigned but
+          still compile (with a lifecycle warning) so contributors without
+          the keystore aren't blocked. CI now base64-decodes
+          ANDROID_KEYSTORE_BASE64 into $RUNNER_TEMP (outside the workspace,
+          so the artifact upload can't sweep it up), verifies the AAB
+          carries a META-INF signature block, and removes the keystore in
+          an always() step.
+
+  ✓ US-189 Run the secret scan on Linux, not in the macOS build job
+                                                        [added mid-loop]
+          *** ROOT CAUSE of the 56-run failure streak. *** Found by reading
+          the first live CI log this project has ever produced (US-188 made
+          push-triggered runs possible). ci.yml ran "Scan for secrets" via
+          trufflesecurity/trufflehog — a DOCKER action — as step 2 of a job
+          on macos-15. GitHub's macOS runners ship no Docker daemon, so it
+          failed with `docker: command not found`, exit 127, twelve seconds
+          in: before Xcode selection, before xcodegen, before a single file
+          was compiled. No iOS CI job has ever reached a compiler in the
+          history of this repository. Moved the scan to its own
+          ubuntu-latest job, matching the layout android-ci.yml already had.
+
+          NOTE: this corrects the US-169 write-up. The malformed XcodeGen
+          spec is a real defect that would have failed the build the moment
+          the job got that far — but it was never the observed failure,
+          because the job never got that far.
+
+  ✓ US-178 Migrate Edge Functions off the deprecated Claude model
+          extract-commitments and generate-dispute-summary both requested
+          claude-sonnet-4-20250514 — deprecated, with a stated retirement of
+          2026-06-15 that has already passed. Every request would 404,
+          meaning the entire Pro/Pro+ value proposition (AI extraction and
+          dispute summaries) was dead on arrival. Migrated both to
+          claude-sonnet-5. Verified clean: neither function sends
+          temperature, top_p, top_k, or a thinking budget — all rejected
+          with a 400 on this model — so no other request-shape change was
+          needed. anthropic-version and the raw-HTTP call shape unchanged.
+
+  ✓ US-175 Provide the Android lint baseline referenced by the build
+          build.gradle.kts referenced lint-baseline.xml with abortOnError =
+          true, but the file didn't exist. AGP creates a missing baseline
+          and then FAILS the build to tell you it did — so the first CI
+          lint run failed by design, every time. The in-code comment said
+          it was "auto-generated on first run", which was true but omitted
+          the failure. Committed a valid, deliberately EMPTY baseline
+          (format 6, zero suppressed issues): it hides nothing, lint still
+          reports everything, abortOnError stays a real gate — it only
+          removes the bootstrap failure. Couldn't run lint locally to
+          confirm zero findings (dl.google.com blocked here); if CI
+          surfaces pre-existing errors the answer is to fix them, not
+          baseline them.
+
+  ✓ US-176 Set aps-environment to production for App Store distribution
+          Seddly.entitlements hardcoded `aps-environment = development`. An
+          App Store build with a development APNs entitlement cannot receive
+          production pushes — the Pro+ silent-push sync would have failed
+          silently in production: app installs, runs fine, never syncs.
+          Rather than fork into two near-identical entitlements files that
+          drift, the value is now $(APS_ENVIRONMENT), resolved from a
+          per-config build setting in project.yml (Debug=development,
+          Release=production). Xcode expands build settings in entitlements
+          during code signing — the same mechanism behind
+          $(AppIdentifierPrefix). Documented in SETUP.md §4.6.
+
+  ✓ US-177 Declare export-compliance status in Info.plist
+          Added ITSAppUsesNonExemptEncryption = false. Without it App Store
+          Connect holds every build behind a manual export-compliance
+          questionnaire, so release.yml's automated TestFlight upload could
+          never finish without a human answering a form. Exemption is
+          legitimate: only standard HTTPS/TLS to Supabase plus Apple
+          platform cryptography (pinning, Keychain). Documented in SETUP.md
+          §4.7 and flagged as a legal attestation to revisit if custom
+          encryption is ever added. Also documented the new watch
+          complication provisioning profile from US-171 in §4.4.
+
+  ✓ US-181 Pin and harden the Supabase lint / type-check steps
+          Added supabase/functions/deno.json with explicit lint rules and
+          strict compiler options; both `deno lint` and `deno check` now run
+          against it instead of unpinned defaults, so a type error strict
+          mode would catch can no longer deploy. Type-check step rewritten
+          to enable globstar, expand entrypoints into an array, and assert
+          the count matches a `find` of the function directories before
+          invoking deno — a partial or empty match now fails loudly.
+
+          CORRECTION to this story's original premise: I assumed `**` failed
+          to expand and deno got a literal pattern. Wrong — with globstar
+          off bash degrades `**` to `*`, and that matches all six functions.
+          Verified: the old form expands to exactly the same six paths. The
+          glob worked by accident; it would only break on a nested layout.
+          The real gap was the missing pinned config. The historical Deploy
+          Supabase failures remain unexplained — those logs are 410 Gone.
+
+  ✓ US-190 Materialize Release.xcconfig in the CI build job  [added mid-loop]
+          With the Docker blocker gone (US-189), CI reached `xcodegen
+          generate` for the first time in project history — and failed with
+          "Spec validation error: Invalid config file
+          Seddly/Config/Release.xcconfig for config Release". project.yml
+          declares configFiles for BOTH Debug and Release, and XcodeGen
+          validates every referenced file at spec-load time regardless of
+          which configuration is being built; ci.yml copied only the Debug
+          sample and Release.xcconfig is gitignored. Now copies both. Safe:
+          the Release sample carries REPLACE_WITH_CI_SECRET placeholders
+          that AppConfiguration.isPlaceholder resolves to nil, and it
+          #includes the committed Shared.xcconfig. release.yml still writes
+          the real Release.xcconfig from secrets and is unaffected.
+
+  ✓ US-191 Fix the Astro build failure blocking every website deploy
+                                                        [added mid-loop]
+          *** THIRD pipeline that has never once succeeded. ***
+          src/pages/c/[id].astro was a dynamic route with no
+          getStaticPaths(), which a static Astro build requires — `astro
+          build` failed with GetStaticPathsRequired, so the website has
+          never deployed. Confirmed pre-existing by stashing my changes and
+          rebuilding. Enumerating paths is impossible by nature: /c/<id>
+          links are keyed by commitment UUID and created by users long
+          after the site is built. Converted to a single static shell at
+          c/index.astro that reads the id from location.pathname at
+          runtime, plus public/_redirects `/c/* /c/index.html 200` — a
+          Cloudflare rewrite, not a redirect, so the URL stays /c/<id> and
+          links remain shareable. The id is validated against
+          ^[A-Za-z0-9-]{1,64}$ before touching the DOM or the seddly://
+          href, and written via textContent/setAttribute, never innerHTML.
+          Verified 8 cases: traversal, encoded markup, attribute breakout,
+          over-length — all rejected. Build now emits 17 pages.
+
+  ✓ US-184 Correct the website's Android availability claim
+          download.astro said "Android version coming soon"; support.astro
+          stated outright "Seddly is currently iOS-only. An Android version
+          is planned if the iOS app proves the model." Both flatly false —
+          Android has been feature-complete since Loop 6 at full parity.
+          Since NEITHER listing is live (the iOS button was already
+          href="#"), corrected to symmetric pre-launch rather than swapping
+          one false claim for another: both store buttons shown, both marked
+          pre-launch, one accurate note. Platform detection now emphasises
+          the visitor's platform instead of denying their app exists; a
+          STORE_URLS map flips either button live with one value. Also
+          updated titles/descriptions/keywords, Requirements (Android 10+,
+          matching minSdk 29), the homepage, and neutralised "Download for
+          iOS" CTAs across 10 pages.
+
+  ✓ US-179 Make SwiftLint pass in CI
+          No .swiftlint.yml existed, so `swiftlint lint --strict` ran the
+          full default rule set with every warning promoted to an error
+          across ~14,700 lines — a guaranteed failure once the build got
+          that far. The invocation also passed an explicit `Seddly/Sources/`
+          path, which OVERRIDES a config's included: list, silently skipping
+          the Share Extension, Widget, Watch, complication, and test
+          targets. Added a config with thresholds measured from the real
+          source, not a template: line_length 200/400 (longest actual line
+          is a 370-char template literal; 14 lines exceed 200), file_length
+          800/1200 (LedgerView 1046, CommitmentDetailView 707 — both already
+          decomposed in Loop 8). Disabled 7 rules that measure SwiftUI's
+          declarative verbosity rather than complexity, each with the reason
+          inline; relaxed identifier_name's 3-char minimum (fires on
+          idiomatic id/db/ok); opted into 16 correctness rules the defaults
+          omit. Also removed `|| true` from the brew install, which would
+          have let a missing SwiftLint pass silently.
+
+          NOT VERIFIED LOCALLY: no Swift toolchain in this environment, so
+          the "zero violations under --strict" criterion is first exercised
+          in CI.
+
+  ✓ US-180 Declare explicit shared schemes for every buildable target
+          ci.yml runs `xcodebuild -scheme SeddlyWatch`, but only the Seddly
+          target declared a `scheme:` block. XcodeGen emits shared schemes
+          only for targets that ask for one, so the watch build depended on
+          Xcode's scheme autocreation rather than anything committed.
+          Scheme added alongside US-171 (a buildable watch target and a
+          usable watch scheme are the same problem). Verified by
+          cross-checking every `-scheme <name>` across all five workflow
+          files against the targets declaring schemes: both sets are exactly
+          {Seddly, SeddlyWatch}, nothing referenced-but-undeclared.
+
+  ✓ US-186 Add Play Store publishing and version-code management
+          The release job built an AAB, uploaded it as a GitHub artifact,
+          and stopped — nothing reached Play Console, so shipping meant a
+          human downloading the artifact and uploading it by hand. And
+          versionCode was hardcoded to 1, so two consecutive releases would
+          collide and Play would reject the second even in that manual flow.
+          versionCode now comes from github.run_number (monotonic per
+          workflow) with a local fallback of 1 — a value that can never
+          reach Play, since only CI holds the keystore. Added a Play Console
+          publish to the *internal* track: upload automated, promotion to
+          production still a deliberate human action. Runs after the
+          existing needs: [build-and-test, secrets-scan] gate AND after the
+          US-174 signature check, so an unsigned bundle can't publish.
+          Documented all five Android secrets in SETUP.md §12 — they were
+          consumed by android-ci.yml but never documented at all. Verified
+          no workflow secret is left undocumented.
+
+  ✓ US-185 Complete the StoreKit configuration metadata
+          Seddly.storekit had empty _applicationInternalID /
+          _developerTeamID and a placeholder group ID (21345678) that read
+          like a real value. Worse: the four product IDs in the .storekit
+          file and the four in AppConstants.SubscriptionProductID were two
+          independent lists with nothing connecting them — rename one and
+          not the other and a purchase silently fails at runtime, never at
+          build time. The pre-existing test only checked the constants
+          contained "pro"/"proplus", which survives any rename. Replaced
+          blanks with explicit REPLACE_WITH_ sentinels, and added
+          StoreKitConfigurationTests with four cases: code→config coverage,
+          config→code orphan detection, tier-substring unambiguity (guards
+          the load-bearing "proplus"-before-"pro" ordering in
+          SubscriptionService), and non-blank identity fields. Wired the
+          .storekit file into the test target as a resource. Verified
+          statically: both sets are the same four IDs, no orphans.
+          NOT COMPILED — no Swift toolchain here; first built in CI.
+
+  ✓ US-192 Resolve simulator destinations at runtime  [added mid-loop]
+          *** xcodegen generate SUCCEEDED for the first time *** — CI logged
+          "Created project at .../Seddly.xcodeproj". US-169 + US-190 landed.
+          Next blocker: ci.yml hardcoded `name=iPhone 16` and `name=Apple
+          Watch Series 10 (46mm)`, and the macos-15 image reported NO iOS
+          simulator runtime at all (only the "Any iOS Device" placeholder,
+          "iOS 18.4 is not installed"), so xcodebuild exited 70 with
+          "Unable to find a destination matching the provided destination
+          specifier". Replaced with a resolve step that parses `simctl list
+          devices available -j`, sorts by runtime so the newest wins, and
+          exports one UDID per platform; build/test now use
+          -destination "id=$IOS_SIM". Falls back to `xcodebuild
+          -downloadPlatform` if the image ships without a runtime, and
+          fails explicitly if still empty. Verified by extracting the exact
+          expression back out of the committed YAML and running it against
+          sample simctl JSON (picks newest runtime, skips unavailable
+          devices, returns empty for an empty set). An earlier draft used a
+          multi-line heredoc that broke the YAML block scalar — caught by
+          parsing the file, rewritten as single-line invocations.
+
+──────────────────────────────────────────
+LOOP 10 SUMMARY
+──────────────────────────────────────────
+  Stories:    21/24 shipped, 3 carried to Loop 11
+  Added mid-loop from live CI logs: US-188 .. US-192 (5 stories that could
+  only be found by actually running the pipelines)
+
+THE FINDING: 56 of 56 prior CI runs had failed. Nothing in this repository
+had ever been built by a machine — not the iOS app, not Android, not the
+website. Nine loops of "Ship it" verdicts rested entirely on reading source.
+
+Why nobody saw it:
+  - ci.yml used `push: branches: ['*']`, which does not match a slash, so
+    pushes to claude/* branches never triggered CI (US-188).
+  - The remaining runs died at step 2 on a Docker-based secret scan running
+    on a macOS runner, which has no Docker daemon (US-189).
+
+Once those two were gone, each push surfaced the next real blocker:
+  xcodegen spec validation (US-169) -> missing Release.xcconfig (US-190)
+  -> hardcoded simulator destinations (US-192).
+
+  *** xcodegen generate now SUCCEEDS. The website now BUILDS (17 pages). ***
+
+Three pipelines that had never once succeeded, now unblocked:
+  iOS      — reaches the compiler; not yet green
+  Android  — gradlew was a 531-byte stub with no wrapper JAR (US-172), and
+             settings.gradle.kts had a DSL typo that failed configuration
+             (US-173). Both fixed and verified locally.
+  Website  — c/[id].astro was a dynamic route with no getStaticPaths, so
+             `astro build` always failed (US-191). Fixed; builds clean.
+
+Also shipped: production APNs entitlement, export-compliance key, bundle
+versions across all four targets, watchOS compilation + a real complication
+extension, Android release signing + Play publishing + version codes, a
+SwiftLint config, StoreKit drift tests, and migration off a Claude model
+whose retirement date had passed — which would have 404'd every single Pro
+and Pro+ AI extraction in production.
+
+CARRIED TO LOOP 11 (not started, and honestly so):
+  US-182  Android remote-to-local sync merge  — Pro+ sync is push-only
+  US-183  Android widget real data            — ships as a static tile
+  US-187  Room schema export                  — no migration safety net
+
+All three need an environment where the Android Gradle build actually runs.
+This one cannot: dl.google.com is blocked by the network policy, so the
+Android Gradle Plugin cannot be resolved. US-187 in particular was
+deliberately NOT faked — Room schema JSON carries identity hashes generated
+by KSP, and a hand-written file would make Room believe a migration had
+already applied. An absent schema is safer than a wrong one.
+
+iOS CI is not green yet. It is several blockers deeper than it has ever
+been, and every remaining failure is now visible in a real log.
+
+— Claude, Loop 10
+================================================================================
+
+  ↻ US-192 follow-up — gated on the wrong signal the first time
+          The first fix resolved a UDID from `simctl list devices available`
+          and the build STILL failed: simctl happily reports devices whose
+          platform Xcode has not installed. CI showed IOS_SIM resolved to a
+          real UDID while the ineligible list said "iOS 18.4 is not
+          installed" — so the download fallback never fired. Rewritten to
+          parse `xcodebuild -showdestinations` and read only the "Available
+          destinations" section, which is xcodebuild's own view of what it
+          will accept. Falls back to -downloadPlatform and dumps the full
+          destination list on failure. Parser verified against a populated
+          section, an empty one, and the dvtdevice placeholder id (which the
+          36-hex-char pattern correctly never matches).
+
+  ↻ US-192 follow-up 2 — my own errexit bug
+          The rewritten step died in 2s with NONE of its diagnostics printed.
+          Cause was in my fix, not the runner: GitHub runs `shell: bash` as
+          `bash --noprofile --norc -e -o pipefail`. Inside avail(), when grep
+          matches nothing it exits 1, pipefail propagates it, and errexit
+          kills the step — before the -downloadPlatform fallback or any echo
+          could run. "No match" is the expected outcome there, not an error.
+          Added a trailing `|| true` to the pipeline. Reproduced the exact
+          failure locally under the same shell flags and verified the fixed
+          version reaches the download branch and exits 0.
+
+  ✓ US-193 Run Android CI on feature-branch pushes  [added mid-loop]
+          android-ci.yml triggered only on push to main and PRs to main, so
+          EVERY Android change in this loop went unvalidated: the real Gradle
+          wrapper (US-172), the settings DSL fix (US-173), release signing
+          (US-174), the lint baseline (US-175), and version codes + Play
+          publishing (US-186) were all reasoned about and locally checked but
+          never machine-built. Same blind spot US-188 fixed for ci.yml.
+          Widened the push filter to '**'. Verified the release job keeps its
+          own `if: github.ref == 'refs/heads/main'` gate, so feature branches
+          run build/lint/test but can never publish to Play Console.
+
+  ✓ US-194 Reconcile declared toolchain versions  [added mid-loop]
+          Three files disagreed. project.yml declared xcodeVersion "26.3" —
+          not a real Xcode version; ci.yml pins 16.3; CLAUDE.md claimed
+          "Xcode 16.3 / Swift 6.2" while the live build log reports Xcode
+          16.3 and Apple Swift 6.1. Set xcodeVersion to 16.3, and corrected
+          CLAUDE.md to distinguish the Swift 6 *language mode*
+          (SWIFT_VERSION = 6.0, correct and unchanged) from the *compiler*
+          version 6.1 — conflating those is what produced the bogus 6.2
+          claim. Not a blocker: XcodeGen tolerated the invalid value, which
+          is exactly why nine loops never noticed it.
+
+  ↻ US-192 follow-up 3 — decouple compiling from bootable devices
+          The diagnostic dump paid off: "Available destinations" on this
+          image lists ONLY placeholders — "Any iOS Device" and "Any iOS
+          Simulator Device" — with no concrete simulator devices at all, and
+          -downloadPlatform produced none. But compiling needs a matching
+          SDK, not a bootable device, and those placeholders are exactly
+          what `generic/platform=iOS Simulator` targets. So build-for-testing
+          and the Watch build now use generic destinations unconditionally.
+          Concrete-device resolution is kept only for the test run, which
+          genuinely needs one; when none exists the resolver warns and
+          leaves IOS_SIM empty, and the test + coverage steps are gated on
+          `env.IOS_SIM != ''` so they SKIP VISIBLY rather than silently
+          passing. This decouples the compile — the single most valuable
+          signal in this pipeline, never once produced in this repo — from
+          whatever runtimes a runner image happens to ship.
+
+  ✓ US-195 Fix the repeated --fail in the Android secret scan  [mid-loop]
+          First Android CI run gave an exact error: "trufflehog: error: flag
+          'fail' cannot be repeated". extra_args passed --fail on top of the
+          one the action already supplies. Every Android secrets-scan run in
+          this repo's history failed on ARGUMENT PARSING, never on a finding
+          — and it retroactively explains the pre-Loop-10 "Secrets Scanning"
+          failures whose logs have aged out. Same defect US-189 removed from
+          ci.yml.
+
+  ✓ US-196 Add the missing Android launcher icon  [added mid-loop]
+          *** The Android app had no icon and could not build at all. ***
+          AndroidManifest.xml has declared android:icon="@mipmap/ic_launcher"
+          since Loop 6, but no mipmap directory ever existed — res/ held only
+          drawable, layout, values, xml. AAPT failed with "resource
+          mipmap/ic_launcher not found", failing :app:processDebugResources,
+          so no Android build could complete in any configuration. Nine loops
+          missed it because Android CI had never run (US-193).
+          minSdk is 29, so every device uses adaptive icons: added
+          mipmap-anydpi-v26/ic_launcher.xml with a #5B7FF5 background (the
+          same accent as the website and iOS icon) and a vector checkmark
+          foreground, plus a monochrome layer for themed icons. The path
+          spans x=34..74 in the 108dp viewport — inside the 72dp safe zone,
+          so no launcher mask clips it. Legacy PNGs at all five densities
+          generated by the repo's OWN gen_icons.py, so the Android icon is
+          brand-identical to the favicons and iOS icon it already produces.
+
+  ALSO VALIDATED by that same run — the Loop 10 Android fixes work:
+          Gradle 8.11.1 wrapper ran (US-172), settings evaluated and the
+          project configured (US-173), and the signing fallback printed
+          exactly as designed: "No release keystore configured (KEYSTORE_FILE
+          unset or missing) — the release build will be unsigned" (US-174).
+          17 tasks executed before the icon failure.
+
+  ✓ US-197 Fix the first real Swift compile errors  [added mid-loop]
+          *** THE COMPILER RAN. *** 358s, 5x longer than any run in this
+          repo's history. Nine loops of Swift, ~14,700 lines, type-checked
+          for the first time — and it reported real errors.
+
+          (1) "enum with raw type cannot have cases with arguments" on
+          MigrationError. Misleading diagnostic: SharedModelContainer.swift
+          imported only SwiftData and os, so LocalizedError was UNRESOLVED,
+          and when Swift can't resolve an enum's inherited type it falls back
+          to treating it as a raw type. Real defect: missing `import
+          Foundation`. Audited the whole tree for the pattern and found three
+          more files (NotificationService, ScreenshotService,
+          AddCommitmentIntent). Fixed all four; audit now clean.
+
+          (2) Swift 6 rejected `static let shared` on WatchSyncService as
+          non-Sendable shared mutable state. The diagnostic was RIGHT — it's
+          @Observable with unguarded state read by SwiftUI. Rather than
+          silence it with nonisolated(unsafe), checked what the code actually
+          does: all six WCSessionDelegate callbacks ALREADY wrap their bodies
+          in `Task { @MainActor in }`. So the state was already main-actor
+          confined; declared the class @MainActor to make that checkable and
+          marked the six witnesses nonisolated. No body changed.
+
+          More compile errors likely remain — the log tail was truncated.
+
+  ✓ US-198 Fix the first real Kotlin compile errors  [added mid-loop]
+          US-196's icon fix let resource linking pass, so
+          :app:compileDebugKotlin ran for the FIRST TIME — and reported
+          errors in Compose UI code from Loops 7-8 that had never compiled.
+          (1) SeddlyNavHost.kt imported ImageVector TWICE verbatim (lines 27
+          and 34) — "Conflicting import: imported name 'ImageVector' is
+          ambiguous". (2) LedgerScreen.kt imported
+          androidx.compose.foundation.lazy.item, which doesn't exist: `item`
+          is a member of LazyListScope, available on the receiver inside a
+          LazyColumn block, not a top-level declaration. Easy mistake, since
+          the sibling `items` IS a real extension — that one is needed and
+          was preserved. Swept the whole Kotlin tree for both patterns: no
+          other duplicates, no other bogus lazy.item.
+
+  ALSO CONFIRMED this run: US-195 worked — "Secrets Scanning" dropped out
+          of the failed-jobs list entirely, and US-196 worked — resource
+          linking passed and the build advanced from 17 to 19 tasks.

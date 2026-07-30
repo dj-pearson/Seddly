@@ -4,7 +4,11 @@ options:
   deploymentTarget:
     iOS: "17.0"
     watchOS: "10.0"
-  xcodeVersion: "26.3"
+  # US-194: this said "26.3", which is not a real Xcode version. CI pins 16.3
+  # and the live build log confirms "Xcode 16.3 (Build version 16E140)".
+  # XcodeGen tolerated the bogus value, so it never broke the build — but it
+  # misleads anyone reading the spec about which toolchain this project targets.
+  xcodeVersion: "16.3"
   createIntermediateGroups: true
   generateEmptyDirectories: true
   groupSortPosition: top
@@ -43,18 +47,16 @@ targets:
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity
         PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-    info:
-      properties:
-        CFBundleURLTypes:
-          - CFBundleURLSchemes:
-              - seddly
       configs:
         Debug:
           CODE_SIGN_STYLE: Automatic
+          # US-176: resolved into aps-environment in Seddly.entitlements.
+          # A Release build must declare "production" or App Store pushes —
+          # including the Pro+ silent-push sync — are delivered to nothing.
+          APS_ENVIRONMENT: development
         Release:
           CODE_SIGN_STYLE: Manual
-    entitlements:
-      path: Seddly/Resources/Seddly.entitlements
+          APS_ENVIRONMENT: production
     dependencies:
       - target: SeddlyShareExtension
       - target: SeddlyWidget
@@ -129,8 +131,35 @@ targets:
           CODE_SIGN_STYLE: Automatic
         Release:
           CODE_SIGN_STYLE: Manual
-    entitlements:
-      path: SeddlyWatch/SeddlyWatch.entitlements
+    dependencies:
+      - target: SeddlyWatchComplication
+    scheme:
+      gatherCoverageData: false
+
+  # US-171: the complication used to live inside the SeddlyWatch app target with
+  # no @main WidgetBundle. WidgetKit only discovers widgets vended by a widget
+  # extension's principal bundle, so it compiled but could never be added to a
+  # watch face. It now has its own extension target, embedded in the watch app.
+  SeddlyWatchComplication:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: SeddlyWatchComplication
+        excludes:
+          - "**/.gitkeep"
+      - path: Seddly/Sources/Shared
+      - path: Seddly/Sources/Models
+    settings:
+      base:
+        INFOPLIST_FILE: SeddlyWatchComplication/Info.plist
+        CODE_SIGN_ENTITLEMENTS: SeddlyWatchComplication/SeddlyWatchComplication.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.pearsonmedia.Seddly.watchkitapp.complication
+        TARGETED_DEVICE_FAMILY: "4"
+      configs:
+        Debug:
+          CODE_SIGN_STYLE: Automatic
+        Release:
+          CODE_SIGN_STYLE: Manual
 
   SeddlyTests:
     type: bundle.unit-test
@@ -139,6 +168,11 @@ targets:
       - path: SeddlyTests
         excludes:
           - "**/.gitkeep"
+      # US-185: StoreKitConfigurationTests reads this to assert the product
+      # identifiers in Seddly.storekit and AppConstants.SubscriptionProductID
+      # cannot drift apart.
+      - path: Seddly/Resources/Seddly.storekit
+        buildPhase: resources
     dependencies:
       - target: Seddly
     settings:

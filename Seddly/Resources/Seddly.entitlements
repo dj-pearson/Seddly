@@ -11,8 +11,15 @@
     <array>
         <string>group.com.pearsonmedia.Seddly</string>
     </array>
+    <!-- US-176: this was hardcoded to "development". An App Store build signed
+         with a development APNs entitlement cannot receive production pushes,
+         which would have silently broken the Pro+ silent-push sync that the
+         send-silent-push Edge Function drives. The value now comes from a
+         per-configuration build setting defined in project.yml — Debug resolves
+         to development, Release to production — so one entitlements file serves
+         both and the two cannot drift apart. -->
     <key>aps-environment</key>
-    <string>development</string>
+    <string>$(APS_ENVIRONMENT)</string>
     <key>com.apple.developer.associated-domains</key>
     <array>
         <string>applinks:seddly.com</string>

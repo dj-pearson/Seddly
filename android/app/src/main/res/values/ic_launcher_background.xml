@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  US-196: brand accent used as the adaptive-icon background layer. Matches the
+  #5B7FF5 accent the website and the iOS icon already use, so the launcher icon
+  is the same blue as the rest of the product.
+-->
+<resources>
+    <color name="ic_launcher_background">#5B7FF5</color>
+</resources>

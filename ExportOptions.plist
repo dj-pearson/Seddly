@@ -21,6 +21,8 @@
         <string>SeddlyWidget_AppStore</string>
         <key>com.pearsonmedia.Seddly.watchkitapp</key>
         <string>SeddlyWatch_AppStore</string>
+        <key>com.pearsonmedia.Seddly.watchkitapp.complication</key>
+        <string>SeddlyWatchComplication_AppStore</string>
     </dict>
 </dict>
 </plist>

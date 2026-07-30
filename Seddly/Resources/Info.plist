@@ -3,6 +3,28 @@
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- US-170: Xcode's "Process Info.plist" step injects CFBundleIdentifier,
+         CFBundleExecutable, and CFBundleName automatically, but NOT the two
+         version keys — those only appear when GENERATE_INFOPLIST_FILE is on,
+         which it is not when INFOPLIST_FILE names a hand-authored plist. Without
+         them, MARKETING_VERSION / CURRENT_PROJECT_VERSION from project.yml never
+         reach any bundle, the release workflow's build-number override is a
+         no-op, and App Store validation rejects the archive. All four targets
+         resolve the same two variables so their versions always match, which
+         App Store Connect requires of app extensions. -->
+    <key>CFBundleShortVersionString</key>
+    <string>$(MARKETING_VERSION)</string>
+    <key>CFBundleVersion</key>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
+    <!-- US-177: without this key, App Store Connect holds every build behind a
+         manual export-compliance questionnaire, so automated TestFlight uploads
+         never finish processing. Seddly qualifies for the exemption: the only
+         cryptography it uses is standard HTTPS/TLS to Supabase (see the
+         NSAppTransportSecurity block below) and Apple-provided platform
+         cryptography via CertificatePinningService and the Keychain. It ships
+         no proprietary or non-standard encryption. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>Seddly reads only your Screenshots album to find commitments, promises, and deadlines. Your personal photos and videos are never accessed.</string>
     <key>NSPhotoLibraryAddUsageDescription</key>
@@ -13,6 +35,23 @@
     <string>Seddly needs full calendar access to create and manage events for your commitment deadlines.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Seddly uses Face ID to keep your commitments and entity profiles private when the app is reopened.</string>
+    <!-- US-169: The seddly:// scheme backs the deep links handled in
+         SeddlyApp.onOpenURL. It previously lived in project.yml under an
+         `info:` block that XcodeGen never applied (a Plist entry requires a
+         `path:`), so the scheme never reached the built bundle and every
+         seddly:// link failed to open the app. Declared here instead, in the
+         Info.plist the target actually processes. -->
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>com.pearsonmedia.Seddly</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>seddly</string>
+            </array>
+        </dict>
+    </array>
     <!-- US-151: Live Activities for the next-due commitment -->
     <key>NSSupportsLiveActivities</key>
     <true/>

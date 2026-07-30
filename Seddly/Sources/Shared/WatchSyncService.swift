@@ -3,6 +3,20 @@ import WatchConnectivity
 import SwiftData
 import Combine
 
+/// US-197: Swift 6 strict concurrency rejected `static let shared` here —
+/// "static property 'shared' is not concurrency-safe because non-'Sendable'
+/// type 'WatchSyncService' may have shared mutable state". The observation is
+/// correct: this type holds unguarded mutable state (`isReachable`,
+/// `syncStatus`, `pendingTransfers`, `modelContainer`) and is `@Observable`,
+/// so SwiftUI reads it from the main actor.
+///
+/// The state was already main-actor-confined in practice — every
+/// WCSessionDelegate callback below already wraps its body in
+/// `Task { @MainActor in ... }`. Declaring the isolation makes that contract
+/// explicit and checkable rather than incidental. The delegate methods are
+/// `nonisolated` because WCSessionDelegate is not main-actor-isolated; their
+/// bodies are unchanged, since they already hop.
+@MainActor
 @Observable
 final class WatchSyncService: NSObject, WCSessionDelegate {
     static let shared = WatchSyncService()
@@ -102,7 +116,7 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
 
     // MARK: - WCSessionDelegate
 
-    func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
+    nonisolated func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         Task { @MainActor in
             if activationState == .activated {
                 self.isReachable = session.isReachable
@@ -113,20 +127,20 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
     }
 
     #if os(iOS)
-    func sessionDidBecomeInactive(_ session: WCSession) {
+    nonisolated func sessionDidBecomeInactive(_ session: WCSession) {
         Task { @MainActor in
             self.syncStatus = .unreachable
         }
     }
 
-    func sessionDidDeactivate(_ session: WCSession) {
+    nonisolated func sessionDidDeactivate(_ session: WCSession) {
         Task { @MainActor in
             self.syncStatus = .unreachable
         }
         session.activate()
     }
 
-    func sessionWatchStateDidChange(_ session: WCSession) {
+    nonisolated func sessionWatchStateDidChange(_ session: WCSession) {
         Task { @MainActor in
             self.isReachable = session.isReachable
             self.syncStatus = session.isReachable ? .synced : .unreachable
@@ -134,7 +148,7 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
     }
     #endif
 
-    func sessionReachabilityDidChange(_ session: WCSession) {
+    nonisolated func sessionReachabilityDidChange(_ session: WCSession) {
         Task { @MainActor in
             self.isReachable = session.isReachable
             self.syncStatus = session.isReachable ? .synced : .unreachable
@@ -144,7 +158,7 @@ final class WatchSyncService: NSObject, WCSessionDelegate {
         }
     }
 
-    func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
+    nonisolated func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         guard let action = userInfo["action"] as? String,
               let commitmentIDString = userInfo["commitmentID"] as? String,
               let commitmentID = UUID(uuidString: commitmentIDString) else { return }

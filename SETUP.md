@@ -207,6 +207,14 @@ Go to **Certificates, Identifiers & Profiles → Profiles → +**
 - Profile Name: `SeddlyWatch_AppStore`
 - Download the `.mobileprovision` file
 
+**Profile 5 — Watch Complication** *(US-171)*
+- Type: App Store Connect
+- App ID: `Seddly Watch Complication (com.pearsonmedia.Seddly.watchkitapp.complication)`
+- Certificate: Select your Apple Distribution certificate
+- Profile Name: `SeddlyWatchComplication_AppStore`
+- Download the `.mobileprovision` file
+- Encode into the `PROVISIONING_PROFILE_WATCH_COMPLICATION` secret
+
 ### 4.5 Encode the Profiles
 
 ```bash
@@ -218,6 +226,38 @@ base64 -i SeddlyShareExt_AppStore.mobileprovision | pbcopy
 ```
 
 **Important:** The profile names `Seddly_AppStore` and `SeddlyShareExt_AppStore` must match what's in `ExportOptions.plist`. If you name them differently in the portal, update `ExportOptions.plist` to match.
+
+### 4.6 APNs Environment — do not hardcode it
+
+`Seddly/Resources/Seddly.entitlements` declares `aps-environment` as
+`$(APS_ENVIRONMENT)`, resolved from a per-configuration build setting in
+`project.yml`:
+
+| Configuration | `APS_ENVIRONMENT` |
+| ------------- | ----------------- |
+| Debug         | `development`     |
+| Release       | `production`      |
+
+This split matters. An App Store build signed with a *development* APNs
+entitlement cannot receive production pushes, which silently breaks the Pro+
+silent-push sync driven by the `send-silent-push` Edge Function — the app
+installs and runs fine, it just never syncs.
+
+If you ever need to change this, change the build setting in `project.yml`. Do
+not hardcode a literal value back into the entitlements file: a single file
+covering both configurations is what stops the two from drifting apart.
+
+### 4.7 Export Compliance
+
+`Info.plist` declares `ITSAppUsesNonExemptEncryption = false`. Without that key,
+App Store Connect holds every build behind a manual export-compliance
+questionnaire and automated TestFlight uploads never finish processing.
+
+The exemption applies because the only cryptography Seddly uses is standard
+HTTPS/TLS to Supabase and Apple-provided platform cryptography (certificate
+pinning, Keychain). **If you ever add proprietary or non-standard encryption,
+this declaration must be revisited** — it is a legal attestation, not a
+convenience flag.
 
 ---
 
@@ -426,6 +466,29 @@ Go to **Settings → Actions → General**
 
 ## 9. StoreKit Product Registration
 
+### 9.0 Fill in the local StoreKit configuration
+
+`Seddly/Resources/Seddly.storekit` drives StoreKit 2 testing in the simulator.
+Three fields are shipped as `REPLACE_WITH_…` placeholders and must be filled in
+from App Store Connect before local purchase testing mirrors production:
+
+| Field | Where to find it |
+| ----- | ---------------- |
+| `settings._applicationInternalID` | App Store Connect → App → App Information → Apple ID |
+| `settings._developerTeamID` | Apple Developer → Membership → Team ID |
+| `subscriptionGroups[].id` and each `subscriptionGroupID` | App Store Connect → Subscriptions → the group's ID |
+
+They are deliberately `REPLACE_WITH_…` strings rather than empty values, so a
+half-configured file is obvious rather than looking like a blank setting.
+`StoreKitConfigurationTests` fails if any of them is blanked out.
+
+The four `productID` values must stay identical to
+`AppConstants.SubscriptionProductID` in `Seddly/Sources/Shared/SharedConstants.swift`.
+`StoreKitConfigurationTests` asserts this in both directions — a product in the
+code with no configuration entry, or a configured product the code never
+resolves, both fail the test suite.
+
+
 ### 9.1 Create the App in App Store Connect
 
 1. Go to https://appstoreconnect.apple.com → My Apps → +
@@ -595,6 +658,7 @@ After all setup is complete and the first build is verified:
 | `PROVISIONING_PROFILE_SHARE_EXT` | `base64 -i SeddlyShareExt_AppStore.mobileprovision` | `release.yml` |
 | `PROVISIONING_PROFILE_WIDGET` | `base64 -i SeddlyWidget_AppStore.mobileprovision` | `release.yml` |
 | `PROVISIONING_PROFILE_WATCH` | `base64 -i SeddlyWatch_AppStore.mobileprovision` | `release.yml` |
+| `PROVISIONING_PROFILE_WATCH_COMPLICATION` | `base64 -i SeddlyWatchComplication_AppStore.mobileprovision` | `release.yml` |
 | `APP_STORE_CONNECT_ISSUER_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect → Integrations → Keys | `release.yml` |
 | `APP_STORE_CONNECT_API_PRIVATE_KEY` | `base64 -i AuthKey_XXXX.p8` | `release.yml` |
@@ -606,7 +670,25 @@ After all setup is complete and the first build is verified:
 | `SUPABASE_PROJECT_REF` | Supabase Studio → Settings → General | `deploy-supabase.yml` |
 | `SUPABASE_ACCESS_TOKEN` | Supabase dashboard → Account → Tokens | `deploy-supabase.yml` |
 
-**Total: 17 GitHub Secrets**
+#### Android release secrets
+
+These were consumed by `android-ci.yml` but had never been documented here.
+
+| Secret Name | Value Source | Used By |
+|-------------|-------------|---------|
+| `ANDROID_KEYSTORE_BASE64` | `base64 -i release.keystore` — the keystore **contents**, not a path | `android-ci.yml` |
+| `ANDROID_KEYSTORE_PASSWORD` | Password set when the keystore was created | `android-ci.yml` |
+| `ANDROID_KEY_ALIAS` | Alias of the signing key inside the keystore | `android-ci.yml` |
+| `ANDROID_KEY_PASSWORD` | Password for that key (often the same as the store password) | `android-ci.yml` |
+| `ANDROID_PLAY_SERVICE_ACCOUNT_JSON` | Google Cloud → IAM → Service Accounts → JSON key, granted release access in Play Console | `android-ci.yml` |
+
+> **US-174:** the workflow previously passed `ANDROID_KEYSTORE_FILE` straight
+> through as a file path. A GitHub secret holds the keystore's *contents*, so
+> the secret is now named `ANDROID_KEYSTORE_BASE64` and the workflow decodes it
+> to a real file under `$RUNNER_TEMP` before building. If you are migrating from
+> the old name, re-add it under the new one.
+
+**Total: 23 GitHub Secrets** (17 Apple/Supabase/Cloudflare + 1 watch complication profile + 5 Android)
 
 ### Supabase Edge Function Environment Variables
 
