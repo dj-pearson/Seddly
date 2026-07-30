@@ -5,9 +5,9 @@
   "ralphLoop": {
     "currentLoop": 10,
     "lastReviewDate": "2026-07-30",
-    "passingCount": 20,
-    "totalCount": 23,
-    "completionRate": "87%",
+    "passingCount": 21,
+    "totalCount": 24,
+    "completionRate": "88%",
     "reviewer": "Claude Code Production Readiness Deep Dive",
     "verdict": "Loop 10 opened. 56/56 historical CI runs failed — the project has never built. 19 stories scoped: 7 build-blocking, 6 ship-blocking, 6 functional/parity gaps."
   },
@@ -446,6 +446,22 @@
       "priority": 23,
       "passes": true,
       "notes": "src/pages/c/[id].astro was a dynamic route with no getStaticPaths(), which a static Astro build requires — 'astro build' failed with GetStaticPathsRequired, so the website has never deployed. Confirmed pre-existing by stashing my changes and rebuilding. Enumerating paths is impossible here: /c/<id> links are keyed by commitment UUID and created by users long after the site is built. Converted the route to a single static shell at src/pages/c/index.astro that reads the id from window.location.pathname at runtime, and added public/_redirects with '/c/*  /c/index.html  200' — a Cloudflare Pages rewrite, not a redirect, so the visitor's URL stays /c/<id> and the link remains shareable. The id is validated against /^[A-Za-z0-9-]{1,64}$/ before being written into the DOM or the seddly:// href, and set via textContent and setAttribute rather than innerHTML. Verified with 8 cases including path traversal (/c/../../etc), encoded markup (/c/%3Cscript%3E), attribute-breakout (/c/a%22onload%3D1), and an over-length id — all rejected. Also replaced the hardcoded placeholder App Store URL (id0000000000) on that page with /download. Build now emits 17 pages and passes the deploy workflow's DOCTYPE and closing-tag validation."
+    },
+    {
+      "id": "US-192",
+      "title": "Resolve simulator destinations at runtime instead of hardcoding device names",
+      "category": "CI/CD — iOS",
+      "description": "As a developer, I need the build steps to target a simulator that actually exists on the runner. ci.yml hardcoded 'platform=iOS Simulator,name=iPhone 16,OS=latest' and 'name=Apple Watch Series 10 (46mm)'. Runner images rotate which simulator runtimes are preinstalled, and the current macos-15 image reported no iOS runtime at all — the only eligible destination was the 'Any iOS Device' placeholder, with 'iOS 18.4 is not installed'. xcodebuild exited 70 with 'Unable to find a destination matching the provided destination specifier'. Found in the first CI run that ever got past project generation.",
+      "acceptanceCriteria": [
+        "No workflow step hardcodes a simulator device name or OS version",
+        "An available iOS and watchOS simulator is discovered at runtime and referenced by UDID",
+        "If the image ships without a runtime, the platform is downloaded rather than failing",
+        "The job fails with a clear message if no simulator can be obtained even after download",
+        "The resolved UDIDs are logged so a destination problem is diagnosable from the run output"
+      ],
+      "priority": 24,
+      "passes": true,
+      "notes": "ci.yml hardcoded 'name=iPhone 16' and 'name=Apple Watch Series 10 (46mm)'. The macos-15 image reported no iOS simulator runtime at all — the only eligible destination was the 'Any iOS Device' placeholder with 'iOS 18.4 is not installed' — so xcodebuild exited 70 with 'Unable to find a destination matching the provided destination specifier'. Replaced with a 'Resolve simulator destinations' step that parses 'xcrun simctl list devices available -j', sorts by runtime identifier so the newest runtime wins, and exports one UDID per platform to GITHUB_ENV; the three build/test steps then use -destination \"id=$IOS_SIM\" / \"id=$WATCH_SIM\". If no runtime is present the step runs 'xcodebuild -downloadPlatform' and re-resolves, and fails with an explicit ::error:: if still empty. Resolved UDIDs are echoed for diagnosability. Verified locally: extracted the exact PICK expression back out of the committed YAML and ran it against sample simctl JSON — it selects the iOS-18-4 device over iOS-18-2, selects the watchOS device, ignores isAvailable:false entries, and returns empty (triggering the download branch) for an empty device set. An earlier draft used a multi-line embedded heredoc that broke the YAML block scalar; caught by parsing the file and rewritten as single-line invocations."
     }
   ]
 }

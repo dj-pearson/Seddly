@@ -87,13 +87,50 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      # US-192: the build steps hardcoded 'name=iPhone 16' and 'name=Apple Watch
+      # Series 10 (46mm)'. Runner images rotate which simulator runtimes are
+      # preinstalled, and this one reported no iOS runtime at all ("iOS 18.4 is
+      # not installed"), so xcodebuild exited 70 with "Unable to find a
+      # destination matching the provided destination specifier". Discover a
+      # real device at runtime instead of asserting one exists, and download the
+      # platform if the image genuinely ships without it.
+      - name: Resolve simulator destinations
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Picks the newest available runtime matching $1 and prints one device UDID.
+          PICK='import json,sys; d=json.load(sys.stdin)["devices"]; c=sorted((r,x["name"],x["udid"]) for r,e in d.items() if sys.argv[1] in r for x in e if x.get("isAvailable")); print(c[-1][2] if c else "")'
+
+          resolve() { xcrun simctl list devices available -j | python3 -c "$PICK" "$1"; }
+
+          IOS_SIM=$(resolve iOS)
+          if [ -z "$IOS_SIM" ]; then
+            echo "No iOS simulator runtime on this image — downloading the platform."
+            xcodebuild -downloadPlatform iOS
+            IOS_SIM=$(resolve iOS)
+          fi
+          [ -n "$IOS_SIM" ] || { echo "::error::No iOS simulator available after download"; exit 1; }
+
+          WATCH_SIM=$(resolve watchOS)
+          if [ -z "$WATCH_SIM" ]; then
+            echo "No watchOS simulator runtime on this image — downloading the platform."
+            xcodebuild -downloadPlatform watchOS
+            WATCH_SIM=$(resolve watchOS)
+          fi
+          [ -n "$WATCH_SIM" ] || { echo "::error::No watchOS simulator available after download"; exit 1; }
+
+          echo "Resolved iOS simulator:     $IOS_SIM"
+          echo "Resolved watchOS simulator: $WATCH_SIM"
+          echo "IOS_SIM=$IOS_SIM" >> "$GITHUB_ENV"
+          echo "WATCH_SIM=$WATCH_SIM" >> "$GITHUB_ENV"
+
       - name: Build for testing
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
             -project Seddly.xcodeproj \
             -scheme Seddly \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "id=$IOS_SIM" \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -106,7 +143,7 @@ jobs:
           xcodebuild build \
             -project Seddly.xcodeproj \
             -scheme SeddlyWatch \
-            -destination 'platform=watchOS Simulator,name=Apple Watch Series 10 (46mm),OS=latest' \
+            -destination "id=$WATCH_SIM" \
             -configuration Debug \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
@@ -129,7 +166,7 @@ jobs:
           xcodebuild test-without-building \
             -project Seddly.xcodeproj \
             -scheme Seddly \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination "id=$IOS_SIM" \
             -configuration Debug \
             -resultBundlePath TestResults.xcresult \
             -enableCodeCoverage YES \

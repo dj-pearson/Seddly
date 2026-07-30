@@ -1585,3 +1585,23 @@ never built. Supabase and website deploys have never completed. Every prior
           .storekit file into the test target as a resource. Verified
           statically: both sets are the same four IDs, no orphans.
           NOT COMPILED — no Swift toolchain here; first built in CI.
+
+  ✓ US-192 Resolve simulator destinations at runtime  [added mid-loop]
+          *** xcodegen generate SUCCEEDED for the first time *** — CI logged
+          "Created project at .../Seddly.xcodeproj". US-169 + US-190 landed.
+          Next blocker: ci.yml hardcoded `name=iPhone 16` and `name=Apple
+          Watch Series 10 (46mm)`, and the macos-15 image reported NO iOS
+          simulator runtime at all (only the "Any iOS Device" placeholder,
+          "iOS 18.4 is not installed"), so xcodebuild exited 70 with
+          "Unable to find a destination matching the provided destination
+          specifier". Replaced with a resolve step that parses `simctl list
+          devices available -j`, sorts by runtime so the newest wins, and
+          exports one UDID per platform; build/test now use
+          -destination "id=$IOS_SIM". Falls back to `xcodebuild
+          -downloadPlatform` if the image ships without a runtime, and
+          fails explicitly if still empty. Verified by extracting the exact
+          expression back out of the committed YAML and running it against
+          sample simctl JSON (picks newest runtime, skips unavailable
+          devices, returns empty for an empty set). An earlier draft used a
+          multi-line heredoc that broke the YAML block scalar — caught by
+          parsing the file, rewritten as single-line invocations.
