@@ -106,12 +106,17 @@ jobs:
           # "Unable to find a destination matching the provided destination
           # specifier" while the ineligible list says "iOS 18.4 is not
           # installed". Gating on xcodebuild's own view avoids that mismatch.
+          # The trailing `|| true` is load-bearing. GitHub runs `shell: bash` as
+          # `bash --noprofile --norc -e -o pipefail`, so when grep matches
+          # nothing it exits 1, pipefail propagates that, and errexit kills the
+          # whole step — before the download fallback or any diagnostic can run.
+          # "No match" is an expected outcome here, not an error.
           avail() {
             xcodebuild -project Seddly.xcodeproj -scheme "$1" -showdestinations 2>/dev/null \
               | sed -n '/Available destinations/,/Ineligible destinations/p' \
               | grep "platform:$2 Simulator" \
               | grep -oE 'id:[0-9A-Fa-f-]{36}' \
-              | head -1 | cut -c4-
+              | head -1 | cut -c4- || true
           }
 
           resolve() { # $1 scheme, $2 platform, $3 env var name
