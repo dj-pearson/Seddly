@@ -555,6 +555,357 @@
       "priority": 30,
       "passes": true,
       "notes": "Two errors, both in Compose UI code from Loops 7-8 that had never been compiled. (1) SeddlyNavHost.kt imported 'androidx.compose.ui.graphics.vector.ImageVector' twice verbatim, at lines 27 and 34; Kotlin rejects the duplicate with \"Conflicting import: imported name 'ImageVector' is ambiguous\" (reported once per occurrence). Removed the later, out-of-order one and kept the alphabetically-placed import. (2) LedgerScreen.kt imported 'androidx.compose.foundation.lazy.item', which does not exist — 'item' is a member function of LazyListScope, available on the scope receiver inside a LazyColumn block, not a top-level declaration. This is an easy mistake because the sibling 'items' IS a real extension function; that import is genuinely needed and was preserved. Swept the whole Kotlin tree for both patterns: no other file has duplicate imports, and no other file imports the non-existent lazy.item. NOT COMPILED LOCALLY — dl.google.com is blocked by this environment's network policy so AGP cannot resolve; CI is the check. More Kotlin errors may remain beyond the tail of the log I could read."
+    },
+    {
+      "id": "LEAP-001",
+      "title": "Entitlement-bound identity so every paid tier actually gets AI, and the server knows who paid",
+      "category": "Monetization - Entitlements",
+      "description": "As a Pro subscriber to Seddly, I need AI extraction to work the moment I pay, without creating an account, so that the $4.99 tier delivers the feature it is sold on. Today extract-commitments and generate-dispute-summary return 401 without a Supabase JWT (extract-commitments/index.ts:168-183, generate-dispute-summary/index.ts:148-163). The only JWT path is Sign in with Apple, rendered only when currentTier == .proPlus (SettingsView.swift:116-133). When the call fails, extractWithAI swallows it with try? and returns 0 (ScreenshotProcessingService.swift:160-162), and the caller still marks the queue item .completed (ScreenshotProcessingService.swift:104). subscription-webhook updates users by apple_transaction_id (subscription-webhook/index.ts:481), a column nothing in the repo ever writes, and send-silent-push only wakes users with a server row (send-silent-push/index.ts:134), so Pro users without one get no background processing. This story replaces all of that with an anonymous identity bound to the App Store transaction: the client sets an appAccountToken, the server verifies the signed transaction, and every AI function gates on users.subscription_tier.",
+      "acceptanceCriteria": [
+        "SubscriptionService.purchase passes a stable appAccountToken (a UUID persisted in the Keychain with the existing whenUnlockedThisDeviceOnly accessibility) on every Product.purchase call",
+        "A new Edge Function exchanges a StoreKit 2 signed transaction (JWS verified against Apple Root CA G3, reusing subscription-webhook's verifier) for a Supabase session tied to that appAccountToken, with no email or Apple ID required",
+        "A migration adds users.app_account_token (unique, indexed); subscription-webhook matches users by appAccountToken or originalTransactionId and writes both on first sight, replacing the apple_transaction_id-only match at index.ts:481",
+        "extract-commitments and generate-dispute-summary read users.subscription_tier and return 403 for free (and generate-dispute-summary for anything below pro_plus), mirroring the check in api-commitments/index.ts:118-128",
+        "The Deno.openKv() rate limiters (extract-commitments/index.ts:97, generate-dispute-summary/index.ts:30, api-commitments/index.ts:36) are replaced by a Postgres-backed limiter table, and a deploy check proves each function boots and answers on the self-hosted edge-runtime",
+        "ScreenshotProcessingService no longer marks a queue item .completed when AI extraction fails; it stays .pending with a stored retry reason that the review queue shows",
+        "A StoreKit test-session test proves a fresh Pro purchase yields a non-nil AuthService.validAccessToken() and a 2xx extraction call; a second test proves a free-tier token gets 403"
+      ],
+      "priority": 31,
+      "passes": false,
+      "notes": "Critic: every code claim in the draft was checked against the repo and holds; added the send-silent-push dependency and the exact openKv sites. The edge-runtime claim is stated as something to prove on deploy, since Seddly has no backend stack on the server yet (hub status not-deployed). Competitive rationale (URLs carried from the draft, not re-fetched in this review): Bloop and CaptainShot sell no-account privacy and run no cloud AI; SnapMind requires an account. Account-free plus server-verified entitlement keeps Seddly's privacy pitch while making paid AI real. Every revenue story below depends on this. Size: L. Success metric: share of Pro/Pro+ extraction calls returning 2xx (target >98%), and webhook user-match rate (target 100% of notifications matched to a users row)."
+    },
+    {
+      "id": "LEAP-002",
+      "title": "Counterparty promise page: a signed, read-only record the other party can confirm or reschedule",
+      "category": "Growth - Viral Loop",
+      "description": "As a renter or freelancer using Seddly, I want to send the person who promised me something a link that shows exactly what they committed to and lets them tap Confirm or Propose new date, so that a nag becomes a two-sided acknowledgement and stronger evidence. Every reminder message already signs off 'Sent via Seddly (seddly.com)' (CommitmentSharingService.swift:27), and the recipient (landlord, contractor, client) is a qualified Seddly prospect. But generateShareableLink builds seddly.com/c/ plus an 8-character UUID prefix (CommitmentSharingService.swift:32-34), and website/src/pages/c/index.astro is a static shell that can only deep-link back into the sender's own app. Nobody else can see anything.",
+      "acceptanceCriteria": [
+        "A migration creates share_records (id, owner_user_id, payload jsonb holding only the user-selected fields, signature, expires_at, revoked_at, response_status, proposed_date, responded_at) with RLS so only the owner can read their rows",
+        "A new Edge Function creates a share record from CommitmentSharingService and returns a token URL with at least 128 bits of entropy, replacing generateShareableLink's 8-character prefix",
+        "A public, rate-limited read Edge Function returns a record by token; website/src/pages/c/index.astro (static, served for /c/* by public/_redirects) fetches it at runtime and renders the selected fields with Confirm and Propose new date actions that need no account",
+        "A recipient response reaches the sender via send-silent-push and updates the LocalCommitment (confirmed flag, or a new deadline entry in its timeline) on next sync or app open",
+        "Share creation shows a preview of exactly which fields leave the device and records the transmission in PrivacyAuditService; raw OCR text and images are never included, asserted by a test over the payload builder",
+        "The page carries a 'Track promises you make to customers' CTA to /download, and public/robots.txt keeps Disallow: /c/",
+        "Links expire (default 30 days) and can be revoked from CommitmentDetailView; an expired or revoked token renders a plain 'no longer available' page, not an error"
+      ],
+      "priority": 32,
+      "passes": false,
+      "notes": "Critic: the draft said the page could render server-side. The website is a static Astro build on Cloudflare Pages with a /c/* rewrite (US-191), so rendering is a runtime fetch from a public Edge Function; criteria fixed. Competitive rationale (draft's citation, not re-fetched): TenantTrace uses two-party co-signing for move-in/out reports only. None of the cited screenshot-to-task apps (Bump, Captr, Bloop) shows the record to the other party. Size: L. Success metric: share links opened per active user per month, recipient response rate, and installs attributed to the /c/ referrer through App Store Connect campaign links."
+    },
+    {
+      "id": "LEAP-003",
+      "title": "Day-one reveal: a backfill that finds real dates and amounts, a paywall on the result, and no false claims on the way",
+      "category": "Growth - Activation",
+      "description": "As a new Seddly user, I want to see 'here are 14 promises already in your camera roll' within a minute of install, with real deadlines and amounts and reminders armed, so that Seddly beats the free built-in screenshot features on the first comparison. Today BackfillView runs for every tier but hard-codes aiEndpoint: nil (BackfillView.swift:188), so even Pro gets the rule path, and that path creates items with entityName 'Unknown', no deadline and no amount (ScreenshotProcessingService.swift:110-118). Deadline notifications are guarded by commitment.deadline != nil, so a rule-based item never schedules one. The paywall the reveal would lead to also shows a fabricated '4.9 - 2,400+ reviews' line and an invented testimonial (SubscriptionView.swift:298-304), and ReferralView promises 'you both get 1 month free' for a code nothing redeems (ReferralView.swift:19, 56). Both are App Review guideline 2.3 risks on the exact screens this funnel routes through.",
+      "acceptanceCriteria": [
+        "RuleFilterService/ScreenshotProcessingService use NSDataDetector to populate deadline, dollarAmount and phone on rule-based commitments, and a conversation-header heuristic replaces 'Unknown' when a name is found",
+        "Deadline notifications fire for rule-based commitments with a detected date",
+        "Pro and Pro+ backfill passes the real extraction endpoint and the LEAP-001 token instead of nil; free backfill stays on device",
+        "The free backfill result screen shows the total found and full detail for the first AppConstants.maxFreeCommitments (5), with the rest blurred, and presents SubscriptionView with the found count in its headline",
+        "The fabricated rating line and testimonial are removed from SubscriptionView; a test asserts no star-rating or review-count string ships in the paywall",
+        "ReferralView's copy promises only what is actually granted until a redemption path exists; the 'you both get 1 month free' lines are removed",
+        "Seddly.storekit and App Store Connect add a 1-week introductory offer to pro.yearly and proplus.yearly (both currently introductoryOffer: null)",
+        "Unit tests cover NSDataDetector extraction on at least 10 fixture OCR strings (relative dates, $ amounts, 'end of week')",
+        "No network call is made during the free backfill, asserted by zero new PrivacyAuditService entries"
+      ],
+      "priority": 33,
+      "passes": false,
+      "notes": "Critic: the draft said free users cannot backfill at all. That is false: BackfillView is presented from OnboardingView.swift:21 and LedgerView.swift:334 for every tier; the real gap is that no tier gets AI on backfill and the rule path extracts almost nothing. The fabricated social proof and the false referral promise were moved here from the replaced LEAP-017 and LEAP-006, because this is the funnel that lands on those screens. The draft's '~5x' RevenueCat figure is removed from the claim; re-read the cited report before quoting any multiple. Competitive rationale (draft's citations, not re-fetched): iOS 26 Visual Intelligence and Pixel Screenshots act on one screenshot at a time; a library-wide promise count is something neither shows. Size: M. Success metric: share of installs completing backfill, trial starts per backfill result view, and trial-to-paid from App Store Connect."
+    },
+    {
+      "id": "LEAP-004",
+      "title": "Sealed evidence: hash at capture, keep the original, embed it in the PDF, verify at seddly.com/verify",
+      "category": "Moat - Evidence Integrity",
+      "description": "As a renter heading into a deposit dispute, I want my Seddly export to include the original screenshots and a code anyone can check, so that my record is worth more than a folder of images. Today the dispute PDF draws text only (DisputeSummaryView.swift:106-162), although every auto commitment carries screenshotAssetID and screenshotDate. Nothing is hashed. Worse, when the user deletes a screenshot from Photos, PhotoCleanupService clears the commitment's reference (PhotoCleanupService.swift:7-30), so the evidence disappears exactly when someone tidies their camera roll. Hash-only sealing keeps 'screenshots never leave the device' intact.",
+      "acceptanceCriteria": [
+        "At ingest, ScreenshotProcessingService stores an evidence copy of the image in the App Group container (file protection complete) and computes SHA-256 over the image bytes, OCR text, PHAsset creationDate and Seddly's recorded date, stored on LocalCommitment as evidenceHash; share-extension items (share- prefixed ids) get the same treatment",
+        "PhotoCleanupService keeps commitments with an evidence copy intact when the Photos asset is deleted, and the detail view says the original was deleted from Photos and a sealed copy remains",
+        "DisputeSummaryView's PDF embeds the evidence image(s) for each commitment in the timeline, with capture date and hash printed beneath each",
+        "On export, a new Edge Function records only the bundle hash (Merkle root over item hashes) plus timestamp in an evidence_seals table; no image or text is uploaded, asserted by a test over the request body",
+        "website/src/pages/verify.astro accepts a code or a PDF and reports seal time and match or no-match via a public read endpoint",
+        "The PDF states 'tamper-evident timeline, not legal advice' and makes no admissibility claim",
+        "The export flow records the seal transmission in PrivacyAuditService",
+        "A test proves that altering one byte of an embedded image changes the bundle hash and fails verification"
+      ],
+      "priority": 34,
+      "passes": false,
+      "notes": "Critic: added the PhotoCleanupService finding, which the draft missed and which would have made embedded originals impossible for any screenshot the user later deleted. Storage cost of evidence copies needs a cap or downscale decision during build. Competitive rationale (draft's citations, not re-fetched): TenantTrace anchors fingerprints in a public verify registry ($9.99 one-time) for move-in/out reports; TenantDesk exports PDF evidence packages. Neither covers promises across chat screenshots with per-entity history. Size: L. Success metric: dispute PDFs exported per month, /verify lookups, and Pro+ conversion among users who open DisputeSummaryView."
+    },
+    {
+      "id": "LEAP-005",
+      "title": "Thread reconstruction: stitch many screenshots into one dated promise timeline",
+      "category": "AI - Differentiation",
+      "description": "As a freelancer chasing a client, I want Seddly to assemble the nine screenshots of one conversation into a single timeline (promise, slip, re-promise, excuse) so that I can show the pattern, not one message. SmartBackfillService already groups related screenshots and exposes combinedText (SmartBackfillService.swift:11-16), but BackfillView only counts the groups (BackfillView.swift:179-181) and then calls processNewScreenshots, which OCRs every asset again and extracts each in isolation. The grouping work is done and thrown away.",
+      "acceptanceCriteria": [
+        "SmartBackfillService's groups become a persisted ConversationThread SwiftData model linking ordered screenshots, de-duplicating overlapping OCR lines, and BackfillView processes threads instead of discarding them (OCR runs once per asset)",
+        "extract-commitments accepts a thread payload (ordered filtered text segments, still no images) and returns linked events: original promise, deadline changes, re-promises, each with source segment indexes",
+        "LocalCommitment gains a timeline of events; CommitmentDetailView renders it with each event linked to its screenshot",
+        "A re-promise updates the deadline while keeping the broken original visible as a 'slipped' event",
+        "DisputeSummaryView's PDF uses the thread timeline when one exists",
+        "Prompt and output schema are covered by fixture tests in supabase/functions/extract-commitments with at least 3 multi-screenshot threads",
+        "A SeddlySchemaVersions migration adds the new models without data loss, covered by a migration test"
+      ],
+      "priority": 35,
+      "passes": false,
+      "notes": "Critic: added the concrete hook that grouping already exists and is discarded, plus the schema-migration criterion SwiftData needs. Competitive rationale (draft's citations, not re-fetched): Bump Task, ScreenshotAI and Bloop extract per screenshot; none of those listings mentions cross-screenshot conversation reconstruction. Size: L. Success metric: share of commitments with 2+ linked events, and dispute exports that include a thread timeline."
+    },
+    {
+      "id": "LEAP-006",
+      "title": "Escalation ladder: overdue promises walk a scheduled path from nudge to formal letter",
+      "category": "Product - Retention",
+      "description": "As a renter whose landlord missed a repair date, I want Seddly to propose the next step on a schedule (friendly nudge, firm reminder, formal letter, case pack) so that broken promises get pursued instead of just turning red. EscalationTemplateService already writes per-category letters, CommitmentSharingService.generateReminderMessage already writes nudges, and StatusUpdateService already marks overdue, but nothing connects them. CustomWorkflow (CustomWorkflow.swift) holds status labels only, with no timing or action. A calendar event from Apple or Bump just expires; Seddly starts a case.",
+      "acceptanceCriteria": [
+        "A per-category default ladder (housing, freelance, purchases, medical, insurance from CommitmentCategory) is defined with step delays and edited in WorkflowManagementView alongside the existing status presets",
+        "StatusUpdateService.updateOverdueStatuses schedules the next ladder step as a local notification with an actionable 'Send' button",
+        "Each step pre-fills from generateReminderMessage or EscalationTemplateService with entity, amount and deadline, opening the share sheet (or the LEAP-002 link) for the user to send",
+        "Sent steps are recorded as timeline events and appear in the dispute PDF",
+        "The final step offers DisputeSummaryView (Pro+) or the LEAP-007 Case Pack",
+        "The user can pause or end a ladder from CommitmentDetailView; a fulfilled or dismissed commitment cancels its pending ladder notifications, covered by a unit test"
+      ],
+      "priority": 36,
+      "passes": false,
+      "notes": "Critic: confirmed not already built (CustomWorkflow is status vocabulary, not a schedule). Seddly never sends on the user's behalf; every step goes through the share sheet. Competitive rationale (draft's citations, not re-fetched): iOS 26 'Add to Calendar' and Bump/ScreenshotAI create events with no follow-through. Size: M. Success metric: share of overdue commitments with at least one ladder step sent, and fulfilment rate after a ladder starts versus before."
+    },
+    {
+      "id": "LEAP-007",
+      "title": "Case Pack: a one-off consumable purchase for a single dispute",
+      "category": "Monetization - New SKU",
+      "description": "As a tenant with one deposit fight, I want to buy a single sealed dispute packet (AI summary, escalation letter, embedded evidence) without subscribing for a year, so that Seddly captures the episodic buyer it currently loses. Disputes are episodic, and Pro+ at $79.99/yr meets that moment against one-time competitors. Generation costs about $0.01-0.03 (Seddly-PRD-v1.md section 8.3), so a consumable is nearly all margin and a natural path into Pro+. The tier check also needs fixing first: refreshSubscriptionStatus maps products by substring, productID.contains(\"proplus\") then contains(\"pro\") (SubscriptionService.swift:52-56), which would grant Pro to any future product id containing 'pro'.",
+      "acceptanceCriteria": [
+        "Seddly.storekit and App Store Connect add a consumable com.pearsonmedia.Seddly.casepack priced in the $9.99-$14.99 band",
+        "SubscriptionService handles consumable transactions and records a case credit server-side (case_credits keyed by app_account_token) through the LEAP-001 transaction exchange",
+        "EntityProfileView shows 'Build case pack' for non-Pro+ users; a purchase unlocks one generate-dispute-summary call plus EscalationLetterView output for that entity",
+        "generate-dispute-summary accepts either pro_plus tier or an unspent case credit and decrements the credit atomically, covered by a concurrency test",
+        "Substring matching in refreshSubscriptionStatus is replaced by an explicit product-to-entitlement map covering every product, with a test that an unmapped product grants nothing",
+        "After a case pack, the paywall offers Pro+ with honest messaging and no fabricated discount"
+      ],
+      "priority": 37,
+      "passes": false,
+      "notes": "Competitive rationale (draft's citation, not re-fetched): TenantTrace sells Pro at $9.99 one-time for the same renter moment. Size: M. Success metric: case pack purchases per 100 entity-profile views, and case-pack-to-Pro+ conversion within 60 days (App Store Connect)."
+    },
+    {
+      "id": "LEAP-008",
+      "title": "Statutory clocks: attach the legal deadline to a housing promise automatically",
+      "category": "Moat - Legal Deadlines",
+      "description": "As a renter who just moved out, I want Seddly to know my state's deposit-return deadline and start the clock the day I hand back the keys, so that I learn the landlord is late on the day they are late, not months later. EscalationTemplateService's housing letter refers generically to 'local tenant protection laws' (EscalationTemplateService.swift:106); nothing in Seddly knows a single real deadline. A sourced per-state table, shared with the LEAP-014 site pages, turns Seddly from a recorder into the thing that knows when a promise becomes a violation.",
+      "acceptanceCriteria": [
+        "A bundled, versioned statutory_deadlines.json (state, rule kind such as deposit_return, days, business-day flag, trigger event, citation URL, checked date) is generated from the same source file as the LEAP-014 website data; entries without a citation are dropped at build, enforced by a test",
+        "Settings gains a state picker stored on device only and never transmitted",
+        "A housing-category commitment offers 'Moved out on <date>', which creates a linked commitment with deadline = trigger + statutory days",
+        "The derived commitment shows the citation and checked date in CommitmentDetailView with 'not legal advice' wording",
+        "When the derived deadline passes, StatusUpdateService marks it overdue and the LEAP-006 ladder starts at the formal-letter step with the citation filled in",
+        "Unit tests cover calendar-day and business-day arithmetic, and a state with no entry yields no clock rather than a guessed default"
+      ],
+      "priority": 38,
+      "passes": false,
+      "notes": "New story, replacing the draft's LEAP-016 scorecard. Seddly's own data model has no notion of a deadline the law sets; this makes the SEO data from LEAP-014 do work inside the product. Competitive rationale (draft's research, not re-fetched): TenantDesk summarises tenant rights in-app but does not tie them to a user's own dated promises. Start with deposit return; extend to repair timelines only where a citation exists. Size: M. Success metric: statutory clocks created per housing commitment, and share of those that end fulfilled versus escalated."
+    },
+    {
+      "id": "LEAP-009",
+      "title": "Import a whole conversation: chat-export text into one dated, attributed thread",
+      "category": "Product - New Capability",
+      "description": "As a freelancer with six months of client chat, I want to share a WhatsApp chat export (.txt or .zip) to Seddly and get every promise with its exact message time and who said it, so that I am not screenshotting forty screens. The share extension accepts images only, at most ten (SeddlyShareExtension/Info.plist:18-22). An export carries sender and timestamp per line, which is stronger evidence than an OCR'd screenshot whose only date is when the screenshot was taken.",
+      "acceptanceCriteria": [
+        "SeddlyShareExtension's activation rule adds plain-text and zip file types; a WhatsApp export parser (iOS and Android export formats, 12 and 24 hour clocks) yields (timestamp, sender, text) rows, tested against at least 6 fixture exports",
+        "Rows feed the LEAP-005 ConversationThread model with message timestamps, so a commitment's date is the message date, not the import date",
+        "The user picks which participant is 'me' once per import, which sets direction once LEAP-010 lands",
+        "RuleFilterService runs on device over every row; only the windows around rule hits go to extract-commitments (Pro), with the count shown before sending and recorded in PrivacyAuditService",
+        "Free tier: import and on-device detection work, subject to maxFreeCommitments",
+        "Media attachments in the export are skipped and the import summary states how many",
+        "A 10,000-line fixture parses in a unit test without exceeding the share extension memory limit"
+      ],
+      "priority": 39,
+      "passes": false,
+      "notes": "New story, replacing the draft's LEAP-017 recovered-money counter. Competitive rationale (draft's citations, not re-fetched): the cited screenshot apps (Bump, Bloop, ScreenshotAI) process images. iMessage has no native export, so iMessage stays covered by screenshots and LEAP-017. Size: M. Success metric: imports per active user and commitments per import, and share of dispute PDFs built from imported threads."
+    },
+    {
+      "id": "LEAP-010",
+      "title": "Two-way ledger: track promises you made, not only ones made to you",
+      "category": "Product - New Capability",
+      "description": "As a contractor who arrived through a customer's Seddly link, I want to track what I promised my customers so that I am the reliable one, which turns the LEAP-002 counterparty CTA into a real product. LocalCommitment has no direction field (LocalCommitment.swift:9-36); every item is implicitly something owed to the user. Seddly's entity model plus a direction gives both sides of every relationship and a per-entity balance.",
+      "acceptanceCriteria": [
+        "LocalCommitment gains direction (theyOwe|iOwe) through a SeddlySchemaVersions migration defaulting existing rows to theyOwe, mirrored in the Supabase commitments table by a migration",
+        "extract-commitments returns which party made the promise using conversation layout; the review queue lets the user flip it",
+        "LedgerView has a segmented control for Owed to me / I owe",
+        "EntityProfileView shows both directions and a net dollar balance; accountabilityScore counts only theyOwe items",
+        "Digest notifications and widgets list my own overdue promises separately",
+        "Confirming a LEAP-002 link from inside Seddly creates an iOwe commitment on the recipient's device"
+      ],
+      "priority": 40,
+      "passes": false,
+      "notes": "Critic: added the accountabilityScore boundary so a user's own lateness does not lower the other party's score. Competitive rationale (draft's citations, not re-fetched): Bump, Captr and Bloop model only the user's tasks, with no counterparty. Size: M. Success metric: share of active users with at least one iOwe commitment, and installs that start from a /c/ link."
+    },
+    {
+      "id": "LEAP-011",
+      "title": "Hedge radar: show soft promises and draft the reply that firms them up",
+      "category": "AI - Differentiation",
+      "description": "As a Seddly user, when someone writes 'I'll try to get that to you next week', I want Seddly to flag it as a hedge, show the words that make it one, and draft a short reply asking for a firm date, so that more promises become enforceable before they slip. extract-commitments already classifies firm_promise vs soft_commitment (extract-commitments/index.ts:23, 46) and LocalCommitment stores it as commitmentTypeRaw, but no view or view model reads commitmentType. The classification is computed, stored and invisible.",
+      "acceptanceCriteria": [
+        "extract-commitments adds hedge_phrases (exact spans) to its output schema; CommitmentDetailView shows the existing commitmentType with those spans highlighted and aiReasoning beneath",
+        "Ledger cards show a 'Soft' badge for softCommitment and FilterView can filter to soft promises",
+        "A 'Firm it up' action generates a polite reply proposing a specific date, editable, sent via the share sheet or the LEAP-002 link",
+        "On-device fallback flags hedge phrases from a curated list in RuleFilterService when AI is unavailable or the user is on Free",
+        "When a soft promise is later confirmed (manually or via LEAP-002), commitmentType becomes firmPromise and the change is recorded on the timeline",
+        "Fixture tests cover at least 20 hedge vs firm examples for both the prompt and the on-device list"
+      ],
+      "priority": 41,
+      "passes": false,
+      "notes": "Critic: the draft proposed a new firmness field; the classifier and storage already exist, so the criteria now reuse commitmentType and the story is about surfacing and acting on it. Still a new user-visible capability, not polish. Competitive rationale (draft's citations, not re-fetched): the cited competitor listings describe date and task extraction only. Size: M. Success metric: share of soft promises that get a 'Firm it up' reply, and share later converted to firm."
+    },
+    {
+      "id": "LEAP-012",
+      "title": "On-device AI extraction with Apple Foundation Models, Claude as the escalation path",
+      "category": "AI - Cost and Privacy",
+      "description": "As a privacy-minded Seddly user on a recent iPhone, I want extraction to run fully on device so that no text leaves my phone, with cloud AI used only for thread reconstruction and dispute summaries. This removes per-call Claude cost from the common case, gives Free users AI-quality items, and answers the no-upload claim of Bloop and CaptainShot while keeping Seddly's commitment schema. The deployment target is iOS 17.0 (project.yml:5), so the path is availability-gated.",
+      "acceptanceCriteria": [
+        "A FoundationModelsExtractionService (if #available iOS 26, model availability checked at runtime) produces the same structured output as extract-commitments via guided generation into a Swift struct",
+        "ScreenshotProcessingService tries on-device first when available, then extract-commitments, then the rule path, recording on each commitment which path ran",
+        "AITextReviewView and PrivacyAuditView state 'processed on device' for on-device items, and no transmission audit entry is written for them",
+        "A Settings toggle 'Never send text to the cloud' forces the on-device or rule path only, asserted by a test that no AIExtractionService request is made",
+        "Parity tests compare on-device vs cloud output on a fixture set and report field-level agreement",
+        "Server-side extraction calls per day are counted in processing_log so the cost reduction is measured, not asserted"
+      ],
+      "priority": 42,
+      "passes": false,
+      "notes": "Competitive rationale (draft's citations, not re-fetched): CaptainShot treats Apple Intelligence as optional with no uploads; Bloop dropped AI credits and keeps everything local. Size: L. Success metric: share of extractions on device, cloud AI cost per active user per month (PRD section 15.4 models about $0.20), and field agreement versus cloud."
+    },
+    {
+      "id": "LEAP-013",
+      "title": "Seddly Business tier for freelancers and contractors",
+      "category": "Monetization - New Tier",
+      "description": "As a freelancer or small contractor, I want a tier built around getting paid: client confirmation links, invoice-promise tracking, a multi-client view and CSV export, so that money disputes have a tool priced for their value. Pro+ at $9.99/mo is the ceiling today, and the LEAP-002 counterparty page and LEAP-010 two-way ledger bring in exactly these users. CustomWorkflow already ships a 'Payment Collection' preset (CustomWorkflow.swift), so the vocabulary exists; the tier, the pricing and the client view do not.",
+      "acceptanceCriteria": [
+        "Seddly.storekit and App Store Connect add business.monthly and business.yearly (target $19.99/$179.99) in the same subscription group, mapped in the LEAP-007 explicit entitlement map",
+        "A 'Clients' view groups entities by client with outstanding amount totals and days overdue",
+        "Invoice promises (amount, due date, entity, invoice number) can be created from a screenshot or manually",
+        "Business users get unlimited LEAP-002 links with their own display name on the page",
+        "DataExportService adds a per-client CSV of outstanding promises",
+        "subscription_tier gains 'business' through a migration; api-commitments and the AI functions treat business as a superset of pro_plus, covered by function tests",
+        "SubscriptionView presents Free plus three paid tiers with an honest feature comparison"
+      ],
+      "priority": 43,
+      "passes": false,
+      "notes": "Critic: the draft said 'three tiers'; with Free it is four columns. Competitive rationale: Seddly-PRD-v1.md section 14 benchmarks contract tools at $25-500+/mo; the draft cites consumer screenshot apps topping out around $5.99-12.99 (SnapMind, Bump listings, not re-fetched). Size: L. Success metric: Business share of new paid subscriptions and ARPPU lift (App Store Connect)."
+    },
+    {
+      "id": "LEAP-014",
+      "title": "Programmatic dispute-letter pages with a sourced fact per page, and real store links",
+      "category": "Growth - SEO",
+      "description": "As a tenant searching '[state] security deposit return deadline letter', I want a page that gives me the deadline, its source and a letter, ending with 'Seddly fills this in from your screenshots', so that dispute intent finds Seddly. The existing blog and use-case pages (website/src/pages/blog, use-cases) prove the intent, and EscalationTemplateService already holds per-category letter text. Every page would currently end at a dead end, though: download.astro's store buttons link to /support (download.astro:28, 35) and BaseLayout ships the literal APPSTORE_ID placeholder in its smart-banner meta (BaseLayout.astro:53).",
+      "acceptanceCriteria": [
+        "A data file in website/src/data/ lists per-state deposit return deadlines, each with a citation URL and checked date; entries without a source are dropped at build, and LEAP-008 consumes the same file",
+        "website/src/pages/letters/[state].astro generates a page per sourced state (getStaticPaths over the data file) with the deadline, citation and a letter rendered from the same template text as EscalationTemplateService",
+        "Further source-gated families cover marketplace non-delivery and unpaid invoice after Net 30",
+        "@astrojs/sitemap replaces the hand-written public/sitemap.xml and IndexNow is pinged on deploy",
+        "Each page carries 'not legal advice' wording and a CTA to /download",
+        "download.astro and BaseLayout.astro read store URLs and the App Store id from config; a placeholder value renders a 'coming soon' state and omits the apple-itunes-app meta instead of shipping APPSTORE_ID",
+        "A build test fails if any generated page lacks a citation or if the built HTML contains APPSTORE_ID"
+      ],
+      "priority": 44,
+      "passes": false,
+      "notes": "Critic: folded the store-link placeholders in from the replaced launch-funnel story, since programmatic pages are worthless if the CTA leads to /support. Hub-side changes (giving seddly a domain in hub/projects.json) belong to the Server repo, not this PRD, and stay out until seddly.com serves. Competitive rationale (draft's citations, not re-fetched): no tenant-side promise tracker found ranking for this intent; DIY guides rank today. Size: M. Success metric: indexed generated pages, organic clicks once Search Console is wired, and /download visits from /letters/."
+    },
+    {
+      "id": "LEAP-015",
+      "title": "Capture in one press: Action Button, Control Center and Back Tap process the latest screenshot",
+      "category": "Product - Capture",
+      "description": "As a Pro user, I want to press the Action Button right after taking a screenshot and see the extracted promise within seconds, so that capture does not wait for background processing iOS may defer for hours. Auto-scan depends on BGAppRefreshTask and silent push, which Seddly-PRD-v1.md section 5.2 calls supplementary. The App Intents in AddCommitmentIntent.swift cover manual add, view overdue, mark fulfilled, check entity and update deadline; none processes a screenshot.",
+      "acceptanceCriteria": [
+        "A ProcessLatestScreenshotIntent fetches the newest screenshot via ScreenshotService and runs ScreenshotProcessingService on that one asset",
+        "The intent ships as an App Shortcut, as an iOS 18 ControlWidget in SeddlyWidget (availability-gated, deployment target stays 17.0), and is documented in-app for Back Tap",
+        "The result appears via LiveActivityService, or a notification when Live Activities are off, with entity, deadline, amount and an Undo action",
+        "Free users get on-device rule extraction within maxFreeCommitments; Pro uses AI through the LEAP-001 token",
+        "An asset already in ProcessingQueue is not processed twice, covered by a unit test",
+        "An intent unit test runs the path end to end against a fixture asset"
+      ],
+      "priority": 45,
+      "passes": false,
+      "notes": "New story, replacing the draft's LEAP-006 referral loop (already planned in Seddly-PRD-v1.md section 11.3 and half-built as ReferralView; its false copy is fixed in LEAP-003, and LEAP-002 is the stronger viral loop). Competitive rationale: the draft's own research cites Bump capturing via Back Tap and Action Button (listing not re-fetched). Size: M. Success metric: share of commitments captured via the intent, and median screenshot-to-commitment time."
+    },
+    {
+      "id": "LEAP-016",
+      "title": "Promises made on the phone: on-device voice-note capture",
+      "category": "Product - Capture",
+      "description": "As someone whose contractor makes promises on calls, I want to dictate a twenty-second note right after hanging up ('Mike said the part arrives Thursday, $340') and get a structured commitment, so that promises that never reach a screen get tracked too. Seddly's inputs are screenshots, the share sheet, the clipboard (ClipboardMonitorService) and manual entry; CommitmentSource has only auto, manual and shareSheet. Calls, where contractors and landlords make many of their promises, have no capture path.",
+      "acceptanceCriteria": [
+        "A voice-note entry in ManualEntryView and as an App Shortcut transcribes with on-device speech recognition only (requiresOnDeviceRecognition = true); no audio or transcript leaves the device unless the user then sends text to extract-commitments",
+        "The transcript runs through RuleFilterService and the LEAP-003 NSDataDetector extraction, and for Pro with consent through extract-commitments; the result opens prefilled for review",
+        "CommitmentSource gains voiceNote, and the dispute PDF labels these entries as the user's own note with its recording time, never as the counterparty's words",
+        "NSMicrophoneUsageDescription and NSSpeechRecognitionUsageDescription are added to Info.plist and PrivacyInfo.xcprivacy is updated",
+        "Audio is discarded after transcription unless the user keeps it, in which case it stays in the app container",
+        "If on-device recognition is unavailable for the locale, the feature says so and offers typing; it never falls back to server recognition"
+      ],
+      "priority": 46,
+      "passes": false,
+      "notes": "New story, replacing the draft's LEAP-014 waitlist (S-size site plumbing; its store-link half moved to LEAP-014). Recording calls themselves was considered and left out: two-party consent laws make it a liability, so this is a note to self. Competitive rationale: the cited screenshot competitors capture images only; OurFamilyWizard and TalkingParents (draft's pricing URLs, not re-fetched) capture calls only inside their own platforms. Size: M. Success metric: voice-note commitments per active user, and share of them later marked fulfilled or escalated."
+    },
+    {
+      "id": "LEAP-017",
+      "title": "Seddly in Messages: an iMessage extension to log and confirm promises inside the thread",
+      "category": "Platform - Reach",
+      "description": "As a Seddly user texting my landlord, I want to drop a promise card into the conversation that the other person can confirm with one tap, so that capture happens at the source rather than after a screenshot. Seddly-PRD-v1.md section 13 already names Messages extensions as a way to diversify input beyond PhotoKit; no target exists in project.yml. Every card is a Seddly impression on the counterparty.",
+      "acceptanceCriteria": [
+        "A new iMessage app extension target is added in project.yml sharing the App Group, with a shared scheme and CI build",
+        "The extension creates a promise card (what, who, when, amount) from typed input",
+        "The card is an MSMessage carrying a LEAP-002 share link; the recipient sees a rich bubble, and without Seddly installed the link opens the /c/ page with Confirm and Propose new date",
+        "Responses update the sender's LocalCommitment through the LEAP-002 response path",
+        "Creating a card writes a PrivacyAuditService entry listing the fields sent",
+        "Free tier allows cards within maxFreeCommitments"
+      ],
+      "priority": 47,
+      "passes": false,
+      "notes": "Critic: dropped 'from the last copied text', which would read the pasteboard from an extension and trigger the iOS paste prompt every time. Competitive rationale (draft's citations, not re-fetched): OurFamilyWizard and TalkingParents capture at the source only inside their own messaging; screenshot apps capture after the fact. Size: L. Success metric: promise cards sent per active user and counterparty confirm rate."
+    },
+    {
+      "id": "LEAP-018",
+      "title": "Shared household ledger for co-parents and caregivers via CloudKit sharing",
+      "category": "Product - Segment Expansion",
+      "description": "As a co-parent, I want to share one ledger of commitments and agreed schedule changes with my co-parent, so that both of us see the same record without a $110-$300/yr court platform. Pro+ is already familyShareable in Seddly.storekit (proplus.monthly and proplus.yearly), but refreshSubscriptionStatus ignores ownership type and there is no way to share data. A CloudKit-shared zone opens the expansion segment in Seddly-PRD-v1.md section 3.4 without a Seddly server ever holding the data.",
+      "acceptanceCriteria": [
+        "App Store Connect family sharing matches Seddly.storekit, and refreshSubscriptionStatus grants Pro+ for transactions with ownershipType .familyShared, covered by a StoreKit test",
+        "The Seddly target gains an iCloud/CloudKit container entitlement, and a new SharedLedgerService uses CKShare on a dedicated zone for commitments marked shared; private commitments never enter it, asserted by a test",
+        "CommitmentDetailView has a 'Share with household' toggle and shows who added each entry",
+        "Edits from either participant appear as timeline events with author and time",
+        "Leaving a share removes the zone from the leaver's device and is recorded in PrivacyAuditService",
+        "DisputeSummaryView can export a shared ledger timeline"
+      ],
+      "priority": 48,
+      "passes": false,
+      "notes": "Critic: the draft asked to 'enable Family Sharing on Pro+'; Seddly.storekit already has familyShareable: true on both Pro+ products, so the criterion now targets the real gaps (ownership type, CloudKit entitlement). Competitive rationale (draft's citations, not re-fetched): OurFamilyWizard $110-$299.88/yr, TalkingParents $7-$32/mo. Size: L. Success metric: Pro+ subscriptions with a shared ledger, and family-shared entitlements in App Store Connect."
+    },
+    {
+      "id": "LEAP-019",
+      "title": "Outbound webhooks for Pro+ and Business so other tools hear about overdue and kept promises",
+      "category": "Platform - Integrations",
+      "description": "As a freelancer who lives in Notion or Todoist, I want Seddly to push new, overdue and kept promises to my tools, so that Seddly becomes the accountability layer under the tools I already use. APIAccessView advertises Zapier webhooks, Notion and Airtable (APIAccessView.swift:105-109), but api-commitments is request-response only: it already supports GET, POST, PATCH and DELETE (api-commitments/index.ts:161-168) and pushes nothing. Server-side state exists only for Pro+ users whose data SyncService uploads, so events derive from sync.",
+      "acceptanceCriteria": [
+        "A migration adds webhooks (user_id, url, secret hash, events[], active) and webhook_deliveries with retry state, under RLS",
+        "An Edge Function delivers HMAC-signed events for commitment.created, commitment.overdue, commitment.fulfilled and share.responded, triggered from synced commitment changes, with exponential retry and a dead-letter state",
+        "APIAccessView lets Pro+/Business users add, test and revoke webhook URLs, shows recent delivery status, and states that only synced commitments emit events",
+        "APIAccessView's Zapier, Notion and Airtable lines describe what actually exists, with the existing PATCH endpoint documented as the path for marking a promise kept from outside",
+        "Each delivery is recorded in privacy_audit_log with the fields sent",
+        "Function tests cover signature verification, retry backoff, and that a revoked webhook receives nothing"
+      ],
+      "priority": 49,
+      "passes": false,
+      "notes": "Critic: the draft required api-commitments to 'accept PATCH'; it already does (index.ts:166), so that criterion was replaced. The EventKit back-link criterion was dropped: CalendarService writes calendar events, and a completed calendar event has no completion callback to listen to. Competitive rationale (draft's citations, not re-fetched): Bump and Clutch export to Reminders, Things, Notion and Todoist; none of those listings mentions overdue or kept events. Size: M. Success metric: Pro+/Business users with an active webhook, and their 90-day retention versus users without one."
+    },
+    {
+      "id": "LEAP-020",
+      "title": "Seddly for Mac: capture desktop screenshots and email promises",
+      "category": "Platform - Reach",
+      "description": "As a freelancer who works on a laptop, I want Seddly on the Mac to watch my screenshots folder and accept shared email text, syncing to my iPhone ledger, so that client promises made in Slack, email and web portals are captured where they happen. project.yml declares iOS and watchOS deployment targets only. Seddly's freelancer segment lives on the desktop, and the draft's research cites CaptainShot shipping on Mac.",
+      "acceptanceCriteria": [
+        "project.yml adds a macOS destination for the Seddly target (SwiftUI multiplatform) with platform conditions around PhotoKit-only services (ScreenshotService, PhotoCleanupService, BackgroundTaskService), and CI builds it",
+        "A FolderWatchService monitors a user-chosen screenshots folder with security-scoped bookmarks and runs Vision OCR plus the existing pipeline",
+        "A macOS Share Extension accepts text and images from Mail and browsers",
+        "Commitments sync to iOS via the Pro+ SyncService or the LEAP-018 CloudKit zone",
+        "A menu bar extra shows the next deadline and overdue count",
+        "Free tier limits match iOS, enforced by the same AppConstants"
+      ],
+      "priority": 50,
+      "passes": false,
+      "notes": "Competitive rationale (draft's citations, not re-fetched): CaptainShot runs on iPhone, iPad and Mac; Bump is phone-only. Lowest priority because it depends on LEAP-001 identity and a sync path, and the desktop segment is best reached after LEAP-013 gives freelancers a tier. Size: L. Success metric: Mac installs and share of paid users active on two devices."
     }
   ]
 }
