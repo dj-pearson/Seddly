@@ -570,7 +570,7 @@
         "ScreenshotProcessingService no longer marks a queue item .completed when AI extraction fails; it stays .pending with a stored retry reason that the review queue shows",
         "A StoreKit test-session test proves a fresh Pro purchase yields a non-nil AuthService.validAccessToken() and a 2xx extraction call; a second test proves a free-tier token gets 403"
       ],
-      "priority": 31,
+      "priority": 13.05,
       "passes": false,
       "notes": "Critic: every code claim in the draft was checked against the repo and holds; added the send-silent-push dependency and the exact openKv sites. The edge-runtime claim is stated as something to prove on deploy, since Seddly has no backend stack on the server yet (hub status not-deployed). Competitive rationale (URLs carried from the draft, not re-fetched in this review): Bloop and CaptainShot sell no-account privacy and run no cloud AI; SnapMind requires an account. Account-free plus server-verified entitlement keeps Seddly's privacy pitch while making paid AI real. Every revenue story below depends on this. Size: L. Success metric: share of Pro/Pro+ extraction calls returning 2xx (target >98%), and webhook user-match rate (target 100% of notifications matched to a users row)."
     },
@@ -588,7 +588,7 @@
         "The page carries a 'Track promises you make to customers' CTA to /download, and public/robots.txt keeps Disallow: /c/",
         "Links expire (default 30 days) and can be revoked from CommitmentDetailView; an expired or revoked token renders a plain 'no longer available' page, not an error"
       ],
-      "priority": 32,
+      "priority": 13.1,
       "passes": false,
       "notes": "Critic: the draft said the page could render server-side. The website is a static Astro build on Cloudflare Pages with a /c/* rewrite (US-191), so rendering is a runtime fetch from a public Edge Function; criteria fixed. Competitive rationale (draft's citation, not re-fetched): TenantTrace uses two-party co-signing for move-in/out reports only. None of the cited screenshot-to-task apps (Bump, Captr, Bloop) shows the record to the other party. Size: L. Success metric: share links opened per active user per month, recipient response rate, and installs attributed to the /c/ referrer through App Store Connect campaign links."
     },
@@ -608,7 +608,7 @@
         "Unit tests cover NSDataDetector extraction on at least 10 fixture OCR strings (relative dates, $ amounts, 'end of week')",
         "No network call is made during the free backfill, asserted by zero new PrivacyAuditService entries"
       ],
-      "priority": 33,
+      "priority": 13.14,
       "passes": false,
       "notes": "Critic: the draft said free users cannot backfill at all. That is false: BackfillView is presented from OnboardingView.swift:21 and LedgerView.swift:334 for every tier; the real gap is that no tier gets AI on backfill and the rule path extracts almost nothing. The fabricated social proof and the false referral promise were moved here from the replaced LEAP-017 and LEAP-006, because this is the funnel that lands on those screens. The draft's '~5x' RevenueCat figure is removed from the claim; re-read the cited report before quoting any multiple. Competitive rationale (draft's citations, not re-fetched): iOS 26 Visual Intelligence and Pixel Screenshots act on one screenshot at a time; a library-wide promise count is something neither shows. Size: M. Success metric: share of installs completing backfill, trial starts per backfill result view, and trial-to-paid from App Store Connect."
     },
@@ -627,7 +627,7 @@
         "The export flow records the seal transmission in PrivacyAuditService",
         "A test proves that altering one byte of an embedded image changes the bundle hash and fails verification"
       ],
-      "priority": 34,
+      "priority": 13.19,
       "passes": false,
       "notes": "Critic: added the PhotoCleanupService finding, which the draft missed and which would have made embedded originals impossible for any screenshot the user later deleted. Storage cost of evidence copies needs a cap or downscale decision during build. Competitive rationale (draft's citations, not re-fetched): TenantTrace anchors fingerprints in a public verify registry ($9.99 one-time) for move-in/out reports; TenantDesk exports PDF evidence packages. Neither covers promises across chat screenshots with per-entity history. Size: L. Success metric: dispute PDFs exported per month, /verify lookups, and Pro+ conversion among users who open DisputeSummaryView."
     },
@@ -645,7 +645,7 @@
         "Prompt and output schema are covered by fixture tests in supabase/functions/extract-commitments with at least 3 multi-screenshot threads",
         "A SeddlySchemaVersions migration adds the new models without data loss, covered by a migration test"
       ],
-      "priority": 35,
+      "priority": 13.24,
       "passes": false,
       "notes": "Critic: added the concrete hook that grouping already exists and is discarded, plus the schema-migration criterion SwiftData needs. Competitive rationale (draft's citations, not re-fetched): Bump Task, ScreenshotAI and Bloop extract per screenshot; none of those listings mentions cross-screenshot conversation reconstruction. Size: L. Success metric: share of commitments with 2+ linked events, and dispute exports that include a thread timeline."
     },
@@ -662,7 +662,7 @@
         "The final step offers DisputeSummaryView (Pro+) or the LEAP-007 Case Pack",
         "The user can pause or end a ladder from CommitmentDetailView; a fulfilled or dismissed commitment cancels its pending ladder notifications, covered by a unit test"
       ],
-      "priority": 36,
+      "priority": 13.29,
       "passes": false,
       "notes": "Critic: confirmed not already built (CustomWorkflow is status vocabulary, not a schedule). Seddly never sends on the user's behalf; every step goes through the share sheet. Competitive rationale (draft's citations, not re-fetched): iOS 26 'Add to Calendar' and Bump/ScreenshotAI create events with no follow-through. Size: M. Success metric: share of overdue commitments with at least one ladder step sent, and fulfilment rate after a ladder starts versus before."
     },
@@ -679,7 +679,7 @@
         "Substring matching in refreshSubscriptionStatus is replaced by an explicit product-to-entitlement map covering every product, with a test that an unmapped product grants nothing",
         "After a case pack, the paywall offers Pro+ with honest messaging and no fabricated discount"
       ],
-      "priority": 37,
+      "priority": 13.33,
       "passes": false,
       "notes": "Competitive rationale (draft's citation, not re-fetched): TenantTrace sells Pro at $9.99 one-time for the same renter moment. Size: M. Success metric: case pack purchases per 100 entity-profile views, and case-pack-to-Pro+ conversion within 60 days (App Store Connect)."
     },
@@ -696,7 +696,7 @@
         "When the derived deadline passes, StatusUpdateService marks it overdue and the LEAP-006 ladder starts at the formal-letter step with the citation filled in",
         "Unit tests cover calendar-day and business-day arithmetic, and a state with no entry yields no clock rather than a guessed default"
       ],
-      "priority": 38,
+      "priority": 13.38,
       "passes": false,
       "notes": "New story, replacing the draft's LEAP-016 scorecard. Seddly's own data model has no notion of a deadline the law sets; this makes the SEO data from LEAP-014 do work inside the product. Competitive rationale (draft's research, not re-fetched): TenantDesk summarises tenant rights in-app but does not tie them to a user's own dated promises. Start with deposit return; extend to repair timelines only where a citation exists. Size: M. Success metric: statutory clocks created per housing commitment, and share of those that end fulfilled versus escalated."
     },
@@ -714,7 +714,7 @@
         "Media attachments in the export are skipped and the import summary states how many",
         "A 10,000-line fixture parses in a unit test without exceeding the share extension memory limit"
       ],
-      "priority": 39,
+      "priority": 13.43,
       "passes": false,
       "notes": "New story, replacing the draft's LEAP-017 recovered-money counter. Competitive rationale (draft's citations, not re-fetched): the cited screenshot apps (Bump, Bloop, ScreenshotAI) process images. iMessage has no native export, so iMessage stays covered by screenshots and LEAP-017. Size: M. Success metric: imports per active user and commitments per import, and share of dispute PDFs built from imported threads."
     },
@@ -731,7 +731,7 @@
         "Digest notifications and widgets list my own overdue promises separately",
         "Confirming a LEAP-002 link from inside Seddly creates an iOwe commitment on the recipient's device"
       ],
-      "priority": 40,
+      "priority": 13.48,
       "passes": false,
       "notes": "Critic: added the accountabilityScore boundary so a user's own lateness does not lower the other party's score. Competitive rationale (draft's citations, not re-fetched): Bump, Captr and Bloop model only the user's tasks, with no counterparty. Size: M. Success metric: share of active users with at least one iOwe commitment, and installs that start from a /c/ link."
     },
@@ -748,7 +748,7 @@
         "When a soft promise is later confirmed (manually or via LEAP-002), commitmentType becomes firmPromise and the change is recorded on the timeline",
         "Fixture tests cover at least 20 hedge vs firm examples for both the prompt and the on-device list"
       ],
-      "priority": 41,
+      "priority": 13.52,
       "passes": false,
       "notes": "Critic: the draft proposed a new firmness field; the classifier and storage already exist, so the criteria now reuse commitmentType and the story is about surfacing and acting on it. Still a new user-visible capability, not polish. Competitive rationale (draft's citations, not re-fetched): the cited competitor listings describe date and task extraction only. Size: M. Success metric: share of soft promises that get a 'Firm it up' reply, and share later converted to firm."
     },
@@ -765,7 +765,7 @@
         "Parity tests compare on-device vs cloud output on a fixture set and report field-level agreement",
         "Server-side extraction calls per day are counted in processing_log so the cost reduction is measured, not asserted"
       ],
-      "priority": 42,
+      "priority": 13.57,
       "passes": false,
       "notes": "Competitive rationale (draft's citations, not re-fetched): CaptainShot treats Apple Intelligence as optional with no uploads; Bloop dropped AI credits and keeps everything local. Size: L. Success metric: share of extractions on device, cloud AI cost per active user per month (PRD section 15.4 models about $0.20), and field agreement versus cloud."
     },
@@ -783,7 +783,7 @@
         "subscription_tier gains 'business' through a migration; api-commitments and the AI functions treat business as a superset of pro_plus, covered by function tests",
         "SubscriptionView presents Free plus three paid tiers with an honest feature comparison"
       ],
-      "priority": 43,
+      "priority": 13.62,
       "passes": false,
       "notes": "Critic: the draft said 'three tiers'; with Free it is four columns. Competitive rationale: Seddly-PRD-v1.md section 14 benchmarks contract tools at $25-500+/mo; the draft cites consumer screenshot apps topping out around $5.99-12.99 (SnapMind, Bump listings, not re-fetched). Size: L. Success metric: Business share of new paid subscriptions and ARPPU lift (App Store Connect)."
     },
@@ -801,7 +801,7 @@
         "download.astro and BaseLayout.astro read store URLs and the App Store id from config; a placeholder value renders a 'coming soon' state and omits the apple-itunes-app meta instead of shipping APPSTORE_ID",
         "A build test fails if any generated page lacks a citation or if the built HTML contains APPSTORE_ID"
       ],
-      "priority": 44,
+      "priority": 13.67,
       "passes": false,
       "notes": "Critic: folded the store-link placeholders in from the replaced launch-funnel story, since programmatic pages are worthless if the CTA leads to /support. Hub-side changes (giving seddly a domain in hub/projects.json) belong to the Server repo, not this PRD, and stay out until seddly.com serves. Competitive rationale (draft's citations, not re-fetched): no tenant-side promise tracker found ranking for this intent; DIY guides rank today. Size: M. Success metric: indexed generated pages, organic clicks once Search Console is wired, and /download visits from /letters/."
     },
@@ -818,7 +818,7 @@
         "An asset already in ProcessingQueue is not processed twice, covered by a unit test",
         "An intent unit test runs the path end to end against a fixture asset"
       ],
-      "priority": 45,
+      "priority": 13.71,
       "passes": false,
       "notes": "New story, replacing the draft's LEAP-006 referral loop (already planned in Seddly-PRD-v1.md section 11.3 and half-built as ReferralView; its false copy is fixed in LEAP-003, and LEAP-002 is the stronger viral loop). Competitive rationale: the draft's own research cites Bump capturing via Back Tap and Action Button (listing not re-fetched). Size: M. Success metric: share of commitments captured via the intent, and median screenshot-to-commitment time."
     },
@@ -835,7 +835,7 @@
         "Audio is discarded after transcription unless the user keeps it, in which case it stays in the app container",
         "If on-device recognition is unavailable for the locale, the feature says so and offers typing; it never falls back to server recognition"
       ],
-      "priority": 46,
+      "priority": 13.76,
       "passes": false,
       "notes": "New story, replacing the draft's LEAP-014 waitlist (S-size site plumbing; its store-link half moved to LEAP-014). Recording calls themselves was considered and left out: two-party consent laws make it a liability, so this is a note to self. Competitive rationale: the cited screenshot competitors capture images only; OurFamilyWizard and TalkingParents (draft's pricing URLs, not re-fetched) capture calls only inside their own platforms. Size: M. Success metric: voice-note commitments per active user, and share of them later marked fulfilled or escalated."
     },
@@ -852,7 +852,7 @@
         "Creating a card writes a PrivacyAuditService entry listing the fields sent",
         "Free tier allows cards within maxFreeCommitments"
       ],
-      "priority": 47,
+      "priority": 13.81,
       "passes": false,
       "notes": "Critic: dropped 'from the last copied text', which would read the pasteboard from an extension and trigger the iOS paste prompt every time. Competitive rationale (draft's citations, not re-fetched): OurFamilyWizard and TalkingParents capture at the source only inside their own messaging; screenshot apps capture after the fact. Size: L. Success metric: promise cards sent per active user and counterparty confirm rate."
     },
@@ -869,7 +869,7 @@
         "Leaving a share removes the zone from the leaver's device and is recorded in PrivacyAuditService",
         "DisputeSummaryView can export a shared ledger timeline"
       ],
-      "priority": 48,
+      "priority": 13.86,
       "passes": false,
       "notes": "Critic: the draft asked to 'enable Family Sharing on Pro+'; Seddly.storekit already has familyShareable: true on both Pro+ products, so the criterion now targets the real gaps (ownership type, CloudKit entitlement). Competitive rationale (draft's citations, not re-fetched): OurFamilyWizard $110-$299.88/yr, TalkingParents $7-$32/mo. Size: L. Success metric: Pro+ subscriptions with a shared ledger, and family-shared entitlements in App Store Connect."
     },
@@ -886,7 +886,7 @@
         "Each delivery is recorded in privacy_audit_log with the fields sent",
         "Function tests cover signature verification, retry backoff, and that a revoked webhook receives nothing"
       ],
-      "priority": 49,
+      "priority": 13.9,
       "passes": false,
       "notes": "Critic: the draft required api-commitments to 'accept PATCH'; it already does (index.ts:166), so that criterion was replaced. The EventKit back-link criterion was dropped: CalendarService writes calendar events, and a completed calendar event has no completion callback to listen to. Competitive rationale (draft's citations, not re-fetched): Bump and Clutch export to Reminders, Things, Notion and Todoist; none of those listings mentions overdue or kept events. Size: M. Success metric: Pro+/Business users with an active webhook, and their 90-day retention versus users without one."
     },
@@ -903,7 +903,7 @@
         "A menu bar extra shows the next deadline and overdue count",
         "Free tier limits match iOS, enforced by the same AppConstants"
       ],
-      "priority": 50,
+      "priority": 13.95,
       "passes": false,
       "notes": "Competitive rationale (draft's citations, not re-fetched): CaptainShot runs on iPhone, iPad and Mac; Bump is phone-only. Lowest priority because it depends on LEAP-001 identity and a sync path, and the desktop segment is best reached after LEAP-013 gives freelancers a tier. Size: L. Success metric: Mac installs and share of paid users active on two devices."
     }
